@@ -1,5 +1,5 @@
 // =====================================================
-// FIREBASE CONFIG - реальные данные проекта
+// FIREBASE CONFIG
 // =====================================================
 const firebaseConfig = {
   apiKey: "AIzaSyC0GD7ZMnm-ooiY0_jQUym3-mKM-tkd7sk",
@@ -11,60 +11,39 @@ const firebaseConfig = {
   measurementId: "G-YCP8PWH5JV"
 };
 
-// Защита от двойной инициализации
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
 
-const auth    = firebase.auth();
-const db      = firebase.firestore();
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+// FIX 1: Safari блокирует WebChannel (XMLHttpRequest CORS ошибка)
+// experimentalForceLongPolling решает это для Firebase v8
+db.settings({ experimentalForceLongPolling: true, merge: true });
 
 // =====================================================
-// ГЛОБАЛЬНЫЕ УТИЛИТЫ
+// УТИЛИТЫ
 // =====================================================
 
 let currentUser     = null;
 let currentUserData = null;
 
 function onAuthReady(callback) {
-  console.log('Проверка аутентификации Firebase...');
   auth.onAuthStateChanged(async function(user) {
-    console.log('Статус пользователя:', user ? 'авторизован' : 'не авторизован');
     if (user) {
-      console.log('UID пользователя:', user.uid);
-      console.log('Email пользователя:', user.email);
       currentUser = user;
       try {
-        console.log('Загрузка данных из Firestore...');
         var snap = await db.collection('users').doc(user.uid).get();
-        console.log('Документ существует:', snap.exists);
-        if (snap.exists) {
-          currentUserData = snap.data();
-          console.log('Данные пользователя загружены:', currentUserData);
-        } else {
-          console.log('Документ пользователя не найден');
-          currentUserData = null;
-        }
-        
-        // Если данных нет, подождать и попробовать снова
-        if (!currentUserData) {
-          console.log('Повторная попытка загрузки через 1 секунду...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          snap = await db.collection('users').doc(user.uid).get();
-          currentUserData = snap.exists ? snap.data() : null;
-          console.log('Результат повторной загрузки:', currentUserData);
-        }
+        currentUserData = snap.exists ? snap.data() : null;
       } catch(e) {
-        console.error('Ошибка загрузки данных пользователя:', e);
-        console.error('Код ошибки:', e.code);
-        console.error('Сообщение:', e.message);
+        console.warn('onAuthReady: не удалось загрузить профиль', e.message);
         currentUserData = null;
       }
     } else {
       currentUser     = null;
       currentUserData = null;
     }
-    console.log('Вызов callback с данными:', {user: !!user, data: !!currentUserData});
     callback(user, currentUserData);
   });
 }
@@ -102,7 +81,16 @@ function showToast(message, type) {
   setTimeout(function() { toast.className = 'toast'; }, 3000);
 }
 
-// Аватар — просто сохраняем URL в Firestore (без Storage)
+// FIX 2: безопасное получение массива из Firestore-документа
+// Firestore может вернуть undefined, null или не-массив — защищаемся
+function safeArray(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  // Иногда Firestore возвращает объект {0:'a',1:'b'} — конвертируем
+  if (typeof val === 'object') return Object.values(val);
+  return [];
+}
+
 async function saveAvatarUrl(uid, url) {
   if (!url) return;
   await db.collection('users').doc(uid).update({ avatar: url });

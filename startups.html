@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Стартапы — LaunchPad</title>
@@ -129,7 +130,7 @@
         s.name?.toLowerCase().includes(search) ||
         s.tagline?.toLowerCase().includes(search) ||
         s.description?.toLowerCase().includes(search) ||
-        (s.tags||[]).some(t => t.toLowerCase().includes(search));
+        safeArray(s.tags).some(t => t.toLowerCase().includes(search));
       const matchCat   = !category || s.category === category;
       const matchStage = !stage    || s.stage === stage;
       return matchSearch && matchCat && matchStage;
@@ -164,7 +165,7 @@
         <div class="startup-tile__footer">
           <span class="badge badge--green">${s.stage||'Идея'}</span>
           <span class="badge badge--gray">${s.category||''}</span>
-          ${(s.tags||[]).slice(0,2).map(t=>`<span class="badge badge--gray">${t}</span>`).join('')}
+          ${safeArray(s.tags).slice(0,2).map(t=>`<span class="badge badge--gray">${t}</span>`).join('')}
         </div>
       </a>`).join('') + '</div>';
   }

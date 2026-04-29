@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Стартап — LaunchPad</title>
@@ -194,7 +195,7 @@
 
     if (startupData.tags?.length) {
       document.getElementById('tagsCard').style.display = 'block';
-      document.getElementById('tagsList').innerHTML = startupData.tags.map(t =>
+      document.getElementById('tagsList').innerHTML = safeArray(startupData.tags).map(t =>
         `<span class="badge badge--gray">${t}</span>`).join('');
     }
 
@@ -311,9 +312,9 @@
     // Check existing invite
     const existing = await db.collection('invites')
       .where('fromUid','==', currentUser.uid)
-      .where('startupId','==', startupId)
-      .where('status','==','pending').get();
-    if (!existing.empty) { showToast('Ты уже подал заявку на этот стартап', 'warn'); return; }
+      .where('startupId','==', startupId).get();
+    const alreadySent = existing.docs.some(d => d.data().status === 'pending');
+    if (alreadySent) { showToast('Ты уже подал заявку на этот стартап', 'warn'); return; }
 
     await db.collection('invites').add({
       fromUid: currentUser.uid,

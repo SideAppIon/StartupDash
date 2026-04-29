@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Мой профиль — LaunchPad</title>
@@ -188,10 +189,6 @@
   onAuthReady(async function(user, data) {
     if (!user) return;
     userData = data;
-    if (!userData) {
-      console.error('Данные пользователя не загружены');
-      return;
-    }
     var role = userData.role;
     var av   = userData.avatar || ('https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(userData.name || 'U'));
 
@@ -208,7 +205,7 @@
     document.getElementById('viewBio').textContent = userData.bio || 'Пока ничего не написано.';
 
     // Skills
-    var skills = userData.skills || [];
+    var skills = safeArray(userData.skills);
     document.getElementById('viewSkills').innerHTML = skills.length
       ? skills.map(function(s){ return '<span class="badge badge--gray">' + s + '</span>'; }).join(' ')
       : '<span style="color:var(--text3);font-size:14px;">Не указаны</span>';
@@ -248,7 +245,7 @@
       document.getElementById('editTelegram').value = userData.telegram || '';
       document.getElementById('editLinkedIn').value = userData.linkedIn || '';
       document.getElementById('editGitHub').value   = userData.gitHub   || '';
-      editSkillsArr = (userData.skills || []).slice();
+      editSkillsArr = safeArray(userData.skills).slice();
       renderEditSkills();
       document.getElementById('editMode').style.display = 'block';
       document.getElementById('viewMode').style.display = 'none';

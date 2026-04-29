@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Участники — LaunchPad</title>
@@ -91,7 +92,7 @@
       const matchSearch = !search ||
         m.name?.toLowerCase().includes(search) ||
         m.bio?.toLowerCase().includes(search) ||
-        (m.skills||[]).some(s => s.toLowerCase().includes(search));
+        safeArray(m.skills).some(s => s.toLowerCase().includes(search));
       return matchRole && matchSearch;
     });
 
@@ -106,7 +107,7 @@
     }
     el.innerHTML = '<div class="members-grid">' + members.map(m => {
       const av = m.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(m.name||'U')}`;
-      const skills = (m.skills||[]).slice(0,4);
+      const skills = safeArray(m.skills).slice(0,4);
       return `
         <a class="member-card" href="member.html?uid=${m.uid}">
           <div class="member-card__top">
@@ -119,7 +120,7 @@
           <div class="member-card__bio">${m.bio||'Пока ничего не написано'}</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;">
             ${skills.map(s=>`<span class="badge badge--gray">${s}</span>`).join('')}
-            ${(m.skills||[]).length>4?`<span class="badge badge--gray">+${m.skills.length-4}</span>`:''}
+            ${safeArray(m.skills).length>4?`<span class="badge badge--gray">+${safeArray(m.skills).length-4}</span>`:''}
           </div>
         </a>`;
     }).join('') + '</div>';
