@@ -188,6 +188,10 @@
   onAuthReady(async function(user, data) {
     if (!user) return;
     userData = data;
+    if (!userData) {
+      console.error('Данные пользователя не загружены');
+      return;
+    }
     var role = userData.role;
     var av   = userData.avatar || ('https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(userData.name || 'U'));
 

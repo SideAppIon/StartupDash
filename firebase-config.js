@@ -33,7 +33,14 @@ function onAuthReady(callback) {
       try {
         var snap = await db.collection('users').doc(user.uid).get();
         currentUserData = snap.exists ? snap.data() : null;
+        // Если данных нет, подождать немного и попробовать снова
+        if (!currentUserData) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          snap = await db.collection('users').doc(user.uid).get();
+          currentUserData = snap.exists ? snap.data() : null;
+        }
       } catch(e) {
+        console.error('Ошибка загрузки данных пользователя:', e);
         currentUserData = null;
       }
     } else {
