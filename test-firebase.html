@@ -18,6 +18,7 @@
     <button onclick="testAuth()">Тест аутентификации</button>
     <button onclick="testFirestore()">Тест Firestore</button>
     <button onclick="testRules()">Тест правил</button>
+    <button onclick="createUserDoc()">Создать документ пользователя</button>
     <button onclick="clearLogs()">Очистить логи</button>
     
     <div id="logs"></div>
@@ -116,6 +117,43 @@
                 
             } catch (error) {
                 log(`❌ Ошибка правил: ${error.message}`, 'error');
+            }
+        }
+
+        async function createUserDoc() {
+            log('🔧 Создание документа пользователя...', 'log');
+            
+            const user = auth.currentUser;
+            if (!user) {
+                log('❌ Сначала авторизуйтесь', 'error');
+                return;
+            }
+            
+            try {
+                const userData = {
+                    uid: user.uid,
+                    name: user.displayName || 'Пользователь',
+                    email: user.email,
+                    role: 'startup', // По умолчанию стартапер
+                    bio: '',
+                    avatar: '',
+                    skills: [],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection('users').doc(user.uid).set(userData);
+                log('✅ Документ пользователя создан успешно', 'success');
+                log(`Данные: ${JSON.stringify(userData)}`, 'success');
+                
+                // Проверяем создание
+                const checkDoc = await db.collection('users').doc(user.uid).get();
+                if (checkDoc.exists) {
+                    log('✅ Документ подтвержден в базе данных', 'success');
+                }
+                
+            } catch (error) {
+                log(`❌ Ошибка создания документа: ${error.message}`, 'error');
+                log(`Код ошибки: ${error.code}`, 'error');
             }
         }
 
