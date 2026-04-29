@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Мои стартапы — LaunchPad</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .startup-row {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 24px;
+      display: flex; gap: 20px; align-items: flex-start;
+      margin-bottom: 16px; transition: border-color .2s;
+    }
+    .startup-row:hover { border-color: var(--border2); }
+    .startup-row__logo {
+      width: 64px; height: 64px; border-radius: 16px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 34px; flex-shrink: 0;
+    }
+    .startup-row__name { font-family: var(--font-head); font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .startup-row__tagline { font-size: 14px; color: var(--text2); margin-bottom: 12px; }
+    .startup-row__meta { display: flex; gap: 10px; flex-wrap: wrap; }
+    .startup-row__actions { margin-left: auto; display: flex; flex-direction: column; gap: 8px; }
+    .mini-stat { text-align: center; }
+    .mini-stat__num { font-family: var(--font-head); font-size: 22px; font-weight: 700; color: var(--accent); }
+    .mini-stat__label { font-size: 11px; color: var(--text3); }
+    .stats-row { display: flex; gap: 24px; margin-left: 16px; padding-left: 16px; border-left: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <div class="nav__user">
+    <a href="dashboard.html" class="btn btn--ghost btn--sm">← Дашборд</a>
+    <span class="nav__role nav__role--startup" id="navRole">Стартапер</span>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="window.location='profile.html'"/>
+    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(()=>window.location.href='index.html')">Выйти</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="container--md">
+    <div class="section-header" style="margin-bottom:32px;">
+      <div>
+        <h1 class="page-title">Мои стартапы</h1>
+        <p class="page-subtitle">Управляй своими проектами</p>
+      </div>
+      <a href="create-startup.html" class="btn btn--primary">+ Создать стартап</a>
+    </div>
+
+    <div id="content"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  requireAuth('login.html');
+
+  onAuthReady(async (user, userData) => {
+    if (!user) return;
+    if (userData?.role !== 'startup' && userData?.role !== 'admin') {
+      window.location.href = 'dashboard.html'; return;
+    }
+    const av = userData.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(userData.name)}`;
+    document.getElementById('navAvatar').src = av;
+
+    const snap = await db.collection('startups').where('ownerUid','==', user.uid).orderBy('createdAt','desc').get();
+    const startups = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const el = document.getElementById('content');
+
+    if (!startups.length) {
+      el.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state__icon">🚀</div>
+          <div class="empty-state__title">Ещё нет стартапов</div>
+          <p style="font-size:14px;margin-bottom:24px;">Создай первый проект и начни привлекать команду и инвесторов</p>
+          <a href="create-startup.html" class="btn btn--primary btn--lg">Создать первый стартап</a>
+        </div>`;
+      return;
+    }
+
+    let html = '';
+    for (const s of startups) {
+      const [teamSnap, updSnap, invSnap] = await Promise.all([
+        db.collection('startups').doc(s.id).collection('team').get(),
+        db.collection('startups').doc(s.id).collection('updates').get(),
+        db.collection('invites').where('startupId','==',s.id).where('status','==','pending').get()
+      ]);
+
+      html += `
+        <div class="startup-row">
+          <div class="startup-row__logo">${s.emoji||'🚀'}</div>
+          <div style="flex:1;min-width:0;">
+            <div class="startup-row__name">${s.name}</div>
+            <div class="startup-row__tagline">${s.tagline||''}</div>
+            <div class="startup-row__meta">
+              <span class="badge badge--green">${s.stage||'Идея'}</span>
+              <span class="badge badge--gray">${s.category||''}</span>
+              ${invSnap.size > 0 ? `<span class="badge badge--red">📩 ${invSnap.size} заявок</span>` : ''}
+            </div>
+          </div>
+          <div class="stats-row">
+            <div class="mini-stat">
+              <div class="mini-stat__num">${teamSnap.size + 1}</div>
+              <div class="mini-stat__label">В команде</div>
+            </div>
+            <div class="mini-stat">
+              <div class="mini-stat__num">${updSnap.size}</div>
+              <div class="mini-stat__label">Обновлений</div>
+            </div>
+          </div>
+          <div class="startup-row__actions">
+            <a href="startup.html?id=${s.id}" class="btn btn--outline btn--sm">👁 Открыть</a>
+            <a href="update-startup.html?id=${s.id}" class="btn btn--primary btn--sm">+ Обновление</a>
+            <a href="create-startup.html?edit=${s.id}" class="btn btn--ghost btn--sm">✏️ Редактировать</a>
+            <button class="btn btn--danger btn--sm" onclick="deleteMyStartup('${s.id}','${s.name}')">✕ Удалить</button>
+          </div>
+        </div>`;
+    }
+    el.innerHTML = html;
+  });
+
+  async function deleteMyStartup(id, name) {
+    if (!confirm(`Удалить стартап "${name}"? Это действие нельзя отменить.`)) return;
+    await db.collection('startups').doc(id).delete();
+    showToast('Стартап удалён', 'success');
+    setTimeout(() => location.reload(), 800);
+  }
+</script>
+</body>
+</html>

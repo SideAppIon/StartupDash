@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Мой профиль — LaunchPad</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .profile-header {
+      background:var(--bg2);border-bottom:1px solid var(--border);
+      padding:40px 0;
+    }
+    .profile-header__inner { display:flex;gap:28px;align-items:center; }
+    .avatar-upload { position:relative;cursor:pointer; }
+    .avatar-upload input { display:none; }
+    .avatar-upload__overlay {
+      position:absolute;inset:0;border-radius:50%;
+      background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;
+      opacity:0;transition:opacity .2s;font-size:22px;
+    }
+    .avatar-upload:hover .avatar-upload__overlay { opacity:1; }
+    .profile-name { font-family:var(--font-head);font-size:28px;font-weight:800;margin-bottom:6px; }
+    .skill-tag {
+      display:inline-flex;align-items:center;gap:6px;
+      background:var(--bg3);border:1px solid var(--border2);
+      border-radius:20px;font-size:13px;padding:5px 14px;
+    }
+    .skill-tag button { background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px; }
+    .skill-tag button:hover{color:var(--danger);}
+    .skills-wrap { display:flex;flex-wrap:wrap;gap:8px;margin-top:8px; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <div class="nav__user">
+    <a href="dashboard.html" class="btn btn--ghost btn--sm">← Дашборд</a>
+    <span class="nav__role" id="navRole"></span>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
+    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(()=>window.location.href='index.html')">Выйти</button>
+  </div>
+</nav>
+
+<div id="loadingState" style="padding:140px 0;text-align:center;"><div class="spinner"></div></div>
+
+<div id="pageContent" style="display:none;">
+  <div class="profile-header">
+    <div class="container">
+      <div class="profile-header__inner">
+        <label class="avatar-upload" title="Нажми чтобы изменить аватар">
+          <img id="profileAvatar" class="avatar avatar--xl" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
+          <div class="avatar-upload__overlay">📷</div>
+          <input type="file" id="avatarInput" accept="image/*" onchange="uploadNewAvatar(this)"/>
+        </label>
+        <div>
+          <h1 class="profile-name" id="profileName"></h1>
+          <div style="margin-bottom:12px;">
+            <span class="nav__role" id="profileRole"></span>
+          </div>
+          <p style="color:var(--text2);font-size:14px;" id="profileEmail"></p>
+        </div>
+        <button class="btn btn--outline" style="margin-left:auto;" onclick="toggleEdit()" id="editBtn">✏️ Редактировать</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" style="padding-top:32px;">
+    <div class="container--md">
+      <!-- View Mode -->
+      <div id="viewMode">
+        <div class="grid-2">
+          <div>
+            <div class="card" style="margin-bottom:20px;">
+              <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px;">О себе</h3>
+              <p id="viewBio" style="color:var(--text2);font-size:14px;line-height:1.7;white-space:pre-wrap;"></p>
+            </div>
+            <div class="card">
+              <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px;">Навыки</h3>
+              <div class="skills-wrap" id="viewSkills"></div>
+            </div>
+          </div>
+          <div>
+            <div class="card" style="margin-bottom:20px;">
+              <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px;">Контакты</h3>
+              <div id="viewContacts" style="font-size:14px;"></div>
+            </div>
+            <div class="card" id="myStartupsCard" style="display:none;">
+              <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px;">Мои стартапы</h3>
+              <div id="myStartupsList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Mode -->
+      <div id="editMode" style="display:none;">
+        <div class="card">
+          <h2 style="font-family:var(--font-head);font-size:22px;font-weight:700;margin-bottom:24px;">Редактировать профиль</h2>
+
+          <div class="form-group">
+            <label class="form-label">Имя и фамилия *</label>
+            <input type="text" class="form-input" id="editName" maxlength="80"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">О себе</label>
+            <textarea class="form-textarea" id="editBio" placeholder="Расскажи о своём опыте, целях, чем занимаешься..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Навыки</label>
+            <div style="display:flex;gap:8px;">
+              <input type="text" class="form-input" id="skillInput" placeholder="React, Python, Дизайн..." onkeydown="if(event.key==='Enter'){event.preventDefault();addSkill()}"/>
+              <button class="btn btn--outline" onclick="addSkill()">+</button>
+            </div>
+            <div class="skills-wrap" id="editSkills"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Telegram</label>
+            <input type="text" class="form-input" id="editTelegram" placeholder="@username"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">LinkedIn</label>
+            <input type="url" class="form-input" id="editLinkedIn" placeholder="https://linkedin.com/in/..."/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">GitHub</label>
+            <input type="url" class="form-input" id="editGitHub" placeholder="https://github.com/..."/>
+          </div>
+
+          <div style="display:flex;gap:12px;margin-top:8px;">
+            <button class="btn btn--primary btn--lg" onclick="saveProfile()">💾 Сохранить</button>
+            <button class="btn btn--ghost" onclick="toggleEdit()">Отмена</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  requireAuth('login.html');
+
+  const ROLE_LABELS = {startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'};
+  let editSkillsArr = [];
+  let userData = null;
+
+  onAuthReady(async (user, data) => {
+    if (!user) return;
+    userData = data;
+
+    const role = userData.role;
+    const av = userData.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(userData.name)}`;
+
+    document.getElementById('navRole').textContent = ROLE_LABELS[role];
+    document.getElementById('navRole').className = `nav__role nav__role--${role}`;
+    document.getElementById('navAvatar').src = av;
+    document.getElementById('profileAvatar').src = av;
+    document.getElementById('profileName').textContent = userData.name;
+    document.getElementById('profileEmail').textContent = userData.email;
+    const pr = document.getElementById('profileRole');
+    pr.textContent = ROLE_LABELS[role]; pr.className = `nav__role nav__role--${role}`;
+
+    // View mode
+    document.getElementById('viewBio').textContent = userData.bio || 'Пользователь пока ничего не написал о себе.';
+
+    const skills = userData.skills || [];
+    document.getElementById('viewSkills').innerHTML = skills.length
+      ? skills.map(s => `<span class="badge badge--gray">${s}</span>`).join('')
+      : '<span style="color:var(--text3);font-size:14px;">Навыки не указаны</span>';
+
+    const contacts = [];
+    if (userData.telegram) contacts.push(`<div style="margin-bottom:8px;">📱 <a href="https://t.me/${userData.telegram.replace('@','')}" target="_blank" style="color:var(--accent);">${userData.telegram}</a></div>`);
+    if (userData.linkedIn) contacts.push(`<div style="margin-bottom:8px;">💼 <a href="${userData.linkedIn}" target="_blank" style="color:var(--accent);">LinkedIn</a></div>`);
+    if (userData.gitHub)   contacts.push(`<div style="margin-bottom:8px;">🐙 <a href="${userData.gitHub}" target="_blank" style="color:var(--accent);">GitHub</a></div>`);
+    document.getElementById('viewContacts').innerHTML = contacts.join('') || '<span style="color:var(--text3);font-size:14px;">Контакты не указаны</span>';
+
+    // My startups (if startup role)
+    if (role === 'startup') {
+      const sSnap = await db.collection('startups').where('ownerUid','==',user.uid).get();
+      if (!sSnap.empty) {
+        document.getElementById('myStartupsCard').style.display = 'block';
+        document.getElementById('myStartupsList').innerHTML = sSnap.docs.map(d => {
+          const s = d.data();
+          return `<a href="startup.html?id=${d.id}" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px;">
+            <span style="font-size:24px;">${s.emoji||'🚀'}</span>
+            <div><div style="font-size:14px;font-weight:500;">${s.name}</div><div style="font-size:12px;color:var(--text2);">${s.stage||''}</div></div>
+          </a>`;
+        }).join('');
+      }
+    }
+
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('pageContent').style.display = 'block';
+  });
+
+  function toggleEdit() {
+    const isEdit = document.getElementById('editMode').style.display !== 'none';
+    if (isEdit) {
+      document.getElementById('editMode').style.display = 'none';
+      document.getElementById('viewMode').style.display = 'block';
+      document.getElementById('editBtn').textContent = '✏️ Редактировать';
+    } else {
+      // Fill edit form
+      document.getElementById('editName').value = userData.name || '';
+      document.getElementById('editBio').value = userData.bio || '';
+      document.getElementById('editTelegram').value = userData.telegram || '';
+      document.getElementById('editLinkedIn').value = userData.linkedIn || '';
+      document.getElementById('editGitHub').value = userData.gitHub || '';
+      editSkillsArr = [...(userData.skills || [])];
+      renderEditSkills();
+
+      document.getElementById('editMode').style.display = 'block';
+      document.getElementById('viewMode').style.display = 'none';
+      document.getElementById('editBtn').textContent = '← Назад';
+    }
+  }
+
+  function addSkill() {
+    const input = document.getElementById('skillInput');
+    const val = input.value.trim();
+    if (val && !editSkillsArr.includes(val) && editSkillsArr.length < 15) {
+      editSkillsArr.push(val); renderEditSkills();
+    }
+    input.value = '';
+  }
+
+  function removeSkill(s) { editSkillsArr = editSkillsArr.filter(x=>x!==s); renderEditSkills(); }
+
+  function renderEditSkills() {
+    document.getElementById('editSkills').innerHTML = editSkillsArr.map(s =>
+      `<span class="skill-tag">${s}<button onclick="removeSkill('${s}')">×</button></span>`).join('');
+  }
+
+  async function saveProfile() {
+    const name = document.getElementById('editName').value.trim();
+    if (!name) { showToast('Введи имя', 'error'); return; }
+
+    const updates = {
+      name,
+      bio: document.getElementById('editBio').value.trim(),
+      skills: editSkillsArr,
+      telegram: document.getElementById('editTelegram').value.trim(),
+      linkedIn: document.getElementById('editLinkedIn').value.trim(),
+      gitHub: document.getElementById('editGitHub').value.trim(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    try {
+      await db.collection('users').doc(currentUser.uid).update(updates);
+      Object.assign(userData, updates);
+      document.getElementById('profileName').textContent = name;
+      toggleEdit();
+      showToast('Профиль сохранён!', 'success');
+    } catch(e) {
+      showToast('Ошибка: ' + e.message, 'error');
+    }
+  }
+
+  async function uploadNewAvatar(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { showToast('Файл слишком большой (макс. 3МБ)', 'error'); return; }
+
+    showToast('Загружаем...', 'warn');
+    try {
+      const url = await uploadAvatar(file, currentUser.uid);
+      await db.collection('users').doc(currentUser.uid).update({ avatar: url });
+      document.getElementById('profileAvatar').src = url;
+      document.getElementById('navAvatar').src = url;
+      userData.avatar = url;
+      showToast('Аватар обновлён!', 'success');
+    } catch(e) {
+      showToast('Ошибка загрузки: ' + e.message, 'error');
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Вход — LaunchPad</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+    .auth-box { width:100%; max-width:420px; padding:24px; }
+    .auth-logo {
+      font-family:var(--font-head); font-size:26px; font-weight:800;
+      color:var(--accent); text-decoration:none; display:block;
+      text-align:center; margin-bottom:32px;
+    }
+    .auth-logo span{color:var(--text);}
+    .auth-title { font-family:var(--font-head); font-size:28px; font-weight:800; letter-spacing:-1px; margin-bottom:6px; text-align:center; }
+    .auth-sub { color:var(--text2); font-size:14px; text-align:center; margin-bottom:32px; }
+    .auth-link { text-align:center; font-size:14px; color:var(--text2); margin-top:20px; }
+    .auth-link a { color:var(--accent); text-decoration:none; font-weight:500; }
+    .forgot { font-size:13px; color:var(--text3); text-align:right; margin-top:-12px; margin-bottom:16px; cursor:pointer; }
+    .forgot:hover { color:var(--accent); }
+  </style>
+</head>
+<body>
+
+<div class="auth-box">
+  <a href="index.html" class="auth-logo">Launch<span>Pad</span></a>
+  <h1 class="auth-title">Добро пожаловать</h1>
+  <p class="auth-sub">Войди в свой аккаунт</p>
+
+  <div class="card">
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-input" id="emailInput" placeholder="ivan@example.com" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <div class="form-group" style="margin-bottom:8px">
+      <label class="form-label">Пароль</label>
+      <input type="password" class="form-input" id="passInput" placeholder="Ваш пароль" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <div class="forgot" onclick="resetPassword()">Забыл пароль?</div>
+    <div id="formError" class="form-error" style="display:none;margin-bottom:12px;"></div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center;" id="submitBtn" onclick="doLogin()">
+      Войти
+    </button>
+  </div>
+
+  <p class="auth-link">Нет аккаунта? <a href="register.html">Зарегистрироваться</a></p>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  redirectIfAuth('dashboard.html');
+
+  async function doLogin() {
+    const email = document.getElementById('emailInput').value.trim();
+    const pass  = document.getElementById('passInput').value;
+    const btn   = document.getElementById('submitBtn');
+    const err   = document.getElementById('formError');
+
+    err.style.display = 'none';
+    if (!email || !pass) { showErr('Заполни все поля'); return; }
+
+    btn.disabled = true; btn.textContent = 'Вход...';
+    try {
+      await auth.signInWithEmailAndPassword(email, pass);
+      window.location.href = 'dashboard.html';
+    } catch(e) {
+      const map = {
+        'auth/user-not-found': 'Пользователь не найден',
+        'auth/wrong-password': 'Неверный пароль',
+        'auth/invalid-email': 'Неверный email',
+        'auth/invalid-credential': 'Неверный email или пароль'
+      };
+      showErr(map[e.code] || 'Ошибка входа');
+      btn.disabled = false; btn.textContent = 'Войти';
+    }
+  }
+
+  function showErr(msg) {
+    const el = document.getElementById('formError');
+    el.textContent = msg; el.style.display = 'block';
+  }
+
+  async function resetPassword() {
+    const email = document.getElementById('emailInput').value.trim();
+    if (!email) { showErr('Введи email для сброса пароля'); return; }
+    try {
+      await auth.sendPasswordResetEmail(email);
+      showToast('Письмо отправлено на ' + email, 'success');
+    } catch(e) {
+      showToast('Ошибка. Проверь email.', 'error');
+    }
+  }
+</script>
+</body>
+</html>

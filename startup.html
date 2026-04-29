@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Стартап — LaunchPad</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .startup-hero {
+      background:var(--bg2);border-bottom:1px solid var(--border);
+      padding:40px 0 32px;
+    }
+    .startup-hero__inner { display:flex;gap:28px;align-items:flex-start; }
+    .startup-logo {
+      width:90px;height:90px;border-radius:20px;
+      background:var(--bg3);border:1px solid var(--border2);
+      display:flex;align-items:center;justify-content:center;
+      font-size:48px;flex-shrink:0;
+    }
+    .startup-hero__name { font-family:var(--font-head);font-size:34px;font-weight:800;letter-spacing:-1px;margin-bottom:6px; }
+    .startup-hero__tagline { font-size:16px;color:var(--text2);margin-bottom:14px; }
+    .startup-hero__meta { display:flex;gap:12px;flex-wrap:wrap;align-items:center; }
+    .startup-layout { display:grid;grid-template-columns:1fr 300px;gap:28px;margin-top:32px; }
+    @media(max-width:900px){.startup-layout{grid-template-columns:1fr;}}
+    .team-member {
+      display:flex;align-items:center;gap:12px;
+      padding:12px 0;border-bottom:1px solid var(--border);
+    }
+    .team-member:last-child{border-bottom:none;}
+    .team-member__name{font-size:14px;font-weight:500;}
+    .team-member__role{font-size:12px;color:var(--text2);}
+    .owner-badge{font-size:11px;color:var(--accent);font-weight:600;}
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="startups.html">Стартапы</a>
+  <div class="nav__user" id="navUser">
+    <a href="login.html" class="btn btn--outline btn--sm">Войти</a>
+    <a href="register.html" class="btn btn--primary btn--sm">Регистрация</a>
+  </div>
+</nav>
+
+<div id="loadingState" style="padding:120px 0;text-align:center;"><div class="spinner"></div></div>
+<div id="pageContent" style="display:none;">
+  <div class="startup-hero">
+    <div class="container">
+      <div class="startup-hero__inner">
+        <div class="startup-logo" id="startupLogo">🚀</div>
+        <div style="flex:1">
+          <h1 class="startup-hero__name" id="startupName"></h1>
+          <p class="startup-hero__tagline" id="startupTagline"></p>
+          <div class="startup-hero__meta">
+            <span class="badge badge--green" id="startupStage"></span>
+            <span class="badge badge--gray" id="startupCategory"></span>
+            <span id="startupWebsite"></span>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;" id="actionBtns"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" style="padding-top:0">
+    <div class="container">
+      <div class="startup-layout">
+        <!-- Left -->
+        <div>
+          <div class="tabs">
+            <button class="tab active" onclick="switchTab('about')">О проекте</button>
+            <button class="tab" onclick="switchTab('updates')">Обновления</button>
+            <button class="tab" onclick="switchTab('team')">Команда</button>
+          </div>
+
+          <div class="tab-panel active" id="tab-about">
+            <div class="card">
+              <h3 class="section-title" style="font-size:18px;margin-bottom:16px;">Описание</h3>
+              <p id="startupDesc" style="color:var(--text2);line-height:1.8;white-space:pre-wrap;"></p>
+              <div id="lookingForBlock" style="display:none;">
+                <hr class="divider">
+                <h4 style="font-family:var(--font-head);font-size:15px;margin-bottom:8px;">🔍 Ищем в команду</h4>
+                <p id="lookingForText" style="color:var(--text2);font-size:14px;"></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="tab-updates">
+            <div id="updatesOwnerActions" style="display:none;margin-bottom:16px;">
+              <a id="addUpdateBtn" href="#" class="btn btn--primary">+ Добавить обновление</a>
+            </div>
+            <div id="updatesList"><div class="spinner"></div></div>
+          </div>
+
+          <div class="tab-panel" id="tab-team">
+            <div id="teamOwnerActions" style="display:none;margin-bottom:16px;">
+              <a href="members.html" class="btn btn--outline btn--sm">Найти участников</a>
+            </div>
+            <div id="teamList"><div class="spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- Right sidebar -->
+        <div>
+          <div class="card" style="margin-bottom:20px;">
+            <h3 style="font-family:var(--font-head);font-size:15px;margin-bottom:14px;">Основатель</h3>
+            <div id="ownerBlock"></div>
+          </div>
+          <div class="card" id="tagsCard" style="display:none;">
+            <h3 style="font-family:var(--font-head);font-size:15px;margin-bottom:12px;">Теги</h3>
+            <div id="tagsList" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Invite modal (for users) -->
+<div class="modal-overlay" id="inviteModal">
+  <div class="modal">
+    <div class="modal__header">
+      <div class="modal__title">Подать заявку в команду</div>
+      <button class="modal__close" onclick="closeModal('inviteModal')">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Сообщение для основателя</label>
+      <textarea class="form-textarea" id="inviteMessage" placeholder="Расскажи о себе и почему хочешь присоединиться..."></textarea>
+    </div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center;" onclick="sendInvite()">Отправить заявку</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  const startupId = getUrlParam('id');
+  if (!startupId) window.location.href = 'startups.html';
+
+  let startupData = null;
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t,i) => {
+      const panels = ['about','updates','team'];
+      t.classList.toggle('active', panels[i] === name);
+    });
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+  }
+
+  onAuthReady(async (user, userData) => {
+    // Update nav
+    const navUser = document.getElementById('navUser');
+    if (user && userData) {
+      navUser.innerHTML = `
+        <span class="nav__role nav__role--${userData.role}">${{startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'}[userData.role]}</span>
+        <img class="nav__avatar" src="${userData.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(userData.name)}`}" onclick="window.location='profile.html'"/>
+        <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(()=>window.location.href='index.html')">Выйти</button>
+      `;
+    }
+
+    // Load startup
+    const snap = await db.collection('startups').doc(startupId).get();
+    if (!snap.exists) { window.location.href = 'startups.html'; return; }
+    startupData = { id: snap.id, ...snap.data() };
+
+    // Fill UI
+    document.getElementById('startupLogo').textContent = startupData.emoji || '🚀';
+    document.getElementById('startupName').textContent = startupData.name;
+    document.getElementById('startupTagline').textContent = startupData.tagline || '';
+    document.getElementById('startupStage').textContent = startupData.stage || 'Идея';
+    document.getElementById('startupCategory').textContent = startupData.category || '';
+    document.getElementById('startupDesc').textContent = startupData.description || '';
+    document.title = startupData.name + ' — LaunchPad';
+
+    if (startupData.website) {
+      document.getElementById('startupWebsite').innerHTML = `<a href="${startupData.website}" target="_blank" style="color:var(--accent);font-size:13px;">🔗 ${startupData.website}</a>`;
+    }
+
+    if (startupData.lookingFor) {
+      document.getElementById('lookingForBlock').style.display = 'block';
+      document.getElementById('lookingForText').textContent = startupData.lookingFor;
+    }
+
+    if (startupData.tags?.length) {
+      document.getElementById('tagsCard').style.display = 'block';
+      document.getElementById('tagsList').innerHTML = startupData.tags.map(t =>
+        `<span class="badge badge--gray">${t}</span>`).join('');
+    }
+
+    // Owner block
+    const ownerSnap = await db.collection('users').doc(startupData.ownerUid).get();
+    const owner = ownerSnap.exists ? ownerSnap.data() : { name: startupData.ownerName };
+    const owAvatar = owner.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(owner.name||'U')}`;
+    document.getElementById('ownerBlock').innerHTML = `
+      <a href="member.html?uid=${startupData.ownerUid}" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;">
+        <img src="${owAvatar}" class="avatar avatar--md"/>
+        <div>
+          <div style="font-size:14px;font-weight:600;">${owner.name}</div>
+          <div class="owner-badge">Основатель</div>
+        </div>
+      </a>
+    `;
+
+    // Action buttons
+    const actions = document.getElementById('actionBtns');
+    const isOwner = user && user.uid === startupData.ownerUid;
+    const isAdmin = userData?.role === 'admin';
+
+    if (isOwner || isAdmin) {
+      actions.innerHTML = `
+        <a href="create-startup.html?edit=${startupId}" class="btn btn--outline">✏️ Редактировать</a>
+        <a href="update-startup.html?id=${startupId}" class="btn btn--primary">+ Обновление</a>
+      `;
+      document.getElementById('updatesOwnerActions').style.display = 'block';
+      document.getElementById('addUpdateBtn').href = `update-startup.html?id=${startupId}`;
+      document.getElementById('teamOwnerActions').style.display = 'block';
+    } else if (user && userData?.role === 'investor') {
+      actions.innerHTML = `<button class="btn btn--investor" onclick="window.location.href='messages.html?to=${startupData.ownerUid}'">💬 Написать</button>`;
+    } else if (user && userData?.role === 'user') {
+      actions.innerHTML = `<button class="btn btn--primary" onclick="document.getElementById('inviteModal').classList.add('open')">👋 Подать заявку</button>`;
+    } else if (!user) {
+      actions.innerHTML = `<a href="login.html" class="btn btn--primary">Войти чтобы взаимодействовать</a>`;
+    }
+
+    // Load updates
+    await loadUpdates();
+    // Load team
+    await loadTeam();
+
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('pageContent').style.display = 'block';
+  });
+
+  async function loadUpdates() {
+    const snap = await db.collection('startups').doc(startupId).collection('updates')
+      .orderBy('createdAt','desc').get();
+    const el = document.getElementById('updatesList');
+    if (snap.empty) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">📢</div><div class="empty-state__title">Нет обновлений</div><p style="font-size:14px;">Основатель ещё не публиковал новости</p></div>';
+      return;
+    }
+    el.innerHTML = snap.docs.map(d => {
+      const u = d.data();
+      return `
+        <div class="update-card">
+          <div class="update-card__header">
+            <div style="flex:1">
+              <div class="update-card__title">${u.title}</div>
+              <div class="update-card__date">${formatDate(u.createdAt)}</div>
+            </div>
+            ${u.type ? `<span class="badge badge--green">${u.type}</span>` : ''}
+          </div>
+          <div class="update-card__body">${u.body}</div>
+        </div>`;
+    }).join('');
+  }
+
+  async function loadTeam() {
+    const snap = await db.collection('startups').doc(startupId).collection('team').get();
+    const el = document.getElementById('teamList');
+    const members = [];
+
+    // Owner first
+    if (startupData) {
+      const ownerSnap = await db.collection('users').doc(startupData.ownerUid).get();
+      if (ownerSnap.exists) members.push({ ...ownerSnap.data(), teamRole: 'Основатель', isOwner: true });
+    }
+
+    for (const d of snap.docs) {
+      const t = d.data();
+      const uSnap = await db.collection('users').doc(t.uid).get();
+      if (uSnap.exists) members.push({ ...uSnap.data(), teamRole: t.role || 'Участник' });
+    }
+
+    if (members.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">👥</div><div class="empty-state__title">Команда пока не сформирована</div></div>';
+      return;
+    }
+
+    el.innerHTML = '<div class="card">' + members.map(m => {
+      const av = m.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(m.name||'U')}`;
+      return `
+        <div class="team-member">
+          <a href="member.html?uid=${m.uid}" style="display:contents;">
+            <img src="${av}" class="avatar avatar--sm"/>
+          </a>
+          <div style="flex:1">
+            <div class="team-member__name">${m.name}</div>
+            <div class="team-member__role">${m.teamRole}</div>
+          </div>
+          ${m.isOwner ? '<span class="owner-badge">👑</span>' : ''}
+        </div>`;
+    }).join('') + '</div>';
+  }
+
+  async function sendInvite() {
+    if (!currentUser) { window.location.href = 'login.html'; return; }
+    const message = document.getElementById('inviteMessage').value.trim();
+
+    // Check existing invite
+    const existing = await db.collection('invites')
+      .where('fromUid','==', currentUser.uid)
+      .where('startupId','==', startupId)
+      .where('status','==','pending').get();
+    if (!existing.empty) { showToast('Ты уже подал заявку на этот стартап', 'warn'); return; }
+
+    await db.collection('invites').add({
+      fromUid: currentUser.uid,
+      fromName: currentUserData.name,
+      fromAvatar: currentUserData.avatar || '',
+      startupId,
+      startupName: startupData.name,
+      startupOwner: startupData.ownerUid,
+      message,
+      status: 'pending',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    closeModal('inviteModal');
+    showToast('✅ Заявка отправлена!', 'success');
+  }
+</script>
+</body>
+</html>

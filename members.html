@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Участники — LaunchPad</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .member-card {
+      background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);
+      padding:24px;transition:all .2s;cursor:pointer;text-decoration:none;color:inherit;display:block;
+    }
+    .member-card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:var(--shadow);}
+    .member-card__top{display:flex;gap:14px;align-items:center;margin-bottom:14px;}
+    .member-card__name{font-family:var(--font-head);font-size:16px;font-weight:700;}
+    .member-card__bio{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+    .members-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-top:32px;}
+    .filters-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:32px;}
+    .search-inp{flex:1;min-width:200px;max-width:360px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:14px;padding:10px 16px;outline:none;transition:border-color .2s;}
+    .search-inp:focus{border-color:var(--accent);}
+    .search-inp::placeholder{color:var(--text3);}
+    .role-filt{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:13px;padding:10px 14px;cursor:pointer;outline:none;}
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="startups.html">Стартапы</a>
+  <a href="members.html" class="active">Участники</a>
+  <div class="nav__user" id="navUser">
+    <a href="login.html" class="btn btn--outline btn--sm">Войти</a>
+    <a href="register.html" class="btn btn--primary btn--sm">Регистрация</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="container">
+    <div style="margin-bottom:28px;">
+      <h1 class="page-title">Участники</h1>
+      <p class="page-subtitle">Найди таланты для своего проекта или покажи себя</p>
+    </div>
+
+    <div class="filters-bar">
+      <input type="text" class="search-inp" id="searchInput" placeholder="🔍 Поиск по имени или навыкам..." oninput="applyFilter()"/>
+      <select class="role-filt" id="roleFilter" onchange="applyFilter()">
+        <option value="">Все роли</option>
+        <option value="startup">Стартаперы</option>
+        <option value="investor">Инвесторы</option>
+        <option value="user">Специалисты</option>
+      </select>
+    </div>
+
+    <div id="membersList"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  const ROLE_LABELS = {startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'};
+  const ROLE_CLASSES = {startup:'badge--green',investor:'badge--purple',user:'badge--blue',admin:'badge--red'};
+  let allMembers = [];
+
+  onAuthReady(async (user, userData) => {
+    if (user && userData) {
+      document.getElementById('navUser').innerHTML = `
+        <span class="nav__role nav__role--${userData.role}">${ROLE_LABELS[userData.role]}</span>
+        <img class="nav__avatar" src="${userData.avatar||`https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(userData.name)}`}" onclick="window.location='profile.html'"/>
+        <a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>
+      `;
+    }
+
+    const snap = await db.collection('users').orderBy('createdAt','desc').get();
+    allMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(u => u.role !== 'admin');
+    applyFilter();
+  });
+
+  function applyFilter() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const role   = document.getElementById('roleFilter').value;
+
+    const filtered = allMembers.filter(m => {
+      const matchRole = !role || m.role === role;
+      const matchSearch = !search ||
+        m.name?.toLowerCase().includes(search) ||
+        m.bio?.toLowerCase().includes(search) ||
+        (m.skills||[]).some(s => s.toLowerCase().includes(search));
+      return matchRole && matchSearch;
+    });
+
+    render(filtered);
+  }
+
+  function render(members) {
+    const el = document.getElementById('membersList');
+    if (!members.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">👥</div><div class="empty-state__title">Никого не найдено</div></div>';
+      return;
+    }
+    el.innerHTML = '<div class="members-grid">' + members.map(m => {
+      const av = m.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(m.name||'U')}`;
+      const skills = (m.skills||[]).slice(0,4);
+      return `
+        <a class="member-card" href="member.html?uid=${m.uid}">
+          <div class="member-card__top">
+            <img src="${av}" class="avatar avatar--md"/>
+            <div>
+              <div class="member-card__name">${m.name||'Без имени'}</div>
+              <span class="badge ${ROLE_CLASSES[m.role]||'badge--gray'}">${ROLE_LABELS[m.role]||m.role}</span>
+            </div>
+          </div>
+          <div class="member-card__bio">${m.bio||'Пока ничего не написано'}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            ${skills.map(s=>`<span class="badge badge--gray">${s}</span>`).join('')}
+            ${(m.skills||[]).length>4?`<span class="badge badge--gray">+${m.skills.length-4}</span>`:''}
+          </div>
+        </a>`;
+    }).join('') + '</div>';
+  }
+</script>
+</body>
+</html>

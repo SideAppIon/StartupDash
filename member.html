@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Профиль участника — LaunchPad</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .profile-cover {
+      height: 180px;
+      background: linear-gradient(135deg, rgba(0,230,118,.15) 0%, rgba(180,139,255,.1) 50%, rgba(61,142,245,.1) 100%);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .profile-cover::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: radial-gradient(circle at 20% 50%, rgba(0,230,118,.08) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 50%, rgba(180,139,255,.08) 0%, transparent 50%);
+    }
+    .profile-main {
+      max-width: 860px; margin: 0 auto; padding: 0 24px;
+    }
+    .profile-top {
+      display: flex; gap: 24px; align-items: flex-end;
+      margin-top: -52px; padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+      position: relative; z-index: 1;
+    }
+    .profile-avatar-wrap img {
+      width: 104px; height: 104px; border-radius: 50%;
+      object-fit: cover; border: 4px solid var(--bg);
+      background: var(--bg3);
+    }
+    .profile-info { flex: 1; padding-bottom: 4px; }
+    .profile-name {
+      font-family: var(--font-head); font-size: 28px; font-weight: 800;
+      letter-spacing: -.5px; margin-bottom: 6px;
+    }
+    .profile-meta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .profile-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .profile-body {
+      display: grid; grid-template-columns: 1fr 280px; gap: 24px;
+      padding: 32px 0;
+    }
+    @media(max-width:768px){ .profile-body{grid-template-columns:1fr;} .profile-top{flex-direction:column;align-items:center;text-align:center;} }
+    .stat-pill {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: var(--text2);
+    }
+    .stat-pill strong { color: var(--text); font-weight: 600; }
+    .contact-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+      font-size: 14px; text-decoration: none; color: inherit;
+      transition: color .2s;
+    }
+    .contact-row:last-child { border-bottom: none; }
+    .contact-row:hover { color: var(--accent); }
+    .contact-icon { font-size: 18px; width: 24px; text-align: center; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="startups.html">Стартапы</a>
+  <a href="members.html">Участники</a>
+  <div class="nav__user" id="navUser">
+    <a href="login.html" class="btn btn--outline btn--sm">Войти</a>
+  </div>
+</nav>
+
+<div id="loadingState" style="padding:140px 0;text-align:center;"><div class="spinner"></div></div>
+
+<div id="pageContent" style="display:none;">
+  <div class="profile-cover"></div>
+  <div class="profile-main">
+    <div class="profile-top">
+      <div class="profile-avatar-wrap">
+        <img id="memberAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
+      </div>
+      <div class="profile-info">
+        <h1 class="profile-name" id="memberName"></h1>
+        <div class="profile-meta">
+          <span class="nav__role" id="memberRole"></span>
+          <span class="stat-pill" id="memberSkillsCount"></span>
+          <span class="stat-pill" id="memberJoined"></span>
+        </div>
+      </div>
+      <div class="profile-actions" id="profileActions"></div>
+    </div>
+
+    <div class="profile-body">
+      <!-- Left -->
+      <div>
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px;">О себе</h3>
+          <p id="memberBio" style="color:var(--text2);font-size:14px;line-height:1.8;white-space:pre-wrap;"></p>
+        </div>
+        <div class="card" style="margin-bottom:20px;" id="skillsCard">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px;">Навыки</h3>
+          <div id="memberSkills" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        </div>
+        <div id="startupsSection" style="display:none;">
+          <h3 class="section-title" style="margin-bottom:16px;">Проекты</h3>
+          <div id="memberStartups"></div>
+        </div>
+      </div>
+
+      <!-- Right -->
+      <div>
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px;">Контакты</h3>
+          <div id="memberContacts"></div>
+        </div>
+        <div id="teamOfCard" style="display:none;" class="card">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px;">Участник в</h3>
+          <div id="teamOfList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  const ROLE_LABELS = {startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'};
+  const profileUid = getUrlParam('uid');
+  if (!profileUid) window.location.href = 'members.html';
+
+  onAuthReady(async (user, myData) => {
+    // Nav
+    const navUser = document.getElementById('navUser');
+    if (user && myData) {
+      navUser.innerHTML = `
+        <span class="nav__role nav__role--${myData.role}">${ROLE_LABELS[myData.role]}</span>
+        <img class="nav__avatar" src="${myData.avatar||`https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(myData.name)}`}" onclick="window.location='profile.html'"/>
+        <a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>
+      `;
+    }
+
+    // If viewing own profile, redirect
+    if (user && user.uid === profileUid) {
+      window.location.href = 'profile.html'; return;
+    }
+
+    const snap = await db.collection('users').doc(profileUid).get();
+    if (!snap.exists) { window.location.href = 'members.html'; return; }
+    const m = snap.data();
+
+    const av = m.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(m.name||'U')}`;
+    document.getElementById('memberAvatar').src = av;
+    document.getElementById('memberName').textContent = m.name || 'Без имени';
+    document.title = (m.name || 'Участник') + ' — LaunchPad';
+
+    const roleEl = document.getElementById('memberRole');
+    roleEl.textContent = ROLE_LABELS[m.role] || m.role;
+    roleEl.className = `nav__role nav__role--${m.role}`;
+
+    const skills = m.skills || [];
+    document.getElementById('memberSkillsCount').innerHTML = `<strong>${skills.length}</strong> навыков`;
+    if (m.createdAt) {
+      document.getElementById('memberJoined').innerHTML = `На платформе с <strong>${formatDate(m.createdAt)}</strong>`;
+    }
+
+    document.getElementById('memberBio').textContent = m.bio || 'Пользователь пока ничего не написал о себе.';
+
+    if (skills.length) {
+      document.getElementById('memberSkills').innerHTML = skills.map(s =>
+        `<span class="badge badge--gray">${s}</span>`).join('');
+    } else {
+      document.getElementById('memberSkills').innerHTML = '<span style="color:var(--text3);font-size:14px;">Не указаны</span>';
+    }
+
+    // Contacts
+    const contacts = [];
+    if (m.telegram) contacts.push(`<a class="contact-row" href="https://t.me/${m.telegram.replace('@','')}" target="_blank"><span class="contact-icon">📱</span>${m.telegram}</a>`);
+    if (m.linkedIn) contacts.push(`<a class="contact-row" href="${m.linkedIn}" target="_blank"><span class="contact-icon">💼</span>LinkedIn</a>`);
+    if (m.gitHub)   contacts.push(`<a class="contact-row" href="${m.gitHub}" target="_blank"><span class="contact-icon">🐙</span>GitHub</a>`);
+    document.getElementById('memberContacts').innerHTML = contacts.join('') || '<p style="color:var(--text3);font-size:14px;">Контакты не указаны</p>';
+
+    // Action buttons
+    const actionsEl = document.getElementById('profileActions');
+    if (user) {
+      const isInvestor = myData?.role === 'investor';
+      const isStartup  = myData?.role === 'startup';
+      actionsEl.innerHTML = `<button class="btn btn--outline" onclick="window.location.href='messages.html?to=${profileUid}'">💬 Написать</button>`;
+      if (isStartup) {
+        actionsEl.innerHTML += `<button class="btn btn--primary" onclick="inviteToStartup('${profileUid}','${m.name}')">+ Пригласить в команду</button>`;
+      }
+    } else {
+      actionsEl.innerHTML = `<a href="login.html" class="btn btn--outline">Войти</a>`;
+    }
+
+    // If startup role — show their startups
+    if (m.role === 'startup') {
+      const sSnap = await db.collection('startups').where('ownerUid','==',profileUid).get();
+      if (!sSnap.empty) {
+        document.getElementById('startupsSection').style.display = 'block';
+        document.getElementById('memberStartups').innerHTML = sSnap.docs.map(d => {
+          const s = d.data();
+          return `<a href="startup.html?id=${d.id}" style="display:flex;gap:12px;align-items:center;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;text-decoration:none;color:inherit;transition:border-color .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:28px;">${s.emoji||'🚀'}</span>
+            <div>
+              <div style="font-family:var(--font-head);font-size:15px;font-weight:700;">${s.name}</div>
+              <div style="font-size:12px;color:var(--text2);">${s.tagline||''}</div>
+            </div>
+            <span class="badge badge--green" style="margin-left:auto;">${s.stage||'Идея'}</span>
+          </a>`;
+        }).join('');
+      }
+    }
+
+    // Check if member of any startup teams
+    const teamSnaps = await db.collectionGroup('team').where('uid','==',profileUid).get();
+    if (!teamSnaps.empty) {
+      document.getElementById('teamOfCard').style.display = 'block';
+      const listEl = document.getElementById('teamOfList');
+      const items = [];
+      for (const d of teamSnaps.docs) {
+        const startupId = d.ref.parent.parent.id;
+        const sSnap = await db.collection('startups').doc(startupId).get();
+        if (sSnap.exists) {
+          const s = sSnap.data();
+          items.push(`<a href="startup.html?id=${startupId}" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;margin-bottom:8px;">
+            <span style="font-size:20px;">${s.emoji||'🚀'}</span>
+            <span style="font-size:14px;font-weight:500;">${s.name}</span>
+          </a>`);
+        }
+      }
+      listEl.innerHTML = items.join('');
+    }
+
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('pageContent').style.display = 'block';
+  });
+
+  // Modal for inviting to startup
+  async function inviteToStartup(toUid, toName) {
+    if (!currentUser) return;
+    const myStartups = await db.collection('startups').where('ownerUid','==',currentUser.uid).get();
+    if (myStartups.empty) { showToast('У тебя нет стартапов', 'warn'); return; }
+
+    const options = myStartups.docs.map(d => `<option value="${d.id}">${d.data().name}</option>`).join('');
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay open';
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal__header">
+          <div class="modal__title">Пригласить ${toName}</div>
+          <button class="modal__close" onclick="this.closest('.modal-overlay').remove()">×</button>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Выбери стартап</label>
+          <select class="form-select" id="invStartup">${options}</select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Роль в команде</label>
+          <input type="text" class="form-input" id="invRole" placeholder="Разработчик, Дизайнер..."/>
+        </div>
+        <button class="btn btn--primary" style="width:100%;justify-content:center;" onclick="sendInviteFromStartup('${toUid}','${toName}',this)">Отправить приглашение</button>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
+
+  async function sendInviteFromStartup(toUid, toName, btn) {
+    const startupId = document.getElementById('invStartup').value;
+    const role = document.getElementById('invRole').value.trim() || 'Участник';
+    btn.disabled = true; btn.textContent = 'Отправка...';
+
+    const sSnap = await db.collection('startups').doc(startupId).get();
+    await db.collection('invites').add({
+      type: 'from_startup',
+      fromUid: currentUser.uid,
+      fromName: currentUserData.name,
+      toUid, toName,
+      startupId,
+      startupName: sSnap.data().name,
+      startupOwner: currentUser.uid,
+      role,
+      status: 'pending',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    btn.closest('.modal-overlay').remove();
+    showToast('Приглашение отправлено!', 'success');
+  }
+</script>
+</body>
+</html>

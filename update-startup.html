@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Обновление стартапа — LaunchPad</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <div class="nav__user">
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
+    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(()=>window.location.href='index.html')">Выйти</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="container--sm">
+    <div style="margin-bottom:28px;">
+      <a id="backLink" href="dashboard.html" style="color:var(--text2);font-size:14px;text-decoration:none;">← К стартапу</a>
+      <h1 class="page-title" style="margin-top:12px;">Новое обновление</h1>
+      <p class="page-subtitle" id="startupNameLabel">Загрузка...</p>
+    </div>
+
+    <div class="card">
+      <div class="form-group">
+        <label class="form-label">Заголовок обновления *</label>
+        <input type="text" class="form-input" id="titleInput" placeholder="MVP готов! Первые 100 пользователей" maxlength="120"/>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Тип обновления</label>
+        <select class="form-select" id="typeSelect">
+          <option value="">Общее</option>
+          <option value="Milestone">🏆 Milestone</option>
+          <option value="MVP">⚡ MVP</option>
+          <option value="Партнёрство">🤝 Партнёрство</option>
+          <option value="Финансирование">💰 Финансирование</option>
+          <option value="Команда">👥 Команда</option>
+          <option value="Запуск">🚀 Запуск</option>
+          <option value="Пресса">📰 Пресса</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Содержание *</label>
+        <textarea class="form-textarea" id="bodyInput" placeholder="Расскажи подробнее что произошло, какие результаты, что дальше..." style="min-height:220px;"></textarea>
+      </div>
+
+      <div id="formError" class="form-error" style="display:none;margin-bottom:12px;"></div>
+
+      <div style="display:flex;gap:12px;justify-content:flex-end;">
+        <a id="cancelLink" href="dashboard.html" class="btn btn--ghost">Отмена</a>
+        <button class="btn btn--primary btn--lg" id="submitBtn" onclick="postUpdate()">📢 Опубликовать</button>
+      </div>
+    </div>
+
+    <!-- Preview of existing updates -->
+    <div style="margin-top:40px;">
+      <h2 class="section-title" style="margin-bottom:20px;">Предыдущие обновления</h2>
+      <div id="prevUpdates"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  requireAuth('login.html');
+
+  const startupId = getUrlParam('id');
+  if (!startupId) window.location.href = 'dashboard.html';
+
+  let startupData = null;
+
+  document.getElementById('backLink').href = `startup.html?id=${startupId}`;
+  document.getElementById('cancelLink').href = `startup.html?id=${startupId}`;
+
+  onAuthReady(async (user, userData) => {
+    if (!user) return;
+    if (userData?.role !== 'startup' && userData?.role !== 'admin') {
+      window.location.href = 'dashboard.html'; return;
+    }
+
+    const snap = await db.collection('startups').doc(startupId).get();
+    if (!snap.exists) { window.location.href = 'dashboard.html'; return; }
+    startupData = { id: snap.id, ...snap.data() };
+
+    if (startupData.ownerUid !== user.uid && userData?.role !== 'admin') {
+      window.location.href = 'dashboard.html'; return;
+    }
+
+    document.getElementById('startupNameLabel').textContent = startupData.name;
+
+    // Load previous updates
+    const updSnap = await db.collection('startups').doc(startupId).collection('updates')
+      .orderBy('createdAt','desc').limit(5).get();
+
+    const prevEl = document.getElementById('prevUpdates');
+    if (updSnap.empty) {
+      prevEl.innerHTML = '<div class="empty-state" style="padding:32px"><div class="empty-state__icon">📋</div><div class="empty-state__title">Нет обновлений</div></div>';
+    } else {
+      prevEl.innerHTML = updSnap.docs.map(d => {
+        const u = d.data();
+        return `
+          <div class="update-card">
+            <div class="update-card__header">
+              <div style="flex:1">
+                <div class="update-card__title">${u.title}</div>
+                <div class="update-card__date">${formatDate(u.createdAt)}</div>
+              </div>
+              ${u.type ? `<span class="badge badge--green">${u.type}</span>` : ''}
+            </div>
+            <div class="update-card__body">${u.body.substring(0,200)}${u.body.length>200?'...':''}</div>
+          </div>`;
+      }).join('');
+    }
+  });
+
+  async function postUpdate() {
+    const title = document.getElementById('titleInput').value.trim();
+    const body  = document.getElementById('bodyInput').value.trim();
+    const type  = document.getElementById('typeSelect').value;
+    const btn   = document.getElementById('submitBtn');
+    const err   = document.getElementById('formError');
+
+    err.style.display = 'none';
+    if (!title) { showErr('Введи заголовок'); return; }
+    if (!body)  { showErr('Напиши содержание обновления'); return; }
+
+    btn.disabled = true; btn.textContent = 'Публикация...';
+
+    try {
+      await db.collection('startups').doc(startupId).collection('updates').add({
+        title, body, type,
+        authorUid: currentUser.uid,
+        authorName: currentUserData.name,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Update startup's last update timestamp
+      await db.collection('startups').doc(startupId).update({
+        lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      showToast('Обновление опубликовано!', 'success');
+      setTimeout(() => window.location.href = `startup.html?id=${startupId}`, 800);
+    } catch(e) {
+      showErr('Ошибка: ' + e.message);
+      btn.disabled = false; btn.textContent = '📢 Опубликовать';
+    }
+  }
+
+  function showErr(msg) {
+    const el = document.getElementById('formError');
+    el.textContent = msg; el.style.display = 'block';
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Главная — LaunchPad</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .dash-grid { display:grid; grid-template-columns:300px 1fr; gap:28px; }
+    @media(max-width:900px){ .dash-grid{grid-template-columns:1fr;} }
+    .sidebar-profile { text-align:center; padding:28px; }
+    .sidebar-profile__avatar { width:80px;height:80px;border-radius:50%;object-fit:cover;background:var(--bg3);border:3px solid var(--border2);margin:0 auto 16px; display:block; }
+    .sidebar-profile__name { font-family:var(--font-head);font-size:18px;font-weight:700; }
+    .sidebar-profile__email { font-size:13px;color:var(--text2);margin-bottom:12px; }
+    .sidebar-links { border-top:1px solid var(--border); }
+    .sidebar-links a {
+      display:flex;align-items:center;gap:12px;
+      padding:14px 24px; color:var(--text2); text-decoration:none;
+      font-size:14px; transition:all .15s; border-left:2px solid transparent;
+    }
+    .sidebar-links a:hover { color:var(--text);background:var(--bg3); border-left-color:var(--border2); }
+    .sidebar-links a.active { color:var(--accent);background:var(--accent-dim); border-left-color:var(--accent); }
+    .startup-card {
+      display:flex;gap:16px;align-items:flex-start;
+      background:var(--bg2);border:1px solid var(--border);
+      border-radius:var(--radius-lg);padding:20px;
+      cursor:pointer;transition:all .2s;text-decoration:none;color:inherit;
+    }
+    .startup-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+    .startup-card__logo {
+      width:52px;height:52px;border-radius:12px;
+      background:var(--bg3);border:1px solid var(--border2);
+      object-fit:cover;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      font-size:24px;
+    }
+    .startup-card__name { font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:4px; }
+    .startup-card__desc { font-size:13px;color:var(--text2);line-height:1.5; }
+    .startup-card__tags { display:flex;gap:8px;flex-wrap:wrap;margin-top:10px; }
+    .stat-row { display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px; }
+    .stat-box { background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;text-align:center; }
+    .stat-box__num { font-family:var(--font-head);font-size:32px;font-weight:800;color:var(--accent); }
+    .stat-box__label { font-size:12px;color:var(--text2);margin-top:4px; }
+    .invite-card {
+      background:var(--bg2);border:1px solid var(--border);
+      border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:12px;
+      display:flex;align-items:center;gap:16px;
+    }
+    .invite-card__info { flex:1; }
+    .invite-card__name { font-size:14px;font-weight:500; }
+    .invite-card__startup { font-size:13px;color:var(--text2); }
+    .invite-actions { display:flex;gap:8px; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="startups.html">Стартапы</a>
+  <a href="members.html">Участники</a>
+  <div class="nav__user">
+    <a href="messages.html">💬</a>
+    <span class="nav__role" id="navRole"></span>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="window.location='profile.html'"/>
+    <button class="btn btn--ghost btn--sm" onclick="logout()">Выйти</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="container">
+    <div class="dash-grid">
+      <!-- Sidebar -->
+      <div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div class="sidebar-profile">
+            <img id="sideAvatar" class="sidebar-profile__avatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
+            <div class="sidebar-profile__name" id="sideName">—</div>
+            <div class="sidebar-profile__email" id="sideEmail">—</div>
+            <span class="nav__role" id="sideRole"></span>
+          </div>
+          <div class="sidebar-links" id="sidebarLinks"></div>
+        </div>
+      </div>
+
+      <!-- Main content -->
+      <div id="mainContent">
+        <div class="spinner"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  requireAuth('login.html');
+
+  const LINKS = {
+    startup: [
+      {icon:'🏠', label:'Дашборд', href:'dashboard.html'},
+      {icon:'🚀', label:'Мои стартапы', href:'my-startups.html'},
+      {icon:'➕', label:'Создать стартап', href:'create-startup.html'},
+      {icon:'💬', label:'Сообщения', href:'messages.html'},
+      {icon:'👤', label:'Мой профиль', href:'profile.html'},
+    ],
+    investor: [
+      {icon:'🏠', label:'Дашборд', href:'dashboard.html'},
+      {icon:'🔍', label:'Стартапы', href:'startups.html'},
+      {icon:'💬', label:'Сообщения', href:'messages.html'},
+      {icon:'👤', label:'Мой профиль', href:'profile.html'},
+    ],
+    user: [
+      {icon:'🏠', label:'Дашборд', href:'dashboard.html'},
+      {icon:'🔍', label:'Стартапы', href:'startups.html'},
+      {icon:'👥', label:'Участники', href:'members.html'},
+      {icon:'💬', label:'Сообщения', href:'messages.html'},
+      {icon:'👤', label:'Мой профиль', href:'profile.html'},
+    ],
+    admin: [
+      {icon:'🏠', label:'Дашборд', href:'dashboard.html'},
+      {icon:'👥', label:'Все пользователи', href:'admin.html'},
+      {icon:'🚀', label:'Все стартапы', href:'startups.html'},
+      {icon:'💬', label:'Сообщения', href:'messages.html'},
+    ]
+  };
+
+  const ROLE_LABELS = {startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'};
+
+  onAuthReady(async (user, userData) => {
+    if (!user || !userData) return;
+
+    const role = userData.role;
+    const avatar = userData.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(userData.name)}`;
+
+    // Nav
+    document.getElementById('navRole').textContent = ROLE_LABELS[role] || role;
+    document.getElementById('navRole').className = `nav__role nav__role--${role}`;
+    document.getElementById('navAvatar').src = avatar;
+
+    // Sidebar
+    document.getElementById('sideName').textContent = userData.name;
+    document.getElementById('sideEmail').textContent = userData.email;
+    document.getElementById('sideAvatar').src = avatar;
+    const sideRole = document.getElementById('sideRole');
+    sideRole.textContent = ROLE_LABELS[role];
+    sideRole.className = `nav__role nav__role--${role}`;
+
+    const links = LINKS[role] || LINKS.user;
+    document.getElementById('sidebarLinks').innerHTML = links.map(l =>
+      `<a href="${l.href}" ${l.href === 'dashboard.html' ? 'class="active"' : ''}>${l.icon} ${l.label}</a>`
+    ).join('');
+
+    // Main content by role
+    await renderMain(role, userData, user.uid);
+  });
+
+  async function renderMain(role, userData, uid) {
+    const main = document.getElementById('mainContent');
+    if (role === 'startup') await renderStartupDash(main, uid, userData);
+    else if (role === 'investor') await renderInvestorDash(main, uid);
+    else if (role === 'user') await renderUserDash(main, uid, userData);
+    else if (role === 'admin') await renderAdminDash(main);
+  }
+
+  async function renderStartupDash(el, uid, userData) {
+    // Load my startups
+    const snap = await db.collection('startups').where('ownerUid','==',uid).get();
+    const startups = snap.docs.map(d => ({id:d.id,...d.data()}));
+
+    // Load pending invites from users
+    const invSnap = await db.collection('invites').where('startupOwner','==',uid).where('status','==','pending').get();
+    const invites = invSnap.docs.map(d => ({id:d.id,...d.data()}));
+
+    el.innerHTML = `
+      <div class="stat-row">
+        <div class="stat-box"><div class="stat-box__num">${startups.length}</div><div class="stat-box__label">Мои стартапы</div></div>
+        <div class="stat-box"><div class="stat-box__num" id="teamCount">—</div><div class="stat-box__label">В командах</div></div>
+        <div class="stat-box"><div class="stat-box__num">${invites.length}</div><div class="stat-box__label">Заявок в команду</div></div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Мои стартапы</div>
+        <a href="create-startup.html" class="btn btn--primary btn--sm">+ Создать</a>
+      </div>
+
+      ${startups.length === 0 ? `
+        <div class="empty-state">
+          <div class="empty-state__icon">🚀</div>
+          <div class="empty-state__title">Ещё нет стартапов</div>
+          <p style="margin-bottom:24px;font-size:14px;">Создай первый проект и начни привлекать команду</p>
+          <a href="create-startup.html" class="btn btn--primary">Создать стартап</a>
+        </div>` : startups.map(s => `
+        <a class="startup-card" href="startup.html?id=${s.id}" style="margin-bottom:16px;display:flex;">
+          <div class="startup-card__logo">${s.emoji || '🚀'}</div>
+          <div style="flex:1">
+            <div class="startup-card__name">${s.name}</div>
+            <div class="startup-card__desc">${s.tagline || ''}</div>
+            <div class="startup-card__tags">
+              ${(s.tags||[]).map(t=>`<span class="badge badge--gray">${t}</span>`).join('')}
+              <span class="badge badge--green">${s.stage || 'Идея'}</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-self:center;">
+            <a href="startup.html?id=${s.id}" class="btn btn--outline btn--sm" onclick="event.stopPropagation()">Открыть</a>
+            <a href="create-startup.html?edit=${s.id}" class="btn btn--ghost btn--sm" onclick="event.stopPropagation()">Ред.</a>
+          </div>
+        </a>`).join('')}
+
+      ${invites.length > 0 ? `
+        <hr class="divider">
+        <div class="section-header"><div class="section-title">Заявки в команду</div></div>
+        ${invites.map(inv => `
+          <div class="invite-card">
+            <img src="${inv.fromAvatar || 'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U'}" class="avatar avatar--sm"/>
+            <div class="invite-card__info">
+              <div class="invite-card__name">${inv.fromName}</div>
+              <div class="invite-card__startup">хочет присоединиться к <strong>${inv.startupName}</strong></div>
+              <div style="font-size:12px;color:var(--text3);margin-top:4px;">${inv.message || ''}</div>
+            </div>
+            <div class="invite-actions">
+              <button class="btn btn--primary btn--sm" onclick="answerInvite('${inv.id}','accepted')">✓ Принять</button>
+              <button class="btn btn--outline btn--sm" onclick="answerInvite('${inv.id}','rejected')">✕</button>
+            </div>
+          </div>`).join('')}` : ''}
+    `;
+
+    // Count total team members
+    let teamTotal = 0;
+    for (const s of startups) {
+      const tm = await db.collection('startups').doc(s.id).collection('team').get();
+      teamTotal += tm.size;
+    }
+    document.getElementById('teamCount').textContent = teamTotal;
+  }
+
+  async function renderInvestorDash(el, uid) {
+    const snap = await db.collection('startups').orderBy('createdAt','desc').limit(6).get();
+    const startups = snap.docs.map(d => ({id:d.id,...d.data()}));
+    el.innerHTML = `
+      <div class="section-header">
+        <div class="section-title">Свежие стартапы</div>
+        <a href="startups.html" class="btn btn--outline btn--sm">Все стартапы</a>
+      </div>
+      ${startups.map(s => `
+        <a class="startup-card" href="startup.html?id=${s.id}" style="margin-bottom:16px;display:flex;">
+          <div class="startup-card__logo">${s.emoji||'🚀'}</div>
+          <div style="flex:1">
+            <div class="startup-card__name">${s.name}</div>
+            <div class="startup-card__desc">${s.tagline||''}</div>
+            <div class="startup-card__tags">
+              ${(s.tags||[]).map(t=>`<span class="badge badge--gray">${t}</span>`).join('')}
+              <span class="badge badge--green">${s.stage||'Идея'}</span>
+            </div>
+          </div>
+        </a>`).join('')}`;
+  }
+
+  async function renderUserDash(el, uid, userData) {
+    // My invites sent
+    const sentSnap = await db.collection('invites').where('fromUid','==',uid).get();
+    const sent = sentSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+    // Recent startups
+    const snap = await db.collection('startups').orderBy('createdAt','desc').limit(4).get();
+    const startups = snap.docs.map(d=>({id:d.id,...d.data()}));
+
+    el.innerHTML = `
+      <div class="section-header">
+        <div class="section-title">Свежие стартапы</div>
+        <a href="startups.html" class="btn btn--outline btn--sm">Смотреть всё</a>
+      </div>
+      ${startups.map(s=>`
+        <a class="startup-card" href="startup.html?id=${s.id}" style="margin-bottom:16px;display:flex;">
+          <div class="startup-card__logo">${s.emoji||'🚀'}</div>
+          <div style="flex:1">
+            <div class="startup-card__name">${s.name}</div>
+            <div class="startup-card__desc">${s.tagline||''}</div>
+          </div>
+        </a>`).join('')}
+
+      ${sent.length > 0 ? `
+        <hr class="divider">
+        <div class="section-header"><div class="section-title">Мои заявки</div></div>
+        ${sent.map(inv=>`
+          <div class="invite-card">
+            <div style="font-size:24px">${inv.status==='pending'?'⏳':inv.status==='accepted'?'✅':'❌'}</div>
+            <div class="invite-card__info">
+              <div class="invite-card__name">${inv.startupName}</div>
+              <div class="invite-card__startup">
+                ${inv.status==='pending'?'Ожидает ответа':inv.status==='accepted'?'Принята':'Отклонена'}
+              </div>
+            </div>
+          </div>`).join('')}` : ''}
+    `;
+  }
+
+  async function renderAdminDash(el) {
+    const usersSnap = await db.collection('users').get();
+    const startSnap = await db.collection('startups').get();
+    el.innerHTML = `
+      <div class="stat-row">
+        <div class="stat-box"><div class="stat-box__num">${usersSnap.size}</div><div class="stat-box__label">Пользователей</div></div>
+        <div class="stat-box"><div class="stat-box__num">${startSnap.size}</div><div class="stat-box__label">Стартапов</div></div>
+        <div class="stat-box"><div class="stat-box__num">—</div><div class="stat-box__label">Сообщений</div></div>
+      </div>
+      <div class="section-header">
+        <div class="section-title">Управление</div>
+      </div>
+      <div class="grid-2">
+        <a href="admin.html" class="card card--clickable" style="text-decoration:none;">
+          <div style="font-size:32px;margin-bottom:12px;">👥</div>
+          <div class="section-title" style="font-size:18px;">Пользователи</div>
+          <p style="font-size:14px;color:var(--text2);margin-top:6px;">Управление ролями, блокировка, сброс паролей</p>
+        </a>
+        <a href="startups.html" class="card card--clickable" style="text-decoration:none;">
+          <div style="font-size:32px;margin-bottom:12px;">🚀</div>
+          <div class="section-title" style="font-size:18px;">Стартапы</div>
+          <p style="font-size:14px;color:var(--text2);margin-top:6px;">Просмотр и удаление всех проектов</p>
+        </a>
+      </div>
+    `;
+  }
+
+  async function answerInvite(inviteId, status) {
+    await db.collection('invites').doc(inviteId).update({ status });
+    showToast(status === 'accepted' ? '✅ Заявка принята' : '❌ Заявка отклонена');
+    setTimeout(() => location.reload(), 1000);
+  }
+
+  function logout() {
+    auth.signOut().then(() => window.location.href = 'index.html');
+  }
+</script>
+</body>
+</html>

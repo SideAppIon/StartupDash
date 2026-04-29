@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Стартапы — LaunchPad</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .filters {
+      background:var(--bg2);border-bottom:1px solid var(--border);
+      padding:20px 0; position:sticky;top:var(--nav-h);z-index:50;
+    }
+    .filters__inner { display:flex;gap:12px;flex-wrap:wrap;align-items:center; }
+    .filter-select {
+      background:var(--bg3);border:1px solid var(--border2);
+      border-radius:var(--radius);color:var(--text);
+      font-family:var(--font-body);font-size:13px;
+      padding:8px 14px;cursor:pointer;outline:none;
+      transition:border-color .2s;
+    }
+    .filter-select:focus { border-color:var(--accent); }
+    .search-input {
+      flex:1;min-width:200px;max-width:360px;
+      background:var(--bg3);border:1px solid var(--border2);
+      border-radius:var(--radius);color:var(--text);
+      font-family:var(--font-body);font-size:14px;
+      padding:8px 16px;outline:none;
+      transition:border-color .2s;
+    }
+    .search-input:focus{border-color:var(--accent);}
+    .search-input::placeholder{color:var(--text3);}
+    .startups-grid {
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+      gap:20px;margin-top:32px;
+    }
+    .startup-tile {
+      background:var(--bg2);border:1px solid var(--border);
+      border-radius:var(--radius-lg);padding:24px;
+      text-decoration:none;color:inherit;
+      display:block;transition:all .2s;
+    }
+    .startup-tile:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:var(--shadow);}
+    .startup-tile__header{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px;}
+    .startup-tile__logo{width:52px;height:52px;border-radius:14px;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;}
+    .startup-tile__name{font-family:var(--font-head);font-size:17px;font-weight:700;margin-bottom:4px;}
+    .startup-tile__tagline{font-size:13px;color:var(--text2);line-height:1.5;}
+    .startup-tile__desc{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+    .startup-tile__footer{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+    .count-label{font-size:13px;color:var(--text2);}
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="startups.html" class="active">Стартапы</a>
+  <a href="members.html">Участники</a>
+  <div class="nav__user" id="navUser">
+    <a href="login.html" class="btn btn--outline btn--sm">Войти</a>
+    <a href="register.html" class="btn btn--primary btn--sm">Регистрация</a>
+  </div>
+</nav>
+
+<div class="filters">
+  <div class="container">
+    <div class="filters__inner">
+      <input type="text" class="search-input" id="searchInput" placeholder="🔍 Поиск стартапов..." oninput="applyFilters()"/>
+      <select class="filter-select" id="categoryFilter" onchange="applyFilters()">
+        <option value="">Все категории</option>
+        <option>FinTech</option><option>EdTech</option><option>HealthTech</option>
+        <option>E-commerce</option><option>SaaS</option><option>AI / ML</option>
+        <option>Gaming</option><option>GreenTech</option><option>Marketplace</option><option>Другое</option>
+      </select>
+      <select class="filter-select" id="stageFilter" onchange="applyFilters()">
+        <option value="">Все стадии</option>
+        <option>Идея</option><option>MVP</option><option>Бета</option>
+        <option>Запущен</option><option>Масштабирование</option>
+      </select>
+      <span class="count-label" id="countLabel"></span>
+    </div>
+  </div>
+</div>
+
+<div class="page" style="padding-top:20px">
+  <div class="container">
+    <div class="section-header" style="margin-bottom:0;">
+      <div>
+        <h1 class="page-title">Каталог стартапов</h1>
+        <p class="page-subtitle">Найди проект мечты или вдохновись чужими идеями</p>
+      </div>
+    </div>
+
+    <div id="startupsList"><div class="spinner" style="margin-top:40px;"></div></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  let allStartups = [];
+
+  onAuthReady(async (user, userData) => {
+    if (user && userData) {
+      const ROLE_LABELS = {startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'};
+      document.getElementById('navUser').innerHTML = `
+        <span class="nav__role nav__role--${userData.role}">${ROLE_LABELS[userData.role]}</span>
+        <img class="nav__avatar" src="${userData.avatar||`https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(userData.name)}`}" onclick="window.location='profile.html'"/>
+        <a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>
+      `;
+    }
+
+    const snap = await db.collection('startups').orderBy('createdAt','desc').get();
+    allStartups = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    applyFilters();
+  });
+
+  function applyFilters() {
+    const search   = document.getElementById('searchInput').value.toLowerCase();
+    const category = document.getElementById('categoryFilter').value;
+    const stage    = document.getElementById('stageFilter').value;
+
+    const filtered = allStartups.filter(s => {
+      const matchSearch = !search ||
+        s.name?.toLowerCase().includes(search) ||
+        s.tagline?.toLowerCase().includes(search) ||
+        s.description?.toLowerCase().includes(search) ||
+        (s.tags||[]).some(t => t.toLowerCase().includes(search));
+      const matchCat   = !category || s.category === category;
+      const matchStage = !stage    || s.stage === stage;
+      return matchSearch && matchCat && matchStage;
+    });
+
+    document.getElementById('countLabel').textContent = `${filtered.length} стартапов`;
+    renderList(filtered);
+  }
+
+  function renderList(items) {
+    const el = document.getElementById('startupsList');
+    if (items.length === 0) {
+      el.innerHTML = `
+        <div class="empty-state" style="margin-top:60px;">
+          <div class="empty-state__icon">🔍</div>
+          <div class="empty-state__title">Ничего не найдено</div>
+          <p style="font-size:14px;">Попробуй изменить фильтры или поисковый запрос</p>
+        </div>`;
+      return;
+    }
+
+    el.innerHTML = `<div class="startups-grid">` + items.map(s => `
+      <a class="startup-tile" href="startup.html?id=${s.id}">
+        <div class="startup-tile__header">
+          <div class="startup-tile__logo">${s.emoji||'🚀'}</div>
+          <div>
+            <div class="startup-tile__name">${s.name}</div>
+            <div class="startup-tile__tagline">${s.tagline||''}</div>
+          </div>
+        </div>
+        <div class="startup-tile__desc">${s.description||''}</div>
+        <div class="startup-tile__footer">
+          <span class="badge badge--green">${s.stage||'Идея'}</span>
+          <span class="badge badge--gray">${s.category||''}</span>
+          ${(s.tags||[]).slice(0,2).map(t=>`<span class="badge badge--gray">${t}</span>`).join('')}
+        </div>
+      </a>`).join('') + '</div>';
+  }
+</script>
+</body>
+</html>

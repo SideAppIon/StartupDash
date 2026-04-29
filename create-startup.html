@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Создать стартап — LaunchPad</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .emoji-grid { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px; }
+    .emoji-opt {
+      width:42px;height:42px;border-radius:10px;background:var(--bg3);border:2px solid var(--border2);
+      font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+      transition:all .15s;
+    }
+    .emoji-opt.selected { border-color:var(--accent);background:var(--accent-dim); }
+    .tag-input-wrap { display:flex;gap:8px; }
+    .tags-list { display:flex;flex-wrap:wrap;gap:8px;margin-top:8px; }
+    .tag-item {
+      background:var(--bg3);border:1px solid var(--border2);border-radius:20px;
+      font-size:13px;padding:4px 12px;display:flex;align-items:center;gap:6px;
+    }
+    .tag-item button { background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1; }
+    .tag-item button:hover { color:var(--danger); }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <div class="nav__user">
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
+    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(()=>window.location.href='index.html')">Выйти</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="container--md">
+    <div style="margin-bottom:32px">
+      <a href="dashboard.html" style="color:var(--text2);font-size:14px;text-decoration:none;">← Назад</a>
+      <h1 class="page-title" id="pageTitle" style="margin-top:12px">Создать стартап</h1>
+      <p class="page-subtitle">Заполни информацию о своём проекте</p>
+    </div>
+
+    <div class="card">
+      <!-- Emoji -->
+      <div class="form-group">
+        <label class="form-label">Иконка проекта</label>
+        <div class="emoji-grid" id="emojiGrid"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Название стартапа *</label>
+          <input type="text" class="form-input" id="name" placeholder="Название проекта" maxlength="60"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Стадия</label>
+          <select class="form-select" id="stage">
+            <option value="Идея">💡 Идея</option>
+            <option value="MVP">⚡ MVP</option>
+            <option value="Бета">🔬 Бета</option>
+            <option value="Запущен">🚀 Запущен</option>
+            <option value="Масштабирование">📈 Масштабирование</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Короткое описание (слоган) *</label>
+        <input type="text" class="form-input" id="tagline" placeholder="Uber для котиков" maxlength="120"/>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Полное описание *</label>
+        <textarea class="form-textarea" id="description" placeholder="Расскажи о проблеме, которую решаешь, и как именно..." style="min-height:160px"></textarea>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Категория</label>
+          <select class="form-select" id="category">
+            <option>FinTech</option>
+            <option>EdTech</option>
+            <option>HealthTech</option>
+            <option>E-commerce</option>
+            <option>SaaS</option>
+            <option>AI / ML</option>
+            <option>Gaming</option>
+            <option>GreenTech</option>
+            <option>Marketplace</option>
+            <option>Другое</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Сайт</label>
+          <input type="url" class="form-input" id="website" placeholder="https://example.com"/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Теги</label>
+        <div class="tag-input-wrap">
+          <input type="text" class="form-input" id="tagInput" placeholder="Введи тег и нажми Enter" onkeydown="addTagOnEnter(event)"/>
+          <button class="btn btn--outline" onclick="addTag()">Добавить</button>
+        </div>
+        <div class="tags-list" id="tagsList"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Ищем в команду</label>
+        <textarea class="form-textarea" id="lookingFor" placeholder="Разработчик React, Дизайнер, Маркетолог..." style="min-height:80px"></textarea>
+        <div class="form-hint">Кого ты хочешь привлечь в проект</div>
+      </div>
+
+      <div id="formError" class="form-error" style="display:none;margin-bottom:12px;"></div>
+
+      <div style="display:flex;gap:12px;justify-content:flex-end;">
+        <a href="dashboard.html" class="btn btn--ghost">Отмена</a>
+        <button class="btn btn--primary btn--lg" id="submitBtn" onclick="saveStartup()">
+          🚀 Опубликовать стартап
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  requireAuth('login.html');
+
+  const EMOJIS = ['🚀','💡','🔬','⚡','🌍','🤖','🎮','📱','💰','🌱','🏥','📚','🛒','✈️','🎵','🔐'];
+  let selectedEmoji = '🚀';
+  let tags = [];
+  let editId = getUrlParam('edit');
+
+  // Render emojis
+  const grid = document.getElementById('emojiGrid');
+  EMOJIS.forEach(e => {
+    const btn = document.createElement('div');
+    btn.className = 'emoji-opt' + (e === selectedEmoji ? ' selected' : '');
+    btn.textContent = e;
+    btn.onclick = () => {
+      document.querySelectorAll('.emoji-opt').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedEmoji = e;
+    };
+    grid.appendChild(btn);
+  });
+
+  onAuthReady(async (user, userData) => {
+    if (!user) return;
+    if (userData?.role !== 'startup' && userData?.role !== 'admin') {
+      window.location.href = 'dashboard.html'; return;
+    }
+
+    if (editId) {
+      document.getElementById('pageTitle').textContent = 'Редактировать стартап';
+      document.getElementById('submitBtn').textContent = '💾 Сохранить';
+      const snap = await db.collection('startups').doc(editId).get();
+      if (snap.exists) {
+        const d = snap.data();
+        document.getElementById('name').value = d.name || '';
+        document.getElementById('tagline').value = d.tagline || '';
+        document.getElementById('description').value = d.description || '';
+        document.getElementById('stage').value = d.stage || 'Идея';
+        document.getElementById('category').value = d.category || 'Другое';
+        document.getElementById('website').value = d.website || '';
+        document.getElementById('lookingFor').value = d.lookingFor || '';
+        tags = d.tags || [];
+        renderTags();
+        if (d.emoji) {
+          selectedEmoji = d.emoji;
+          document.querySelectorAll('.emoji-opt').forEach(b => {
+            b.classList.toggle('selected', b.textContent === d.emoji);
+          });
+        }
+      }
+    }
+  });
+
+  function addTagOnEnter(e) { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }
+
+  function addTag() {
+    const input = document.getElementById('tagInput');
+    const val = input.value.trim();
+    if (val && !tags.includes(val) && tags.length < 8) {
+      tags.push(val); renderTags();
+    }
+    input.value = '';
+  }
+
+  function removeTag(tag) { tags = tags.filter(t => t !== tag); renderTags(); }
+
+  function renderTags() {
+    document.getElementById('tagsList').innerHTML = tags.map(t =>
+      `<span class="tag-item">${t}<button onclick="removeTag('${t}')">×</button></span>`
+    ).join('');
+  }
+
+  async function saveStartup() {
+    const name = document.getElementById('name').value.trim();
+    const tagline = document.getElementById('tagline').value.trim();
+    const description = document.getElementById('description').value.trim();
+    const err = document.getElementById('formError');
+    const btn = document.getElementById('submitBtn');
+
+    err.style.display = 'none';
+    if (!name) { showFormErr('Введи название'); return; }
+    if (!tagline) { showFormErr('Введи короткое описание'); return; }
+    if (!description) { showFormErr('Введи описание проекта'); return; }
+
+    btn.disabled = true; btn.textContent = 'Сохранение...';
+
+    const data = {
+      name, tagline, description,
+      stage: document.getElementById('stage').value,
+      category: document.getElementById('category').value,
+      website: document.getElementById('website').value.trim(),
+      lookingFor: document.getElementById('lookingFor').value.trim(),
+      emoji: selectedEmoji,
+      tags,
+      ownerUid: currentUser.uid,
+      ownerName: currentUserData.name,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    try {
+      let id;
+      if (editId) {
+        await db.collection('startups').doc(editId).update(data);
+        id = editId;
+      } else {
+        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        const ref = await db.collection('startups').add(data);
+        id = ref.id;
+      }
+      showToast('Стартап сохранён!');
+      setTimeout(() => window.location.href = `startup.html?id=${id}`, 800);
+    } catch(e) {
+      showFormErr('Ошибка сохранения: ' + e.message);
+      btn.disabled = false; btn.textContent = editId ? '💾 Сохранить' : '🚀 Опубликовать';
+    }
+  }
+
+  function showFormErr(msg) {
+    const el = document.getElementById('formError');
+    el.textContent = msg; el.style.display = 'block';
+  }
+</script>
+</body>
+</html>
