@@ -27,26 +27,44 @@ let currentUser     = null;
 let currentUserData = null;
 
 function onAuthReady(callback) {
+  console.log('Проверка аутентификации Firebase...');
   auth.onAuthStateChanged(async function(user) {
+    console.log('Статус пользователя:', user ? 'авторизован' : 'не авторизован');
     if (user) {
+      console.log('UID пользователя:', user.uid);
+      console.log('Email пользователя:', user.email);
       currentUser = user;
       try {
+        console.log('Загрузка данных из Firestore...');
         var snap = await db.collection('users').doc(user.uid).get();
-        currentUserData = snap.exists ? snap.data() : null;
-        // Если данных нет, подождать немного и попробовать снова
+        console.log('Документ существует:', snap.exists);
+        if (snap.exists) {
+          currentUserData = snap.data();
+          console.log('Данные пользователя загружены:', currentUserData);
+        } else {
+          console.log('Документ пользователя не найден');
+          currentUserData = null;
+        }
+        
+        // Если данных нет, подождать и попробовать снова
         if (!currentUserData) {
+          console.log('Повторная попытка загрузки через 1 секунду...');
           await new Promise(resolve => setTimeout(resolve, 1000));
           snap = await db.collection('users').doc(user.uid).get();
           currentUserData = snap.exists ? snap.data() : null;
+          console.log('Результат повторной загрузки:', currentUserData);
         }
       } catch(e) {
         console.error('Ошибка загрузки данных пользователя:', e);
+        console.error('Код ошибки:', e.code);
+        console.error('Сообщение:', e.message);
         currentUserData = null;
       }
     } else {
       currentUser     = null;
       currentUserData = null;
     }
+    console.log('Вызов callback с данными:', {user: !!user, data: !!currentUserData});
     callback(user, currentUserData);
   });
 }

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест Firebase</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Тест Firebase подключения</h1>
+    
+    <button onclick="testAuth()">Тест аутентификации</button>
+    <button onclick="testFirestore()">Тест Firestore</button>
+    <button onclick="testRules()">Тест правил</button>
+    <button onclick="clearLogs()">Очистить логи</button>
+    
+    <div id="logs"></div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="firebase-config.js"></script>
+    
+    <script>
+        function log(message, type = 'log') {
+            const logs = document.getElementById('logs');
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+            logs.appendChild(div);
+            console.log(message);
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        async function testAuth() {
+            log('🔍 Тест аутентификации Firebase...', 'log');
+            
+            try {
+                // Проверяем текущего пользователя
+                const user = auth.currentUser;
+                if (user) {
+                    log(`✅ Пользователь авторизован: ${user.email} (UID: ${user.uid})`, 'success');
+                } else {
+                    log('⚠️ Пользователь не авторизован', 'log');
+                    
+                    // Пробуем войти с тестовыми данными
+                    try {
+                        const testUser = await auth.signInWithEmailAndPassword('test@test.com', '123456');
+                        log(`✅ Тестовый вход успешен: ${testUser.user.email}`, 'success');
+                    } catch (loginError) {
+                        log(`❌ Тестовый вход не удался: ${loginError.message}`, 'error');
+                    }
+                }
+            } catch (error) {
+                log(`❌ Ошибка аутентификации: ${error.message}`, 'error');
+            }
+        }
+
+        async function testFirestore() {
+            log('🔍 Тест Firestore подключения...', 'log');
+            
+            try {
+                // Тест чтения
+                const testDoc = await db.collection('users').limit(1).get();
+                log(`✅ Firestore подключен, найдено документов: ${testDoc.size}`, 'success');
+                
+                // Тест записи
+                const testRef = db.collection('test').doc('connection');
+                await testRef.set({
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    test: true
+                });
+                log('✅ Тестовая запись в Firestore успешна', 'success');
+                
+                // Удаляем тестовый документ
+                await testRef.delete();
+                log('✅ Тестовый документ удален', 'success');
+                
+            } catch (error) {
+                log(`❌ Ошибка Firestore: ${error.message}`, 'error');
+                log(`Код ошибки: ${error.code}`, 'error');
+            }
+        }
+
+        async function testRules() {
+            log('🔍 Тест правил безопасности...', 'log');
+            
+            const user = auth.currentUser;
+            if (!user) {
+                log('❌ Сначала авторизуйтесь', 'error');
+                return;
+            }
+            
+            try {
+                // Тест чтения пользователей
+                const usersSnap = await db.collection('users').get();
+                log(`✅ Чтение пользователей: ${usersSnap.size} документов`, 'success');
+                
+                // Тест чтения своего документа
+                const myDoc = await db.collection('users').doc(user.uid).get();
+                if (myDoc.exists) {
+                    log('✅ Чтение своего документа успешно', 'success');
+                    log(`Данные: ${JSON.stringify(myDoc.data())}`, 'success');
+                } else {
+                    log('⚠️ Свой документ не найден', 'log');
+                }
+                
+            } catch (error) {
+                log(`❌ Ошибка правил: ${error.message}`, 'error');
+            }
+        }
+
+        // Автоматический тест при загрузке
+        window.addEventListener('load', () => {
+            log('🚀 Страница загружена, начинаю автоматические тесты...', 'log');
+            setTimeout(testAuth, 1000);
+            setTimeout(testFirestore, 2000);
+        });
+    </script>
+</body>
+</html>
