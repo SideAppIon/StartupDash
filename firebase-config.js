@@ -1,11 +1,6 @@
-// Импорты (модульный SDK)
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-
-// Конфиг (оставляем как есть — он у тебя норм)
+// =====================================================
+// FIREBASE CONFIG — реальные данные проекта
+// =====================================================
 const firebaseConfig = {
   apiKey: "AIzaSyC0GD7ZMnm-ooiY0_jQUym3-mKM-tkd7sk",
   authDomain: "startuphelper-f5fb1.firebaseapp.com",
@@ -16,85 +11,74 @@ const firebaseConfig = {
   measurementId: "G-YCP8PWH5JV"
 };
 
-// Инициализация
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+// Защита от двойной инициализации
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
-// Сервисы
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+const auth    = firebase.auth();
+const db      = firebase.firestore();
 
 // =====================================================
-// УТИЛИТЫ
+// ГЛОБАЛЬНЫЕ УТИЛИТЫ
 // =====================================================
 
-let currentUser = null;
+let currentUser     = null;
 let currentUserData = null;
 
-// Слушатель авторизации
 function onAuthReady(callback) {
-  onAuthStateChanged(auth, async (user) => {
+  auth.onAuthStateChanged(async function(user) {
     if (user) {
       currentUser = user;
-
-      const snap = await getDoc(doc(db, "users", user.uid));
-      currentUserData = snap.exists() ? snap.data() : null;
-
+      try {
+        var snap = await db.collection('users').doc(user.uid).get();
+        currentUserData = snap.exists ? snap.data() : null;
+      } catch(e) {
+        currentUserData = null;
+      }
     } else {
-      currentUser = null;
+      currentUser     = null;
       currentUserData = null;
     }
-
     callback(user, currentUserData);
   });
 }
 
-// Редирект если не авторизован
-function requireAuth(redirectTo = 'login.html') {
-  onAuthStateChanged(auth, (user) => {
+function requireAuth(redirectTo) {
+  redirectTo = redirectTo || 'login.html';
+  auth.onAuthStateChanged(function(user) {
     if (!user) window.location.href = redirectTo;
   });
 }
 
-// Редирект если уже авторизован
-function redirectIfAuth(redirectTo = 'index.html') {
-  onAuthStateChanged(auth, (user) => {
+function redirectIfAuth(redirectTo) {
+  redirectTo = redirectTo || 'dashboard.html';
+  auth.onAuthStateChanged(function(user) {
     if (user) window.location.href = redirectTo;
   });
 }
 
-// Получить параметр из URL
 function getUrlParam(name) {
-  const params = new URLSearchParams(window.location.search);
-  return params.get(name);
+  return new URLSearchParams(window.location.search).get(name);
 }
 
-// Форматирование даты
 function formatDate(timestamp) {
   if (!timestamp) return '';
-  const d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return d.toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
+  var d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-// Показать уведомление
-function showToast(message, type = 'success') {
-  const toast = document.getElementById('toast');
+function showToast(message, type) {
+  type = type || 'success';
+  var toast = document.getElementById('toast');
   if (!toast) return;
-
   toast.textContent = message;
-  toast.className = `toast toast--${type} toast--show`;
-
-  setTimeout(() => toast.className = 'toast', 3000);
+  toast.className   = 'toast toast--' + type + ' toast--show';
+  setTimeout(function() { toast.className = 'toast'; }, 3000);
 }
 
-// Загрузка аватара
-async function uploadAvatar(file, uid) {
-  const storageRef = ref(storage, `avatars/${uid}`);
-  await uploadBytes(storageRef, file);
-  return await getDownloadURL(storageRef);
+// Аватар — просто сохраняем URL в Firestore (без Storage)
+async function saveAvatarUrl(uid, url) {
+  if (!url) return;
+  await db.collection('users').doc(uid).update({ avatar: url });
 }

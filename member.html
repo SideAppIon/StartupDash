@@ -125,10 +125,10 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
 <script src="firebase-config.js"></script>
 <script>
   const ROLE_LABELS = {startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'};
@@ -219,23 +219,25 @@
     }
 
     // Check if member of any startup teams
-    const teamSnaps = await db.collectionGroup('team').where('uid','==',profileUid).get();
-    if (!teamSnaps.empty) {
-      document.getElementById('teamOfCard').style.display = 'block';
-      const listEl = document.getElementById('teamOfList');
-      const items = [];
-      for (const d of teamSnaps.docs) {
-        const startupId = d.ref.parent.parent.id;
-        const sSnap = await db.collection('startups').doc(startupId).get();
-        if (sSnap.exists) {
-          const s = sSnap.data();
-          items.push(`<a href="startup.html?id=${startupId}" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;margin-bottom:8px;">
-            <span style="font-size:20px;">${s.emoji||'🚀'}</span>
-            <span style="font-size:14px;font-weight:500;">${s.name}</span>
-          </a>`);
+    try {
+      const teamSnaps = await db.collectionGroup('team').where('uid','==',profileUid).get();
+      if (!teamSnaps.empty) {
+        document.getElementById('teamOfCard').style.display = 'block';
+        const listEl = document.getElementById('teamOfList');
+        const items = [];
+        for (const d of teamSnaps.docs) {
+          const startupId = d.ref.parent.parent.id;
+          const sSnap = await db.collection('startups').doc(startupId).get();
+          if (sSnap.exists) {
+            const s = sSnap.data();
+            items.push('<a href="startup.html?id=' + startupId + '" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;margin-bottom:8px;"><span style="font-size:20px;">' + (s.emoji||'🚀') + '</span><span style="font-size:14px;font-weight:500;">' + s.name + '</span></a>');
+          }
         }
+        listEl.innerHTML = items.join('');
       }
-      listEl.innerHTML = items.join('');
+    } catch(e) {
+      // collectionGroup requires a Firestore index — see ИНСТРУКЦИЯ.md
+      console.log('collectionGroup index not ready:', e.message);
     }
 
     document.getElementById('loadingState').style.display = 'none';

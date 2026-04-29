@@ -6,28 +6,42 @@
   <title>Мой профиль — LaunchPad</title>
   <link rel="stylesheet" href="styles.css"/>
   <style>
-    .profile-header {
-      background:var(--bg2);border-bottom:1px solid var(--border);
-      padding:40px 0;
+    .profile-cover {
+      height: 180px;
+      background: linear-gradient(135deg, rgba(0,230,118,.15) 0%, rgba(180,139,255,.1) 50%, rgba(61,142,245,.1) 100%);
+      border-bottom: 1px solid var(--border);
     }
-    .profile-header__inner { display:flex;gap:28px;align-items:center; }
-    .avatar-upload { position:relative;cursor:pointer; }
-    .avatar-upload input { display:none; }
-    .avatar-upload__overlay {
-      position:absolute;inset:0;border-radius:50%;
-      background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;
-      opacity:0;transition:opacity .2s;font-size:22px;
+    .profile-wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+    .profile-top {
+      display: flex; gap: 24px; align-items: flex-end;
+      margin-top: -56px; padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
     }
-    .avatar-upload:hover .avatar-upload__overlay { opacity:1; }
-    .profile-name { font-family:var(--font-head);font-size:28px;font-weight:800;margin-bottom:6px; }
-    .skill-tag {
-      display:inline-flex;align-items:center;gap:6px;
-      background:var(--bg3);border:1px solid var(--border2);
-      border-radius:20px;font-size:13px;padding:5px 14px;
+    .profile-avatar-wrap { position: relative; cursor: pointer; }
+    .profile-avatar-wrap img {
+      width: 112px; height: 112px; border-radius: 50%;
+      object-fit: cover; border: 4px solid var(--bg);
+      background: var(--bg3); display: block;
     }
-    .skill-tag button { background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px; }
+    .avatar-edit-btn {
+      position: absolute; bottom: 4px; right: 4px;
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--accent); border: 2px solid var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; cursor: pointer;
+    }
+    .profile-name { font-family: var(--font-head); font-size: 26px; font-weight: 800; letter-spacing: -.5px; margin-bottom: 6px; }
+    .profile-info { flex: 1; padding-bottom: 4px; }
+    .profile-body { display: grid; grid-template-columns: 1fr 280px; gap: 24px; padding: 32px 0; }
+    @media(max-width:768px){ .profile-body{grid-template-columns:1fr;} .profile-top{flex-direction:column;align-items:center;text-align:center;margin-top:-40px;} }
+    .skill-tag { display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border2);border-radius:20px;font-size:13px;padding:5px 14px; }
+    .skill-tag button { background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1; }
     .skill-tag button:hover{color:var(--danger);}
     .skills-wrap { display:flex;flex-wrap:wrap;gap:8px;margin-top:8px; }
+    .avatar-url-preview { width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);background:var(--bg3); }
+    .contact-row { display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;text-decoration:none;color:inherit; }
+    .contact-row:last-child{border-bottom:none;}
+    .contact-icon{font-size:18px;width:24px;text-align:center;}
   </style>
 </head>
 <body>
@@ -38,78 +52,60 @@
     <a href="dashboard.html" class="btn btn--ghost btn--sm">← Дашборд</a>
     <span class="nav__role" id="navRole"></span>
     <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
-    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(()=>window.location.href='index.html')">Выйти</button>
+    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
   </div>
 </nav>
 
 <div id="loadingState" style="padding:140px 0;text-align:center;"><div class="spinner"></div></div>
 
 <div id="pageContent" style="display:none;">
-  <div class="profile-header">
-    <div class="container">
-      <div class="profile-header__inner">
-        <label class="avatar-upload" title="Нажми чтобы изменить аватар">
-          <img id="profileAvatar" class="avatar avatar--xl" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
-          <div class="avatar-upload__overlay">📷</div>
-          <input type="file" id="avatarInput" accept="image/*" onchange="uploadNewAvatar(this)"/>
-        </label>
-        <div>
-          <h1 class="profile-name" id="profileName"></h1>
-          <div style="margin-bottom:12px;">
-            <span class="nav__role" id="profileRole"></span>
-          </div>
-          <p style="color:var(--text2);font-size:14px;" id="profileEmail"></p>
-        </div>
-        <button class="btn btn--outline" style="margin-left:auto;" onclick="toggleEdit()" id="editBtn">✏️ Редактировать</button>
+  <div class="profile-cover"></div>
+  <div class="profile-wrap">
+    <div class="profile-top">
+      <div class="profile-avatar-wrap" onclick="document.getElementById('avatarModal').classList.add('open')">
+        <img id="profileAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
+        <div class="avatar-edit-btn">✏️</div>
       </div>
+      <div class="profile-info">
+        <h1 class="profile-name" id="profileName"></h1>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+          <span class="nav__role" id="profileRole"></span>
+          <span style="font-size:13px;color:var(--text2);" id="profileEmail"></span>
+        </div>
+      </div>
+      <button class="btn btn--outline" onclick="toggleEdit()" id="editBtn">✏️ Редактировать</button>
     </div>
-  </div>
 
-  <div class="page" style="padding-top:32px;">
-    <div class="container--md">
-      <!-- View Mode -->
+    <div class="profile-body">
+      <!-- VIEW MODE -->
       <div id="viewMode">
-        <div class="grid-2">
-          <div>
-            <div class="card" style="margin-bottom:20px;">
-              <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px;">О себе</h3>
-              <p id="viewBio" style="color:var(--text2);font-size:14px;line-height:1.7;white-space:pre-wrap;"></p>
-            </div>
-            <div class="card">
-              <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px;">Навыки</h3>
-              <div class="skills-wrap" id="viewSkills"></div>
-            </div>
-          </div>
-          <div>
-            <div class="card" style="margin-bottom:20px;">
-              <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px;">Контакты</h3>
-              <div id="viewContacts" style="font-size:14px;"></div>
-            </div>
-            <div class="card" id="myStartupsCard" style="display:none;">
-              <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px;">Мои стартапы</h3>
-              <div id="myStartupsList"></div>
-            </div>
-          </div>
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px;">О себе</h3>
+          <p id="viewBio" style="color:var(--text2);font-size:14px;line-height:1.8;white-space:pre-wrap;"></p>
+        </div>
+        <div class="card">
+          <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px;">Навыки</h3>
+          <div id="viewSkills"></div>
         </div>
       </div>
 
-      <!-- Edit Mode -->
+      <!-- EDIT MODE -->
       <div id="editMode" style="display:none;">
         <div class="card">
-          <h2 style="font-family:var(--font-head);font-size:22px;font-weight:700;margin-bottom:24px;">Редактировать профиль</h2>
-
+          <h2 style="font-family:var(--font-head);font-size:20px;font-weight:700;margin-bottom:24px;">Редактировать профиль</h2>
           <div class="form-group">
             <label class="form-label">Имя и фамилия *</label>
             <input type="text" class="form-input" id="editName" maxlength="80"/>
           </div>
           <div class="form-group">
             <label class="form-label">О себе</label>
-            <textarea class="form-textarea" id="editBio" placeholder="Расскажи о своём опыте, целях, чем занимаешься..."></textarea>
+            <textarea class="form-textarea" id="editBio" placeholder="Опыт, цели, чем занимаешься..."></textarea>
           </div>
           <div class="form-group">
             <label class="form-label">Навыки</label>
             <div style="display:flex;gap:8px;">
-              <input type="text" class="form-input" id="skillInput" placeholder="React, Python, Дизайн..." onkeydown="if(event.key==='Enter'){event.preventDefault();addSkill()}"/>
+              <input type="text" class="form-input" id="skillInput" placeholder="React, Python, Дизайн..."
+                onkeydown="if(event.key==='Enter'){event.preventDefault();addSkill()}"/>
               <button class="btn btn--outline" onclick="addSkill()">+</button>
             </div>
             <div class="skills-wrap" id="editSkills"></div>
@@ -122,100 +118,134 @@
             <label class="form-label">LinkedIn</label>
             <input type="url" class="form-input" id="editLinkedIn" placeholder="https://linkedin.com/in/..."/>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">GitHub</label>
             <input type="url" class="form-input" id="editGitHub" placeholder="https://github.com/..."/>
           </div>
-
-          <div style="display:flex;gap:12px;margin-top:8px;">
+          <div style="display:flex;gap:12px;margin-top:24px;">
             <button class="btn btn--primary btn--lg" onclick="saveProfile()">💾 Сохранить</button>
             <button class="btn btn--ghost" onclick="toggleEdit()">Отмена</button>
           </div>
+        </div>
+      </div>
+
+      <!-- RIGHT SIDEBAR -->
+      <div>
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px;">Контакты</h3>
+          <div id="viewContacts"></div>
+        </div>
+        <div class="card" id="myStartupsCard" style="display:none;">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px;">Мои стартапы</h3>
+          <div id="myStartupsList"></div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
+<!-- Avatar URL Modal -->
+<div class="modal-overlay" id="avatarModal">
+  <div class="modal">
+    <div class="modal__header">
+      <div class="modal__title">Изменить аватар</div>
+      <button class="modal__close" onclick="document.getElementById('avatarModal').classList.remove('open')">×</button>
+    </div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:20px;">
+      Вставь прямую ссылку на изображение. Например, из <a href="https://imgur.com" target="_blank" style="color:var(--accent);">imgur.com</a> или любого другого хостинга.
+    </p>
+    <div style="display:flex;gap:16px;align-items:center;margin-bottom:20px;">
+      <img id="avatarPreview" class="avatar-url-preview" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
+      <div style="flex:1;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">URL изображения</label>
+          <input type="url" class="form-input" id="avatarUrlInput" placeholder="https://i.imgur.com/..."
+            oninput="previewAvatar(this.value)"/>
+        </div>
+      </div>
+    </div>
+    <div class="form-hint" style="margin-bottom:20px;">Рекомендуем квадратное изображение, минимум 200×200px</div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn--primary" style="flex:1;justify-content:center;" onclick="saveAvatarUrl()">Сохранить</button>
+      <button class="btn btn--ghost" onclick="document.getElementById('avatarModal').classList.remove('open')">Отмена</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script src="firebase-config.js"></script>
 <script>
   requireAuth('login.html');
 
-  const ROLE_LABELS = {startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'};
-  let editSkillsArr = [];
-  let userData = null;
+  var ROLE_LABELS = {startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'};
+  var editSkillsArr = [];
+  var userData = null;
 
-  onAuthReady(async (user, data) => {
+  onAuthReady(async function(user, data) {
     if (!user) return;
     userData = data;
+    var role = userData.role;
+    var av   = userData.avatar || ('https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(userData.name || 'U'));
 
-    const role = userData.role;
-    const av = userData.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(userData.name)}`;
+    document.getElementById('navRole').textContent  = ROLE_LABELS[role] || role;
+    document.getElementById('navRole').className    = 'nav__role nav__role--' + role;
+    document.getElementById('navAvatar').src        = av;
+    document.getElementById('profileAvatar').src    = av;
+    document.getElementById('profileName').textContent  = userData.name || '';
+    document.getElementById('profileEmail').textContent = userData.email || '';
+    var pr = document.getElementById('profileRole');
+    pr.textContent = ROLE_LABELS[role]; pr.className = 'nav__role nav__role--' + role;
 
-    document.getElementById('navRole').textContent = ROLE_LABELS[role];
-    document.getElementById('navRole').className = `nav__role nav__role--${role}`;
-    document.getElementById('navAvatar').src = av;
-    document.getElementById('profileAvatar').src = av;
-    document.getElementById('profileName').textContent = userData.name;
-    document.getElementById('profileEmail').textContent = userData.email;
-    const pr = document.getElementById('profileRole');
-    pr.textContent = ROLE_LABELS[role]; pr.className = `nav__role nav__role--${role}`;
+    // Bio
+    document.getElementById('viewBio').textContent = userData.bio || 'Пока ничего не написано.';
 
-    // View mode
-    document.getElementById('viewBio').textContent = userData.bio || 'Пользователь пока ничего не написал о себе.';
-
-    const skills = userData.skills || [];
+    // Skills
+    var skills = userData.skills || [];
     document.getElementById('viewSkills').innerHTML = skills.length
-      ? skills.map(s => `<span class="badge badge--gray">${s}</span>`).join('')
-      : '<span style="color:var(--text3);font-size:14px;">Навыки не указаны</span>';
+      ? skills.map(function(s){ return '<span class="badge badge--gray">' + s + '</span>'; }).join(' ')
+      : '<span style="color:var(--text3);font-size:14px;">Не указаны</span>';
 
-    const contacts = [];
-    if (userData.telegram) contacts.push(`<div style="margin-bottom:8px;">📱 <a href="https://t.me/${userData.telegram.replace('@','')}" target="_blank" style="color:var(--accent);">${userData.telegram}</a></div>`);
-    if (userData.linkedIn) contacts.push(`<div style="margin-bottom:8px;">💼 <a href="${userData.linkedIn}" target="_blank" style="color:var(--accent);">LinkedIn</a></div>`);
-    if (userData.gitHub)   contacts.push(`<div style="margin-bottom:8px;">🐙 <a href="${userData.gitHub}" target="_blank" style="color:var(--accent);">GitHub</a></div>`);
-    document.getElementById('viewContacts').innerHTML = contacts.join('') || '<span style="color:var(--text3);font-size:14px;">Контакты не указаны</span>';
+    // Contacts
+    var c = [];
+    if (userData.telegram) c.push('<a class="contact-row" href="https://t.me/' + userData.telegram.replace('@','') + '" target="_blank"><span class="contact-icon">📱</span>' + userData.telegram + '</a>');
+    if (userData.linkedIn)  c.push('<a class="contact-row" href="' + userData.linkedIn + '" target="_blank"><span class="contact-icon">💼</span>LinkedIn</a>');
+    if (userData.gitHub)    c.push('<a class="contact-row" href="' + userData.gitHub + '" target="_blank"><span class="contact-icon">🐙</span>GitHub</a>');
+    document.getElementById('viewContacts').innerHTML = c.join('') || '<span style="color:var(--text3);font-size:14px;">Не указаны</span>';
 
     // My startups (if startup role)
     if (role === 'startup') {
-      const sSnap = await db.collection('startups').where('ownerUid','==',user.uid).get();
+      var sSnap = await db.collection('startups').where('ownerUid','==',user.uid).get();
       if (!sSnap.empty) {
         document.getElementById('myStartupsCard').style.display = 'block';
-        document.getElementById('myStartupsList').innerHTML = sSnap.docs.map(d => {
-          const s = d.data();
-          return `<a href="startup.html?id=${d.id}" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px;">
-            <span style="font-size:24px;">${s.emoji||'🚀'}</span>
-            <div><div style="font-size:14px;font-weight:500;">${s.name}</div><div style="font-size:12px;color:var(--text2);">${s.stage||''}</div></div>
-          </a>`;
+        document.getElementById('myStartupsList').innerHTML = sSnap.docs.map(function(d){
+          var s = d.data();
+          return '<a href="startup.html?id=' + d.id + '" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px;"><span style="font-size:22px;">' + (s.emoji||'🚀') + '</span><div><div style="font-size:14px;font-weight:500;">' + s.name + '</div><div style="font-size:12px;color:var(--text2);">' + (s.stage||'') + '</div></div></a>';
         }).join('');
       }
     }
 
     document.getElementById('loadingState').style.display = 'none';
-    document.getElementById('pageContent').style.display = 'block';
+    document.getElementById('pageContent').style.display  = 'block';
   });
 
   function toggleEdit() {
-    const isEdit = document.getElementById('editMode').style.display !== 'none';
+    var isEdit = document.getElementById('editMode').style.display !== 'none';
     if (isEdit) {
       document.getElementById('editMode').style.display = 'none';
       document.getElementById('viewMode').style.display = 'block';
       document.getElementById('editBtn').textContent = '✏️ Редактировать';
     } else {
-      // Fill edit form
-      document.getElementById('editName').value = userData.name || '';
-      document.getElementById('editBio').value = userData.bio || '';
+      document.getElementById('editName').value     = userData.name || '';
+      document.getElementById('editBio').value      = userData.bio  || '';
       document.getElementById('editTelegram').value = userData.telegram || '';
       document.getElementById('editLinkedIn').value = userData.linkedIn || '';
-      document.getElementById('editGitHub').value = userData.gitHub || '';
-      editSkillsArr = [...(userData.skills || [])];
+      document.getElementById('editGitHub').value   = userData.gitHub   || '';
+      editSkillsArr = (userData.skills || []).slice();
       renderEditSkills();
-
       document.getElementById('editMode').style.display = 'block';
       document.getElementById('viewMode').style.display = 'none';
       document.getElementById('editBtn').textContent = '← Назад';
@@ -223,61 +253,69 @@
   }
 
   function addSkill() {
-    const input = document.getElementById('skillInput');
-    const val = input.value.trim();
-    if (val && !editSkillsArr.includes(val) && editSkillsArr.length < 15) {
+    var input = document.getElementById('skillInput');
+    var val   = input.value.trim();
+    if (val && editSkillsArr.indexOf(val) === -1 && editSkillsArr.length < 15) {
       editSkillsArr.push(val); renderEditSkills();
     }
     input.value = '';
   }
 
-  function removeSkill(s) { editSkillsArr = editSkillsArr.filter(x=>x!==s); renderEditSkills(); }
+  function removeSkill(s) {
+    editSkillsArr = editSkillsArr.filter(function(x){ return x !== s; });
+    renderEditSkills();
+  }
 
   function renderEditSkills() {
-    document.getElementById('editSkills').innerHTML = editSkillsArr.map(s =>
-      `<span class="skill-tag">${s}<button onclick="removeSkill('${s}')">×</button></span>`).join('');
+    document.getElementById('editSkills').innerHTML = editSkillsArr.map(function(s){
+      return '<span class="skill-tag">' + s + '<button onclick="removeSkill(\'' + s + '\')">×</button></span>';
+    }).join('');
   }
 
   async function saveProfile() {
-    const name = document.getElementById('editName').value.trim();
+    var name = document.getElementById('editName').value.trim();
     if (!name) { showToast('Введи имя', 'error'); return; }
-
-    const updates = {
+    var updates = {
       name,
-      bio: document.getElementById('editBio').value.trim(),
-      skills: editSkillsArr,
-      telegram: document.getElementById('editTelegram').value.trim(),
-      linkedIn: document.getElementById('editLinkedIn').value.trim(),
-      gitHub: document.getElementById('editGitHub').value.trim(),
+      bio:       document.getElementById('editBio').value.trim(),
+      skills:    editSkillsArr,
+      telegram:  document.getElementById('editTelegram').value.trim(),
+      linkedIn:  document.getElementById('editLinkedIn').value.trim(),
+      gitHub:    document.getElementById('editGitHub').value.trim(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-
     try {
       await db.collection('users').doc(currentUser.uid).update(updates);
       Object.assign(userData, updates);
       document.getElementById('profileName').textContent = name;
+      document.getElementById('navAvatar').alt = name;
       toggleEdit();
-      showToast('Профиль сохранён!', 'success');
+      location.reload(); // обновляем view
     } catch(e) {
       showToast('Ошибка: ' + e.message, 'error');
     }
   }
 
-  async function uploadNewAvatar(input) {
-    const file = input.files[0];
-    if (!file) return;
-    if (file.size > 3 * 1024 * 1024) { showToast('Файл слишком большой (макс. 3МБ)', 'error'); return; }
+  // ── Avatar URL ──
+  function previewAvatar(url) {
+    if (!url) return;
+    document.getElementById('avatarPreview').src = url;
+  }
 
-    showToast('Загружаем...', 'warn');
+  async function saveAvatarUrl() {
+    var url = document.getElementById('avatarUrlInput').value.trim();
+    if (!url) { showToast('Вставь ссылку на изображение', 'error'); return; }
+    // Basic check
+    if (!url.startsWith('http')) { showToast('Ссылка должна начинаться с http', 'error'); return; }
     try {
-      const url = await uploadAvatar(file, currentUser.uid);
       await db.collection('users').doc(currentUser.uid).update({ avatar: url });
       document.getElementById('profileAvatar').src = url;
-      document.getElementById('navAvatar').src = url;
+      document.getElementById('navAvatar').src     = url;
       userData.avatar = url;
+      document.getElementById('avatarModal').classList.remove('open');
       showToast('Аватар обновлён!', 'success');
     } catch(e) {
-      showToast('Ошибка загрузки: ' + e.message, 'error');
+      showToast('Ошибка: ' + e.message, 'error');
     }
   }
 </script>
