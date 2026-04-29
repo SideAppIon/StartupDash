@@ -1,5 +1,5 @@
 // =====================================================
-// FIREBASE CONFIG — реальные данные проекта
+// FIREBASE CONFIG - реальные данные проекта
 // =====================================================
 const firebaseConfig = {
   apiKey: "AIzaSyC0GD7ZMnm-ooiY0_jQUym3-mKM-tkd7sk",

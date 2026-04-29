@@ -56,7 +56,9 @@
 
 <script src="firebase-config.js"></script>
 <script>
-  redirectIfAuth('dashboard.html');
+  document.addEventListener('DOMContentLoaded', function() {
+    redirectIfAuth('dashboard.html');
+  });
 
   async function doLogin() {
     const email = document.getElementById('emailInput').value.trim();
