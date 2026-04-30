@@ -97,9 +97,9 @@
 <div id="toast" class="toast"></div>
 
 <!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script src="firebase-config.js"></script>
 <script>
@@ -133,14 +133,18 @@
 
     try {
       const cred = await auth.createUserWithEmailAndPassword(email, pass);
+      // Создаём документ пользователя в Firestore
       await db.collection('users').doc(cred.user.uid).set({
-        uid: cred.user.uid,
-        name,
-        email,
-        role: selectedRole,
-        bio: '',
-        avatar: '',
-        skills: [],
+        uid:       cred.user.uid,
+        name:      name,
+        email:     email,
+        role:      selectedRole,
+        bio:       '',
+        avatar:    '',
+        skills:    [],
+        telegram:  '',
+        linkedIn:  '',
+        gitHub:    '',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       window.location.href = 'dashboard.html';

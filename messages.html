@@ -1,227 +1,239 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Сообщения — LaunchPad</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <link rel="stylesheet" href="styles.css"/>
   <style>
-    body { overflow: hidden; }
-    .chat-header {
-      padding:16px 24px;border-bottom:1px solid var(--border);
-      display:flex;align-items:center;gap:12px;
-      background:var(--bg2);
-    }
-    .chat-header__name { font-family:var(--font-head);font-size:16px;font-weight:700; }
-    .chat-header__role { font-size:12px;color:var(--text2); }
-    .sidebar-header { padding:16px;border-bottom:1px solid var(--border); }
-    .sidebar-header h3 { font-family:var(--font-head);font-size:16px;font-weight:700; }
-    .empty-chat { flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--text2); }
-    .empty-chat__icon { font-size:48px;opacity:.3; }
-    .chat-input { flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:14px;padding:10px 16px;outline:none;resize:none; }
-    .chat-input:focus { border-color:var(--accent); }
-    .nav-chat { position:fixed;top:0;left:0;right:0;height:var(--nav-h);background:rgba(10,12,15,.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;z-index:100; }
-    .nav-chat__logo { font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--accent);text-decoration:none; }
-    .nav-chat__logo span{color:var(--text);}
+    html,body{height:100%;overflow:hidden}
+    .chat-layout{display:grid;grid-template-columns:280px 1fr;height:calc(100vh - var(--nav-h));margin-top:var(--nav-h)}
+    .chat-sidebar{background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+    .chat-main{display:flex;flex-direction:column;overflow:hidden}
+    .sidebar-head{padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .sidebar-head h3{font-family:var(--font-head);font-size:15px;font-weight:700}
+    .conv-list{flex:1;overflow-y:auto}
+    .conv-item{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .15s}
+    .conv-item:hover{background:var(--bg3)}
+    .conv-item.active{background:var(--accent-dim)}
+    .conv-name{font-size:14px;font-weight:500}
+    .conv-preview{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+    .chat-header{padding:14px 20px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;align-items:center;gap:12px;flex-shrink:0}
+    .chat-header__name{font-family:var(--font-head);font-size:15px;font-weight:700}
+    .chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+    .chat-input-area{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0}
+    .chat-textarea{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:14px;padding:10px 14px;outline:none;resize:none;transition:border-color .2s;line-height:1.5}
+    .chat-textarea:focus{border-color:var(--accent)}
+    .msg{max-width:72%}
+    .msg--mine{align-self:flex-end}
+    .msg__bubble{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5;word-break:break-word}
+    .msg--theirs .msg__bubble{background:var(--bg3);border-radius:4px 14px 14px 14px}
+    .msg--mine .msg__bubble{background:var(--accent-dim);border:1px solid rgba(0,230,118,.2);border-radius:14px 4px 14px 14px}
+    .msg__time{font-size:11px;color:var(--text3);margin-top:4px}
+    .msg--mine .msg__time{text-align:right}
+    .empty-chat{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--text2)}
+    .empty-chat__icon{font-size:48px;opacity:.3}
+    @media(max-width:640px){.chat-layout{grid-template-columns:1fr}.chat-sidebar{display:none}}
   </style>
 </head>
 <body>
-
-<nav class="nav-chat">
-  <a href="index.html" class="nav-chat__logo">Launch<span>Pad</span></a>
-  <a href="dashboard.html" class="btn btn--ghost btn--sm" style="margin-left:auto;">← Дашборд</a>
-  <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <div class="nav__user">
+    <a href="dashboard.html" class="btn btn--ghost btn--sm">← Дашборд</a>
+    <span class="nav__role" id="navRole"></span>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="window.location.href='profile.html'"/>
+  </div>
 </nav>
 
 <div class="chat-layout">
-  <!-- Sidebar -->
   <div class="chat-sidebar">
-    <div class="sidebar-header">
-      <h3>Сообщения</h3>
-    </div>
-    <div id="convList">
-      <div class="spinner" style="margin:32px auto;width:24px;height:24px;border-width:2px;"></div>
+    <div class="sidebar-head"><h3>Сообщения</h3></div>
+    <div class="conv-list" id="convList">
+      <div style="padding:20px;text-align:center"><div class="spinner" style="width:24px;height:24px;border-width:2px;margin:0 auto"></div></div>
     </div>
   </div>
-
-  <!-- Chat main -->
   <div class="chat-main" id="chatMain">
     <div class="empty-chat">
       <div class="empty-chat__icon">💬</div>
-      <p>Выбери диалог слева</p>
+      <p style="font-size:14px">Выбери диалог слева</p>
     </div>
   </div>
 </div>
 
 <div id="toast" class="toast"></div>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script>
-  requireAuth('login.html');
+requireAuth('login.html');
 
-  let activeConvId = null;
-  let msgUnsubscribe = null;
+var myUid     = null;
+var activeId  = null;
+var msgUnsub  = null;
+var convUnsub = null;
 
-  onAuthReady(async (user, userData) => {
-    if (!user) return;
+onAuthReady(async function(user, userData) {
+  if (!user) return;
+  myUid = user.uid;
+  renderNav(userData);
 
-    const avatar = userData?.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(userData?.name||'U')}`;
-    document.getElementById('navAvatar').src = avatar;
-    document.getElementById('navAvatar').onclick = () => window.location.href = 'profile.html';
+  // Если открыт из startup.html?to=uid
+  var toUid = getUrlParam('to');
+  if (toUid && toUid !== myUid) {
+    try {
+      activeId = await ensureConv(myUid, toUid, userData);
+    } catch(e) { console.warn('ensureConv:', e.message); }
+  }
 
-    // Check if coming from startup page (to=uid)
-    const toUid = getUrlParam('to');
-    if (toUid && toUid !== user.uid) {
-      await ensureConversation(user.uid, toUid);
+  startConvListener(myUid);
+});
+
+function startConvListener(uid) {
+  if (convUnsub) convUnsub();
+  convUnsub = db.collection('conversations')
+    .where('participants','array-contains', uid)
+    .orderBy('lastAt','desc')
+    .onSnapshot(function(snap) {
+      renderConvList(snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); }));
+      if (activeId) openConv(activeId);
+    }, function(err) {
+      // Если индекс не создан — грузим без сортировки
+      if (err.code === 'failed-precondition') {
+        db.collection('conversations')
+          .where('participants','array-contains', uid)
+          .get().then(function(snap) {
+            renderConvList(snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); }));
+            if (activeId) openConv(activeId);
+          });
+      }
+    });
+}
+
+function renderConvList(convs) {
+  var el = document.getElementById('convList');
+  if (!convs.length) {
+    el.innerHTML = '<p style="padding:20px;font-size:13px;color:var(--text2)">Нет диалогов. Напиши стартаперу из карточки стартапа.</p>';
+    return;
+  }
+  el.innerHTML = convs.map(function(c) {
+    var other = (c.participants||[]).find(function(p){ return p !== myUid; }) || '';
+    var name  = (c.participantNames && c.participantNames[other]) || 'Неизвестно';
+    var av    = (c.participantAvatars && c.participantAvatars[other]) ||
+      'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(name);
+    return '<div class="conv-item' + (activeId===c.id?' active':'') + '" onclick="openConv(\'' + c.id + '\')">' +
+      '<img src="' + esc(av) + '" class="avatar avatar--sm"/>' +
+      '<div style="flex:1;min-width:0"><div class="conv-name">' + esc(name) + '</div>' +
+      '<div class="conv-preview">' + esc(c.lastMessage||'...') + '</div></div>' +
+    '</div>';
+  }).join('');
+}
+
+async function ensureConv(myUid, otherUid, myData) {
+  var existing = await db.collection('conversations')
+    .where('participants','array-contains', myUid).get();
+  for (var i = 0; i < existing.docs.length; i++) {
+    var p = existing.docs[i].data().participants || [];
+    if (p.indexOf(otherUid) !== -1) return existing.docs[i].id;
+  }
+  // Создаём новый
+  var otherSnap = await db.collection('users').doc(otherUid).get();
+  var other = otherSnap.exists ? otherSnap.data() : { name: 'Unknown', avatar: '' };
+  var names = {}; names[myUid] = (myData&&myData.name)||''; names[otherUid] = other.name||'';
+  var avatars = {}; avatars[myUid] = (myData&&myData.avatar)||''; avatars[otherUid] = other.avatar||'';
+  var ref = await db.collection('conversations').add({
+    participants: [myUid, otherUid],
+    participantNames: names,
+    participantAvatars: avatars,
+    lastMessage: '',
+    lastAt: firebase.firestore.FieldValue.serverTimestamp(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  return ref.id;
+}
+
+async function openConv(convId) {
+  activeId = convId;
+  if (msgUnsub) msgUnsub();
+
+  var snap = await db.collection('conversations').doc(convId).get();
+  if (!snap.exists) return;
+  var conv  = snap.data();
+  var other = (conv.participants||[]).find(function(p){ return p !== myUid; }) || '';
+  var name  = (conv.participantNames && conv.participantNames[other]) || 'Неизвестно';
+  var av    = (conv.participantAvatars && conv.participantAvatars[other]) ||
+    'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(name);
+
+  document.getElementById('chatMain').innerHTML =
+    '<div class="chat-header">' +
+      '<img src="' + esc(av) + '" class="avatar avatar--sm"/>' +
+      '<div><div class="chat-header__name">' + esc(name) + '</div>' +
+      '<a href="member.html?uid=' + esc(other) + '" style="font-size:12px;color:var(--accent);text-decoration:none">Профиль →</a></div>' +
+    '</div>' +
+    '<div class="chat-messages" id="chatMessages"></div>' +
+    '<div class="chat-input-area">' +
+      '<textarea class="chat-textarea" id="msgInput" placeholder="Напиши сообщение..." rows="1" ' +
+        'onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();send()}" ' +
+        'oninput="this.style.height=\'auto\';this.style.height=Math.min(this.scrollHeight,120)+\'px\'"></textarea>' +
+      '<button class="btn btn--primary" onclick="send()">→</button>' +
+    '</div>';
+
+  // Подсвечиваем активный диалог
+  document.querySelectorAll('.conv-item').forEach(function(el){
+    el.classList.toggle('active', el.onclick && el.onclick.toString().includes(convId));
+  });
+  document.querySelectorAll('.conv-item').forEach(function(el){
+    el.classList.remove('active');
+  });
+  var items = document.querySelectorAll('.conv-item');
+  items.forEach(function(el){
+    if (el.getAttribute('onclick') && el.getAttribute('onclick').includes(convId)) {
+      el.classList.add('active');
     }
-
-    loadConversations(user.uid);
   });
 
-  async function ensureConversation(myUid, otherUid) {
-    // Find existing
-    const convSnap = await db.collection('conversations')
-      .where('participants','array-contains', myUid).get();
-
-    let found = null;
-    convSnap.forEach(doc => {
-      const p = doc.data().participants;
-      if (p.includes(otherUid)) found = doc.id;
+  msgUnsub = db.collection('conversations').doc(convId)
+    .collection('messages').orderBy('createdAt','asc')
+    .onSnapshot(function(snap) {
+      var el = document.getElementById('chatMessages');
+      if (!el) return;
+      el.innerHTML = snap.docs.map(function(d) {
+        var m = d.data();
+        var mine = m.senderUid === myUid;
+        return '<div class="msg ' + (mine?'msg--mine':'msg--theirs') + '">' +
+          '<div class="msg__bubble">' + esc(m.text||'').replace(/\n/g,'<br>') + '</div>' +
+          '<div class="msg__time">' + formatDate(m.createdAt) + '</div>' +
+        '</div>';
+      }).join('');
+      el.scrollTop = el.scrollHeight;
+    }, function(err) {
+      console.warn('messages listener:', err.message);
     });
+}
 
-    if (!found) {
-      const otherUser = await db.collection('users').doc(otherUid).get();
-      const ref = await db.collection('conversations').add({
-        participants: [myUid, otherUid],
-        participantNames: {
-          [myUid]: currentUserData.name,
-          [otherUid]: otherUser.exists ? otherUser.data().name : 'Unknown'
-        },
-        participantAvatars: {
-          [myUid]: currentUserData.avatar || '',
-          [otherUid]: otherUser.exists ? otherUser.data().avatar || '' : ''
-        },
-        lastMessage: '',
-        lastAt: firebase.firestore.FieldValue.serverTimestamp(),
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      found = ref.id;
-    }
-    activeConvId = found;
-    return found;
-  }
-
-  function loadConversations(uid) {
-    db.collection('conversations')
-      .where('participants','array-contains', uid)
-      .orderBy('lastAt','desc')
-      .onSnapshot(snap => {
-        const convs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderConvList(convs, uid);
-        if (activeConvId) openConversation(activeConvId, uid);
-      });
-  }
-
-  function renderConvList(convs, myUid) {
-    const el = document.getElementById('convList');
-    if (convs.length === 0) {
-      el.innerHTML = '<p style="font-size:13px;color:var(--text2);padding:16px;">Нет диалогов</p>';
-      return;
-    }
-    el.innerHTML = convs.map(c => {
-      const otherUid = c.participants.find(p => p !== myUid);
-      const name = c.participantNames?.[otherUid] || 'Неизвестно';
-      const av = c.participantAvatars?.[otherUid] || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(name)}`;
-      return `
-        <div class="conv-item ${activeConvId === c.id ? 'active' : ''}" onclick="openConversation('${c.id}','${myUid}')">
-          <img src="${av}" class="avatar avatar--sm"/>
-          <div style="flex:1;min-width:0;">
-            <div class="conv-item__name">${name}</div>
-            <div class="conv-item__preview" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.lastMessage||'...'}</div>
-          </div>
-        </div>`;
-    }).join('');
-  }
-
-  async function openConversation(convId, myUid) {
-    activeConvId = convId;
-    if (msgUnsubscribe) msgUnsubscribe();
-
-    // Get other user info
-    const convSnap = await db.collection('conversations').doc(convId).get();
-    const conv = convSnap.data();
-    const otherUid = conv.participants.find(p => p !== myUid);
-    const otherName = conv.participantNames?.[otherUid] || 'Неизвестно';
-    const otherAvatar = conv.participantAvatars?.[otherUid] || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(otherName)}`;
-
-    document.getElementById('chatMain').innerHTML = `
-      <div class="chat-header">
-        <img src="${otherAvatar}" class="avatar avatar--sm"/>
-        <div>
-          <div class="chat-header__name">${otherName}</div>
-          <div class="chat-header__role">
-            <a href="member.html?uid=${otherUid}" style="color:var(--accent);font-size:12px;text-decoration:none;">Посмотреть профиль →</a>
-          </div>
-        </div>
-      </div>
-      <div class="chat-messages" id="chatMessages"></div>
-      <div class="chat-input-area">
-        <textarea class="chat-input" id="msgInput" placeholder="Напиши сообщение..." rows="1"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage('${convId}','${myUid}')}"
-          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
-        <button class="btn btn--primary" onclick="sendMessage('${convId}','${myUid}')">→</button>
-      </div>
-    `;
-
-    // Listen to messages
-    msgUnsubscribe = db.collection('conversations').doc(convId).collection('messages')
-      .orderBy('createdAt','asc')
-      .onSnapshot(snap => {
-        const msgsEl = document.getElementById('chatMessages');
-        if (!msgsEl) return;
-        msgsEl.innerHTML = snap.docs.map(d => {
-          const m = d.data();
-          const isMine = m.senderUid === myUid;
-          return `
-            <div class="msg ${isMine ? 'msg--mine' : 'msg--theirs'}">
-              <div class="msg__bubble">${escapeHtml(m.text)}</div>
-              <div class="msg__time">${m.createdAt ? formatDate(m.createdAt) : ''}</div>
-            </div>`;
-        }).join('');
-        msgsEl.scrollTop = msgsEl.scrollHeight;
-      });
-
-    // Highlight in sidebar
-    document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
-    document.querySelector(`.conv-item[onclick*="${convId}"]`)?.classList.add('active');
-  }
-
-  async function sendMessage(convId, myUid) {
-    const input = document.getElementById('msgInput');
-    const text = input.value.trim();
-    if (!text) return;
-
-    input.value = ''; input.style.height = 'auto';
-
-    await db.collection('conversations').doc(convId).collection('messages').add({
-      text, senderUid: myUid,
+async function send() {
+  if (!activeId || !myUid) return;
+  var inp  = document.getElementById('msgInput');
+  var text = inp ? inp.value.trim() : '';
+  if (!text) return;
+  inp.value = ''; inp.style.height = 'auto';
+  try {
+    await db.collection('conversations').doc(activeId).collection('messages').add({
+      text: text, senderUid: myUid,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-
-    await db.collection('conversations').doc(convId).update({
-      lastMessage: text.substring(0, 80),
+    await db.collection('conversations').doc(activeId).update({
+      lastMessage: text.substring(0,80),
       lastAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-  }
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
+}
 
-  function escapeHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-  }
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>
 </body>
 </html>
