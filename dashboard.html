@@ -97,6 +97,9 @@ onAuthReady(async function(user, userData) {
       const docSnap = await docRef.get();
       
       if (!docSnap.exists) {
+        // Документ не существует - это может произойти если пользователь зарегистрировался через Firebase Auth
+        // но Firestore документ не был создан. В этом случае создаем с ролью 'user' по умолчанию.
+        console.log('[Dashboard] Document does not exist, creating with default role');
         await docRef.set({
           uid: user.uid, name: user.email.split('@')[0],
           email: user.email, role: 'user',
@@ -109,7 +112,7 @@ onAuthReady(async function(user, userData) {
       } else {
         // Документ уже существует, используем его данные
         userData = docSnap.data();
-        console.log('[Dashboard] Using existing user document');
+        console.log('[Dashboard] Using existing user document with role:', userData.role);
       }
     } catch(e) {
       console.error('[Dashboard] Error with user document:', e);

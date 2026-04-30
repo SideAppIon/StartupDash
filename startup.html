@@ -314,6 +314,7 @@
 
     el.innerHTML = '<div class="card">' + members.map(m => {
       const av = m.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(m.name||'U')}`;
+      const canMessage = user && userData && user.uid !== m.uid;
       return `
         <div class="team-member">
           <a href="member.html?uid=${m.uid}" style="display:contents;">
@@ -323,7 +324,10 @@
             <div class="team-member__name">${m.name}</div>
             <div class="team-member__role">${m.teamRole}</div>
           </div>
-          ${m.isOwner ? '<span class="owner-badge">👑</span>' : ''}
+          <div style="display:flex;gap:6px;align-items:center">
+            ${m.isOwner ? '<span class="owner-badge">👑</span>' : ''}
+            ${canMessage ? `<button class="btn btn--ghost btn--sm" onclick="window.location.href='messages.html?to=${m.uid}'">💬</button>` : ''}
+          </div>
         </div>`;
     }).join('') + '</div>';
   }
