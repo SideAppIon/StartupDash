@@ -57,7 +57,8 @@
 
 <script src="firebase-config.js"></script>
 <script>
-  redirectIfAuth('dashboard.html');
+  // Ждём инициализации Firebase перед проверкой авторизации
+  setTimeout(() => redirectIfAuth('dashboard.html'), 100);
 
   async function doLogin() {
     const email = document.getElementById('emailInput').value.trim();

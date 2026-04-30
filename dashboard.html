@@ -89,14 +89,19 @@ onAuthReady(async function(user, userData) {
 
   // Создаём документ если не существует
   if (!userData) {
-    await db.collection('users').doc(user.uid).set({
-      uid: user.uid, name: user.email.split('@')[0],
-      email: user.email, role: 'user',
-      bio:'', skills:[], avatar:'',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    var s2 = await db.collection('users').doc(user.uid).get();
-    userData = s2.data();
+    try {
+      await db.collection('users').doc(user.uid).set({
+        uid: user.uid, name: user.email.split('@')[0],
+        email: user.email, role: 'user',
+        bio:'', skills:[], avatar:'',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      var s2 = await db.collection('users').doc(user.uid).get();
+      userData = s2.data();
+    } catch(e) {
+      console.error('Error creating user document:', e);
+      userData = { uid: user.uid, name: user.email.split('@')[0], email: user.email, role: 'user' };
+    }
   }
 
   var role = userData.role || 'user';
@@ -117,13 +122,24 @@ onAuthReady(async function(user, userData) {
   }).join('');
 
   var main = document.getElementById('main');
+  
+  // Таймаут для предотвращения бесконечной загрузки
+  var loadTimeout = setTimeout(() => {
+    if (main.innerHTML.includes('Загрузка дашборда')) {
+      main.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⏱️</div><div class="empty-state__title">Превышено время загрузки</div><p style="font-size:14px">Проверьте подключение к интернету</p><button class="btn btn--outline" onclick="location.reload()">Обновить</button></div>';
+    }
+  }, 10000);
+  
   try {
     if (role==='startup')  await renderStartup(main, user.uid);
     else if (role==='investor') await renderInvestor(main);
     else if (role==='admin')    await renderAdmin(main);
     else                         await renderUser(main, user.uid);
+    clearTimeout(loadTimeout);
   } catch(e) {
-    main.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Ошибка загрузки</div><p style="font-size:14px">'+e.message+'</p><button class="btn btn--outline" onclick="location.reload()">Попробовать снова</button></div>';
+    clearTimeout(loadTimeout);
+    console.error('Dashboard render error:', e);
+    main.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Ошибка загрузки</div><p style="font-size:14px">'+(e.message || 'Неизвестная ошибка')+'</p><button class="btn btn--outline" onclick="location.reload()">Попробовать снова</button></div>';
   }
 });
 
@@ -169,11 +185,28 @@ async function renderStartup(el, uid) {
       }).join('')
     : '');
 
-  // Считаем команды
+  // Считаем команды с таймаутом
   var total = 0;
-  for (var i=0; i<startups.length; i++) {
-    try { var t = await db.collection('startups').doc(startups[i].id).collection('team').get(); total+=t.size; } catch(e){}
+  var teamPromises = startups.map(async function(s) {
+    try {
+      var t = await Promise.race([
+        db.collection('startups').doc(s.id).collection('team').get(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+      ]);
+      return t.size;
+    } catch(e) {
+      console.warn('Error loading team for startup', s.id, e);
+      return 0;
+    }
+  });
+  
+  try {
+    var results = await Promise.all(teamPromises);
+    total = results.reduce((sum, count) => sum + count, 0);
+  } catch(e) {
+    console.warn('Error counting team members:', e);
   }
+  
   var tt = document.getElementById('teamTotal');
   if (tt) tt.textContent = total;
 }

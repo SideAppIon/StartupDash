@@ -55,7 +55,17 @@ function onAuthReady(callback) {
 }
 
 function requireAuth(redirectTo) {
+  let checked = false;
+  const timeout = setTimeout(() => {
+    if (!checked) {
+      console.warn('Auth check timeout - redirecting to login');
+      window.location.href = redirectTo || 'login.html';
+    }
+  }, 5000);
+  
   auth.onAuthStateChanged(function(user) {
+    checked = true;
+    clearTimeout(timeout);
     if (!user) window.location.href = redirectTo || 'login.html';
   });
 }
