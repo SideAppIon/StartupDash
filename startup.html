@@ -159,6 +159,29 @@
     document.getElementById(id).classList.remove('open');
   }
 
+  async function ensureConv(myUid, otherUid, myData) {
+    var existing = await db.collection('conversations')
+      .where('participants','array-contains', myUid).get();
+    for (var i = 0; i < existing.docs.length; i++) {
+      var p = existing.docs[i].data().participants || [];
+      if (p.indexOf(otherUid) !== -1) return existing.docs[i].id;
+    }
+    // Создаём новый
+    var otherSnap = await db.collection('users').doc(otherUid).get();
+    var other = otherSnap.exists ? otherSnap.data() : { name: 'Unknown', avatar: '' };
+    var names = {}; names[myUid] = (myData&&myData.name)||''; names[otherUid] = other.name||'';
+    var avatars = {}; avatars[myUid] = (myData&&myData.avatar)||''; avatars[otherUid] = other.avatar||'';
+    var ref = await db.collection('conversations').add({
+      participants: [myUid, otherUid],
+      participantNames: names,
+      participantAvatars: avatars,
+      lastMessage: '',
+      lastAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return ref.id;
+  }
+
   onAuthReady(async (user, userData) => {
     // Update nav
     const navUser = document.getElementById('navUser');
@@ -306,18 +329,19 @@
   }
 
   async function sendInvite() {
-    if (!currentUser) { window.location.href = 'login.html'; return; }
+    const user = auth.currentUser;
+    if (!user || !currentUserData) { window.location.href = 'login.html'; return; }
     const message = document.getElementById('inviteMessage').value.trim();
 
     // Check existing invite
     const existing = await db.collection('invites')
-      .where('fromUid','==', currentUser.uid)
+      .where('fromUid','==', user.uid)
       .where('startupId','==', startupId).get();
     const alreadySent = existing.docs.some(d => d.data().status === 'pending');
     if (alreadySent) { showToast('Ты уже подал заявку на этот стартап', 'warn'); return; }
 
     await db.collection('invites').add({
-      fromUid: currentUser.uid,
+      fromUid: user.uid,
       fromName: currentUserData.name,
       fromAvatar: currentUserData.avatar || '',
       startupId,
@@ -328,8 +352,29 @@
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
+    // Создаем диалог между основателем и соискателем
+    try {
+      const convId = await ensureConv(startupData.ownerUid, user.uid, currentUserData);
+      
+      // Добавляем системное сообщение о заявке
+      await db.collection('conversations').doc(convId).collection('messages').add({
+        text: `📋 Новая заявка в команду "${startupData.name}"\n\n${currentUserData.name}: ${message}`,
+        senderUid: user.uid,
+        isSystem: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      
+      // Обновляем последнее сообщение
+      await db.collection('conversations').doc(convId).update({
+        lastMessage: `Заявка: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
+        lastAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } catch(e) {
+      console.warn('Error creating conversation for invite:', e);
+    }
+
     closeModal('inviteModal');
-    showToast('✅ Заявка отправлена!', 'success');
+    showToast('✅ Заявка отправлена! Основатель увидит ее в сообщениях.', 'success');
   }
 </script>
 </body>

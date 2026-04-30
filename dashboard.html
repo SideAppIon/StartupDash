@@ -92,17 +92,27 @@ onAuthReady(async function(user, userData) {
   if (!userData) {
     console.log('[Dashboard] Creating user document for:', user.uid);
     try {
-      await db.collection('users').doc(user.uid).set({
-        uid: user.uid, name: user.email.split('@')[0],
-        email: user.email, role: 'user',
-        bio:'', skills:[], avatar:'',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      var s2 = await db.collection('users').doc(user.uid).get();
-      userData = s2.data();
-      console.log('[Dashboard] User document created successfully');
+      // Проверяем, существует ли документ перед созданием
+      const docRef = db.collection('users').doc(user.uid);
+      const docSnap = await docRef.get();
+      
+      if (!docSnap.exists) {
+        await docRef.set({
+          uid: user.uid, name: user.email.split('@')[0],
+          email: user.email, role: 'user',
+          bio:'', skills:[], avatar:'',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        var s2 = await docRef.get();
+        userData = s2.data();
+        console.log('[Dashboard] User document created successfully');
+      } else {
+        // Документ уже существует, используем его данные
+        userData = docSnap.data();
+        console.log('[Dashboard] Using existing user document');
+      }
     } catch(e) {
-      console.error('[Dashboard] Error creating user document:', e);
+      console.error('[Dashboard] Error with user document:', e);
       userData = { uid: user.uid, name: user.email.split('@')[0], email: user.email, role: 'user' };
     }
   }
