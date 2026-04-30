@@ -37,13 +37,16 @@ function safeArray(val) {
 
 function onAuthReady(callback) {
   auth.onAuthStateChanged(async function(user) {
+    console.log('[onAuthReady] Auth state changed:', user ? 'user authenticated' : 'no user');
     if (user) {
       currentUser = user;
       try {
+        console.log('[onAuthReady] Loading user data for UID:', user.uid);
         var snap = await db.collection('users').doc(user.uid).get();
         currentUserData = snap.exists ? snap.data() : null;
+        console.log('[onAuthReady] User data loaded:', currentUserData ? 'success' : 'not found');
       } catch(e) {
-        console.warn('[firebase-config] Firestore:', e.code, e.message);
+        console.error('[firebase-config] Firestore error loading user:', e.code, e.message);
         currentUserData = null;
       }
     } else {
@@ -56,17 +59,24 @@ function onAuthReady(callback) {
 
 function requireAuth(redirectTo) {
   let checked = false;
+  console.log('[requireAuth] Starting auth check...');
   const timeout = setTimeout(() => {
     if (!checked) {
-      console.warn('Auth check timeout - redirecting to login');
+      console.error('[requireAuth] Auth check timeout after 10 seconds - redirecting to login');
       window.location.href = redirectTo || 'login.html';
     }
-  }, 5000);
+  }, 10000);
   
   auth.onAuthStateChanged(function(user) {
+    console.log('[requireAuth] Auth state changed:', user ? 'authenticated' : 'not authenticated');
     checked = true;
     clearTimeout(timeout);
-    if (!user) window.location.href = redirectTo || 'login.html';
+    if (!user) {
+      console.log('[requireAuth] No user, redirecting to login');
+      window.location.href = redirectTo || 'login.html';
+    } else {
+      console.log('[requireAuth] User authenticated, staying on page');
+    }
   });
 }
 
