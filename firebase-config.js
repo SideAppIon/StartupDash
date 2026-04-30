@@ -18,9 +18,6 @@ if (!firebase.apps.length) {
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
-// CORS fix для Safari/WebKit — обязательно
-db.settings({ experimentalForceLongPolling: true, merge: true });
-
 // ─────────────────────────────────────────────────────
 // СОСТОЯНИЕ
 // ─────────────────────────────────────────────────────
@@ -31,7 +28,6 @@ let currentUserData = null;
 // УТИЛИТЫ
 // ─────────────────────────────────────────────────────
 
-// Безопасное приведение любого значения к массиву
 function safeArray(val) {
   if (Array.isArray(val)) return val;
   if (!val) return [];
@@ -39,8 +35,6 @@ function safeArray(val) {
   return [];
 }
 
-// Слушатель авторизации — вызывает callback(user, userData)
-// userData = null если документ не найден (новый юзер или ошибка)
 function onAuthReady(callback) {
   auth.onAuthStateChanged(async function(user) {
     if (user) {
@@ -49,7 +43,7 @@ function onAuthReady(callback) {
         var snap = await db.collection('users').doc(user.uid).get();
         currentUserData = snap.exists ? snap.data() : null;
       } catch(e) {
-        console.warn('[firebase-config] Firestore error:', e.code, e.message);
+        console.warn('[firebase-config] Firestore:', e.code, e.message);
         currentUserData = null;
       }
     } else {
@@ -60,35 +54,28 @@ function onAuthReady(callback) {
   });
 }
 
-// Редирект если НЕ авторизован
 function requireAuth(redirectTo) {
   auth.onAuthStateChanged(function(user) {
     if (!user) window.location.href = redirectTo || 'login.html';
   });
 }
 
-// Редирект если УЖЕ авторизован
 function redirectIfAuth(redirectTo) {
   auth.onAuthStateChanged(function(user) {
     if (user) window.location.href = redirectTo || 'dashboard.html';
   });
 }
 
-// Получить GET-параметр из URL (?id=xxx)
 function getUrlParam(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
-// Форматировать Firestore Timestamp → читаемая дата
 function formatDate(timestamp) {
   if (!timestamp) return '';
-  var d = (timestamp.toDate) ? timestamp.toDate() : new Date(timestamp);
-  return d.toLocaleDateString('ru-RU', {
-    day: 'numeric', month: 'long', year: 'numeric'
-  });
+  var d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-// Показать toast-уведомление
 function showToast(message, type) {
   var toast = document.getElementById('toast');
   if (!toast) return;
@@ -97,13 +84,6 @@ function showToast(message, type) {
   setTimeout(function() { toast.className = 'toast'; }, 3000);
 }
 
-// Аватар — URL сохраняется прямо в Firestore (без Storage)
-function saveAvatarUrl(uid, url) {
-  if (!url || !uid) return Promise.resolve();
-  return db.collection('users').doc(uid).update({ avatar: url });
-}
-
-// Стандартный nav для авторизованных страниц
 var ROLE_LABELS = {
   startup:  'Стартапер',
   investor: 'Инвестор',
@@ -112,9 +92,9 @@ var ROLE_LABELS = {
 };
 
 function renderNav(userData) {
+  if (!userData) return;
   var navRole   = document.getElementById('navRole');
   var navAvatar = document.getElementById('navAvatar');
-  if (!userData) return;
   if (navRole) {
     navRole.textContent = ROLE_LABELS[userData.role] || userData.role;
     navRole.className   = 'nav__role nav__role--' + userData.role;
@@ -124,4 +104,8 @@ function renderNav(userData) {
       'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' +
       encodeURIComponent(userData.name || 'U');
   }
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
