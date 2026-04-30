@@ -265,8 +265,30 @@ async function renderAdmin(el) {
 }
 
 async function answer(id, status) {
+  const inviteSnap = await db.collection('invites').doc(id).get();
+  if (!inviteSnap.exists) return;
+  
+  const invite = inviteSnap.data();
+  
+  // Обновляем статус заявки
   await db.collection('invites').doc(id).update({ status: status });
-  showToast(status==='accepted'?'✅ Принято':'❌ Отклонено');
+  
+  if (status === 'accepted') {
+    // Добавляем участника в команду стартапа
+    try {
+      await db.collection('startups').doc(invite.startupId).collection('team').add({
+        uid: invite.fromUid,
+        role: 'Участник',
+        addedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        inviteId: id
+      });
+      console.log('[answer] Added user to team:', invite.fromUid, 'to startup:', invite.startupId);
+    } catch(e) {
+      console.error('[answer] Error adding to team:', e);
+    }
+  }
+  
+  showToast(status==='accepted'?'✅ Принято и добавлено в команду':'❌ Отклонено');
   setTimeout(function(){ location.reload(); }, 800);
 }
 

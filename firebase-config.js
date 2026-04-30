@@ -67,7 +67,7 @@ function requireAuth(redirectTo) {
     }
   }, 10000);
   
-  auth.onAuthStateChanged(function(user) {
+  auth.onAuthStateChanged(async function(user) {
     console.log('[requireAuth] Auth state changed:', user ? 'authenticated' : 'not authenticated');
     checked = true;
     clearTimeout(timeout);
@@ -75,7 +75,16 @@ function requireAuth(redirectTo) {
       console.log('[requireAuth] No user, redirecting to login');
       window.location.href = redirectTo || 'login.html';
     } else {
-      console.log('[requireAuth] User authenticated, staying on page');
+      console.log('[requireAuth] User authenticated, loading user data');
+      currentUser = user;
+      try {
+        var snap = await db.collection('users').doc(user.uid).get();
+        currentUserData = snap.exists ? snap.data() : null;
+        console.log('[requireAuth] User data loaded:', currentUserData ? 'success' : 'not found');
+      } catch(e) {
+        console.error('[requireAuth] Firestore error loading user:', e.code, e.message);
+        currentUserData = null;
+      }
     }
   });
 }
