@@ -148,6 +148,7 @@ function switchTab(idx, btn) {
   document.querySelectorAll('.tab-panel').forEach(function(p,i){ p.classList.toggle('active', i===idx); });
 }
 
+function openInviteModal() { document.getElementById('inviteModal').classList.add('open'); }
 function closeModal() { document.getElementById('inviteModal').classList.remove('open'); }
 
 // ── INIT ──────────────────────────────────────────────
@@ -261,7 +262,7 @@ function renderActions(user, userData, inviteStatus) {
     } else if (inviteStatus === 'rejected') {
       el.innerHTML = '<span class="badge badge--red" style="padding:8px 16px;font-size:13px">❌ Заявка отклонена</span>';
     } else {
-      el.innerHTML = '<button class="btn btn--primary" onclick="document.getElementById('inviteModal').classList.add('open')">👋 Подать заявку</button>';
+      el.innerHTML = '<button class="btn btn--primary" onclick="openInviteModal()">👋 Подать заявку</button>';
     }
 
   } else if (!user) {
