@@ -64,8 +64,7 @@
 
 <script src="firebase-config.js"></script>
 <script>
-  const ROLE_LABELS = {startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'};
-  const ROLE_CLASSES = {startup:'badge--green',investor:'badge--purple',user:'badge--blue',admin:'badge--red'};
+  var ROLE_CLASSES = {startup:'badge--green',investor:'badge--purple',user:'badge--blue',admin:'badge--red'};
   let allMembers = [];
 
   onAuthReady(async (user, userData) => {

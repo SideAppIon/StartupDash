@@ -107,8 +107,7 @@
 
   onAuthReady(async (user, userData) => {
     if (user && userData) {
-      const ROLE_LABELS = {startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'};
-      document.getElementById('navUser').innerHTML = `
+          document.getElementById('navUser').innerHTML = `
         <span class="nav__role nav__role--${userData.role}">${ROLE_LABELS[userData.role]}</span>
         <img class="nav__avatar" src="${userData.avatar||`https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(userData.name)}`}" onclick="window.location='profile.html'"/>
         <a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>
