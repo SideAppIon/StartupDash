@@ -239,6 +239,7 @@ function toggleEdit() {
     document.getElementById('editBtn').textContent    = '✏️ Редактировать';
   } else {
     document.getElementById('editName').value     = uData.name     || '';
+    document.getElementById('editRole').value     = uData.role     || 'user';
     document.getElementById('editBio').value      = uData.bio      || '';
     document.getElementById('editTelegram').value = uData.telegram || '';
     document.getElementById('editLinkedIn').value = uData.linkedIn || '';
@@ -274,8 +275,10 @@ function renderEditSkills() {
 async function saveProfile() {
   var name = document.getElementById('editName').value.trim();
   if (!name) { showToast('Введи имя', 'error'); return; }
+  var newRole = document.getElementById('editRole').value;
   var upd = {
     name:      name,
+    role:      newRole,
     bio:       document.getElementById('editBio').value.trim(),
     skills:    skills.slice(),
     telegram:  document.getElementById('editTelegram').value.trim(),
@@ -287,6 +290,12 @@ async function saveProfile() {
     await db.collection('users').doc(currentUser.uid).update(upd);
     Object.assign(uData, upd);
     showToast('Профиль сохранён!', 'success');
+    // Обновляем бейдж роли
+    var pr = document.getElementById('profileRole');
+    pr.textContent = ROLE_LABELS[newRole] || newRole;
+    pr.className   = 'nav__role nav__role--' + newRole;
+    var nr = document.getElementById('navRole');
+    if (nr) { nr.textContent = ROLE_LABELS[newRole] || newRole; nr.className = 'nav__role nav__role--' + newRole; }
     toggleEdit();
     document.getElementById('profileName').textContent = name;
     document.getElementById('viewBio').textContent = upd.bio || 'Пока ничего не написано.';

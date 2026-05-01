@@ -200,8 +200,20 @@ onAuthReady(async function(user, userData) {
         tags.map(function(t){ return '<span class="badge badge--gray">' + esc(t) + '</span>'; }).join('');
     }
 
-    // Кнопки действий
-    renderActions(user, userData);
+    // Кнопки действий — проверяем статус заявки текущего пользователя
+    var userInviteStatus = null;
+    if (user && userData && userData.role === 'user') {
+      try {
+        var invSnap = await db.collection('invites')
+          .where('fromUid','==', user.uid)
+          .where('startupId','==', startupId).get();
+        if (!invSnap.empty) {
+          // берём последнюю заявку
+          userInviteStatus = invSnap.docs[invSnap.docs.length-1].data().status;
+        }
+      } catch(e) { /* игнорируем */ }
+    }
+    renderActions(user, userData, userInviteStatus);
 
     // Основатель
     await loadOwner();
@@ -223,7 +235,7 @@ onAuthReady(async function(user, userData) {
 });
 
 // ── ACTIONS ───────────────────────────────────────────
-function renderActions(user, userData) {
+function renderActions(user, userData, inviteStatus) {
   var el      = document.getElementById('actionBtns');
   var isOwner = user && startupData && user.uid === startupData.ownerUid;
   var isAdmin = userData && userData.role === 'admin';
@@ -242,9 +254,15 @@ function renderActions(user, userData) {
       '<button class="btn btn--investor" onclick="writeToFounder()">💬 Написать основателю</button>';
 
   } else if (role === 'user') {
-    // Специалист → подать заявку
-    el.innerHTML =
-      '<button class="btn btn--primary" onclick="document.getElementById(\'inviteModal\').classList.add(\'open\')">👋 Подать заявку</button>';
+    if (inviteStatus === 'accepted') {
+      el.innerHTML = '<span class="badge badge--green" style="padding:8px 16px;font-size:13px">✅ Ты в команде</span>';
+    } else if (inviteStatus === 'pending') {
+      el.innerHTML = '<span class="badge badge--gray" style="padding:8px 16px;font-size:13px">⏳ Заявка на рассмотрении</span>';
+    } else if (inviteStatus === 'rejected') {
+      el.innerHTML = '<span class="badge badge--red" style="padding:8px 16px;font-size:13px">❌ Заявка отклонена</span>';
+    } else {
+      el.innerHTML = '<button class="btn btn--primary" onclick="document.getElementById('inviteModal').classList.add('open')">👋 Подать заявку</button>';
+    }
 
   } else if (!user) {
     el.innerHTML =
@@ -315,11 +333,13 @@ async function loadTeam() {
       members.push({ name: startupData.ownerName||'Основатель', uid: startupData.ownerUid, _teamRole: 'Основатель', _isOwner: true });
     }
 
-    // Участники команды
+    // Участники из коллекции team
     var teamSnap = await db.collection('startups').doc(startupId).collection('team').get();
+    var teamUids = [];
     for (var i = 0; i < teamSnap.docs.length; i++) {
       var t = teamSnap.docs[i].data();
       if (!t.uid) continue;
+      teamUids.push(t.uid);
       try {
         var uSnap = await db.collection('users').doc(t.uid).get();
         if (uSnap.exists) {
@@ -327,6 +347,24 @@ async function loadTeam() {
         }
       } catch(e) { /* пропускаем */ }
     }
+
+    // Также показываем принятые invites (accepted) если ещё не в team
+    try {
+      var accSnap = await db.collection('invites')
+        .where('startupId','==', startupId)
+        .where('status','==','accepted').get();
+      for (var j = 0; j < accSnap.docs.length; j++) {
+        var inv = accSnap.docs[j].data();
+        if (!inv.fromUid || inv.fromUid === startupData.ownerUid) continue;
+        if (teamUids.indexOf(inv.fromUid) !== -1) continue; // уже есть
+        try {
+          var iUsnap = await db.collection('users').doc(inv.fromUid).get();
+          if (iUsnap.exists) {
+            members.push(Object.assign({ _teamRole: 'Участник' }, iUsnap.data()));
+          }
+        } catch(e) { /* пропускаем */ }
+      }
+    } catch(e) { /* invites недоступны */ }
 
     el.innerHTML = '<div class="card">' +
       members.map(function(m) {
@@ -362,8 +400,15 @@ async function sendInvite() {
     var existing = await db.collection('invites')
       .where('fromUid','==', pageUser.uid)
       .where('startupId','==', startupId).get();
-    var hasPending = existing.docs.some(function(d){ return d.data().status === 'pending'; });
-    if (hasPending) { showToast('Ты уже подал заявку на этот стартап', 'warn'); return; }
+    var alreadyApplied = existing.docs.some(function(d){
+      var s = d.data().status;
+      return s === 'pending' || s === 'accepted';
+    });
+    if (alreadyApplied) {
+      var isAccepted = existing.docs.some(function(d){ return d.data().status === 'accepted'; });
+      showToast(isAccepted ? '✅ Ты уже в команде этого стартапа' : '⏳ Заявка уже отправлена', 'warn');
+      return;
+    }
 
     await db.collection('invites').add({
       fromUid:      pageUser.uid,

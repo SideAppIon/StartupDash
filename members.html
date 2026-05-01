@@ -45,10 +45,10 @@
     <div class="filters-bar">
       <input type="text" class="search-inp" id="searchInput" placeholder="🔍 Поиск по имени или навыкам..." oninput="applyFilter()"/>
       <select class="role-filt" id="roleFilter" onchange="applyFilter()">
+        <option value="user" selected>Специалисты</option>
         <option value="">Все роли</option>
         <option value="startup">Стартаперы</option>
         <option value="investor">Инвесторы</option>
-        <option value="user">Специалисты</option>
       </select>
     </div>
 
@@ -76,7 +76,7 @@
       `;
     }
 
-    const snap = await db.collection('users').orderBy('createdAt','desc').get();
+    const snap = await db.collection('users').get();
     allMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .filter(u => u.role !== 'admin');
     applyFilter();
