@@ -147,11 +147,7 @@
         gitHub:    '',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      
-      // Небольшая задержка чтобы Firestore успел обновиться
-      setTimeout(() => {
-        window.location.href = 'dashboard.html';
-      }, 500);
+      window.location.href = 'dashboard.html';
     } catch(e) {
       showErr(getFirebaseError(e.code));
       btn.disabled = false; btn.textContent = 'Зарегистрироваться';

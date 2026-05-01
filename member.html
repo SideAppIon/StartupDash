@@ -132,6 +132,7 @@
 
 <script src="firebase-config.js"></script>
 <script>
+  const ROLE_LABELS = {startup:'Стартапер',investor:'Инвестор',user:'Специалист',admin:'Администратор'};
   const profileUid = getUrlParam('uid');
   if (!profileUid) window.location.href = 'members.html';
 

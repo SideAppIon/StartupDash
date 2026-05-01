@@ -85,39 +85,18 @@ var NAV = {
 };
 
 onAuthReady(async function(user, userData) {
-  console.log('[Dashboard] onAuthReady called, user:', !!user, 'userData:', !!userData);
   if (!user) return;
 
   // Создаём документ если не существует
   if (!userData) {
-    console.log('[Dashboard] Creating user document for:', user.uid);
-    try {
-      // Проверяем, существует ли документ перед созданием
-      const docRef = db.collection('users').doc(user.uid);
-      const docSnap = await docRef.get();
-      
-      if (!docSnap.exists) {
-        // Документ не существует - это может произойти если пользователь зарегистрировался через Firebase Auth
-        // но Firestore документ не был создан. В этом случае создаем с ролью 'user' по умолчанию.
-        console.log('[Dashboard] Document does not exist, creating with default role');
-        await docRef.set({
-          uid: user.uid, name: user.email.split('@')[0],
-          email: user.email, role: 'user',
-          bio:'', skills:[], avatar:'',
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        var s2 = await docRef.get();
-        userData = s2.data();
-        console.log('[Dashboard] User document created successfully');
-      } else {
-        // Документ уже существует, используем его данные
-        userData = docSnap.data();
-        console.log('[Dashboard] Using existing user document with role:', userData.role);
-      }
-    } catch(e) {
-      console.error('[Dashboard] Error with user document:', e);
-      userData = { uid: user.uid, name: user.email.split('@')[0], email: user.email, role: 'user' };
-    }
+    await db.collection('users').doc(user.uid).set({
+      uid: user.uid, name: user.email.split('@')[0],
+      email: user.email, role: 'user',
+      bio:'', skills:[], avatar:'',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    var s2 = await db.collection('users').doc(user.uid).get();
+    userData = s2.data();
   }
 
   var role = userData.role || 'user';
@@ -138,39 +117,22 @@ onAuthReady(async function(user, userData) {
   }).join('');
 
   var main = document.getElementById('main');
-  
-  // Таймаут для предотвращения бесконечной загрузки
-  var loadTimeout = setTimeout(() => {
-    if (main.innerHTML.includes('Загрузка дашборда')) {
-      main.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⏱️</div><div class="empty-state__title">Превышено время загрузки</div><p style="font-size:14px">Проверьте подключение к интернету</p><button class="btn btn--outline" onclick="location.reload()">Обновить</button></div>';
-    }
-  }, 10000);
-  
   try {
-    console.log('[Dashboard] Starting render for role:', role);
     if (role==='startup')  await renderStartup(main, user.uid);
     else if (role==='investor') await renderInvestor(main);
     else if (role==='admin')    await renderAdmin(main);
     else                         await renderUser(main, user.uid);
-    console.log('[Dashboard] Render completed successfully');
-    clearTimeout(loadTimeout);
   } catch(e) {
-    clearTimeout(loadTimeout);
-    console.error('[Dashboard] Render error:', e);
-    main.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Ошибка загрузки</div><p style="font-size:14px">'+(e.message || 'Неизвестная ошибка')+'</p><button class="btn btn--outline" onclick="location.reload()">Попробовать снова</button></div>';
+    main.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Ошибка загрузки</div><p style="font-size:14px">'+e.message+'</p><button class="btn btn--outline" onclick="location.reload()">Попробовать снова</button></div>';
   }
 });
 
 async function renderStartup(el, uid) {
-  console.log('[renderStartup] Loading startups for UID:', uid);
   var snap    = await db.collection('startups').where('ownerUid','==',uid).get();
   var startups = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
-  console.log('[renderStartup] Loaded', startups.length, 'startups');
 
-  console.log('[renderStartup] Loading invites for UID:', uid);
   var invSnap = await db.collection('invites').where('startupOwner','==',uid).get();
   var invites = invSnap.docs.filter(function(d){ return d.data().status==='pending'; }).map(function(d){ return Object.assign({id:d.id},d.data()); });
-  console.log('[renderStartup] Loaded', invites.length, 'pending invites');
 
   el.innerHTML =
     '<div class="stat-row">' +
@@ -207,28 +169,11 @@ async function renderStartup(el, uid) {
       }).join('')
     : '');
 
-  // Считаем команды с таймаутом
+  // Считаем команды
   var total = 0;
-  var teamPromises = startups.map(async function(s) {
-    try {
-      var t = await Promise.race([
-        db.collection('startups').doc(s.id).collection('team').get(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
-      ]);
-      return t.size;
-    } catch(e) {
-      console.warn('Error loading team for startup', s.id, e);
-      return 0;
-    }
-  });
-  
-  try {
-    var results = await Promise.all(teamPromises);
-    total = results.reduce((sum, count) => sum + count, 0);
-  } catch(e) {
-    console.warn('Error counting team members:', e);
+  for (var i=0; i<startups.length; i++) {
+    try { var t = await db.collection('startups').doc(startups[i].id).collection('team').get(); total+=t.size; } catch(e){}
   }
-  
   var tt = document.getElementById('teamTotal');
   if (tt) tt.textContent = total;
 }
@@ -268,30 +213,8 @@ async function renderAdmin(el) {
 }
 
 async function answer(id, status) {
-  const inviteSnap = await db.collection('invites').doc(id).get();
-  if (!inviteSnap.exists) return;
-  
-  const invite = inviteSnap.data();
-  
-  // Обновляем статус заявки
   await db.collection('invites').doc(id).update({ status: status });
-  
-  if (status === 'accepted') {
-    // Добавляем участника в команду стартапа
-    try {
-      await db.collection('startups').doc(invite.startupId).collection('team').add({
-        uid: invite.fromUid,
-        role: 'Участник',
-        addedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        inviteId: id
-      });
-      console.log('[answer] Added user to team:', invite.fromUid, 'to startup:', invite.startupId);
-    } catch(e) {
-      console.error('[answer] Error adding to team:', e);
-    }
-  }
-  
-  showToast(status==='accepted'?'✅ Принято и добавлено в команду':'❌ Отклонено');
+  showToast(status==='accepted'?'✅ Принято':'❌ Отклонено');
   setTimeout(function(){ location.reload(); }, 800);
 }
 
