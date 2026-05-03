@@ -236,14 +236,27 @@ onAuthReady(async function(user, userData) {
     try {
       var sSnap = await db.collection('startups').where('ownerUid','==',user.uid).get();
       if (!sSnap.empty) {
-        document.getElementById('myStartupsCard').style.display = 'block';
-        document.getElementById('myStartupsList').innerHTML = sSnap.docs.map(function(d){
-          var s = d.data();
-          return '<a href="startup.html?id='+d.id+'" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px">'+
-            '<span style="font-size:22px">'+(s.emoji||'🚀')+'</span>'+
-            '<div><div style="font-size:14px;font-weight:500">'+esc(s.name||'')+'</div>'+
-            '<div style="font-size:12px;color:var(--text2)">'+esc(s.stage||'')+'</div></div></a>';
-        }).join('');
+        // Фильтруем: closed не показываем, private показываем без ссылки
+        var visible = sSnap.docs.filter(function(d){ return d.data().privacy !== 'closed'; });
+        if (visible.length) {
+          document.getElementById('myStartupsCard').style.display = 'block';
+          document.getElementById('myStartupsList').innerHTML = visible.map(function(d){
+            var s = d.data();
+            var isPublic = !s.privacy || s.privacy === 'public';
+            var logo = s.iconImage
+              ? '<img src="'+esc(s.iconImage)+'" style="width:28px;height:28px;border-radius:6px;object-fit:cover"/>'
+              : '<span style="font-size:22px">'+(s.emoji||'🚀')+'</span>';
+            var privBadge = s.privacy==='private'?'<span class="badge badge--gray" style="font-size:10px;margin-left:4px">🔒</span>':'';
+            var inner = logo+
+              '<div style="flex:1"><div style="font-size:14px;font-weight:500">'+esc(s.name||'')+privBadge+'</div>'+
+              '<div style="font-size:12px;color:var(--text2)">'+esc(s.stage||'')+'</div></div>';
+            if (isPublic) {
+              return '<a href="startup.html?id='+d.id+'" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px">'+inner+'</a>';
+            } else {
+              return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;opacity:.7">'+inner+'</div>';
+            }
+          }).join('');
+        }
       }
     } catch(e){console.warn(e.message);}
   }

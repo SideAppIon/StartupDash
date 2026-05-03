@@ -378,6 +378,9 @@ async function save(){
   var tagline=document.getElementById('tagline').value.trim();
   if (!name){showFormErr('Введи название');return;}
   if (!tagline){showFormErr('Введи слоган');return;}
+  // Проверяем что есть хотя бы один заполненный текстовый блок
+  var hasText = blocks.some(function(b){ return b.type==='text' && b.content && b.content.trim().length > 0; });
+  if (!hasText){showFormErr('Добавь хотя бы один текстовый блок с описанием проекта');return;}
   var btn=document.getElementById('submitBtn');
   btn.disabled=true; btn.textContent='Сохранение...';
 
