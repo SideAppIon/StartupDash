@@ -146,7 +146,7 @@ async function renderStartup(el, uid) {
     '</div>' +
     (startups.length ? startups.map(function(s){
       return '<a class="s-card" href="startup.html?id='+s.id+'" style="display:flex">' +
-        '<div class="s-card__logo">'+(s.emoji||'🚀')+'</div>' +
+        '<div class="s-card__logo">'+(s.iconImage?'<img src="'+s.iconImage+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.style.display=&quot;none&quot;"/>':'')+(s.iconImage?'':(s.emoji||'🚀'))+'</div>' +
         '<div style="flex:1"><div class="s-card__name">'+esc(s.name||'')+'</div><div class="s-card__tagline">'+esc(s.tagline||'')+'</div>' +
         '<div style="display:flex;gap:6px;margin-top:8px"><span class="badge badge--green">'+esc(s.stage||'Идея')+'</span></div></div>' +
         '<div style="display:flex;gap:6px;align-self:center">' +
@@ -184,7 +184,7 @@ async function renderInvestor(el) {
   el.innerHTML = '<div class="section-header" style="margin-bottom:16px"><div class="section-title">Свежие стартапы</div><a href="startups.html" class="btn btn--outline btn--sm">Все</a></div>' +
     list.map(function(s){
       return '<a class="s-card" href="startup.html?id='+s.id+'" style="display:flex">' +
-        '<div class="s-card__logo">'+(s.emoji||'🚀')+'</div>' +
+        '<div class="s-card__logo">'+(s.iconImage?'<img src="'+s.iconImage+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.style.display=&quot;none&quot;"/>':'')+(s.iconImage?'':(s.emoji||'🚀'))+'</div>' +
         '<div><div class="s-card__name">'+esc(s.name||'')+'</div><div class="s-card__tagline">'+esc(s.tagline||'')+'</div></div></a>';
     }).join('');
 }
@@ -196,7 +196,7 @@ async function renderUser(el, uid) {
   var invs  = iSnap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
   el.innerHTML = '<div class="section-header" style="margin-bottom:16px"><div class="section-title">Стартапы</div><a href="startups.html" class="btn btn--outline btn--sm">Все</a></div>' +
     list.map(function(s){
-      return '<a class="s-card" href="startup.html?id='+s.id+'" style="display:flex"><div class="s-card__logo">'+(s.emoji||'🚀')+'</div><div><div class="s-card__name">'+esc(s.name||'')+'</div><div class="s-card__tagline">'+esc(s.tagline||'')+'</div></div></a>';
+      return '<a class="s-card" href="startup.html?id='+s.id+'" style="display:flex"><div class="s-card__logo">'+(s.iconImage?'<img src="'+s.iconImage+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.style.display=&quot;none&quot;"/>':'')+(s.iconImage?'':(s.emoji||'🚀'))+'</div><div><div class="s-card__name">'+esc(s.name||'')+'</div><div class="s-card__tagline">'+esc(s.tagline||'')+'</div></div></a>';
     }).join('') +
     (invs.length ? '<hr class="divider"><div class="section-title" style="margin-bottom:16px">Мои заявки</div>' +
       invs.map(function(inv){

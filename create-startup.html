@@ -58,6 +58,19 @@
       <div class="form-group">
         <label class="form-label">Иконка</label>
         <div class="emoji-grid" id="emojiGrid"></div>
+        <div style="margin-top:12px;display:flex;gap:12px;align-items:center">
+          <div id="iconPreviewWrap" style="width:52px;height:52px;border-radius:14px;background:var(--bg3);border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;overflow:hidden">
+            <span id="iconPreviewEmoji">🚀</span>
+            <img id="iconPreviewImg" style="width:100%;height:100%;object-fit:cover;display:none" alt=""/>
+          </div>
+          <div style="flex:1">
+            <label class="form-label" style="margin-bottom:6px">Или вставь ссылку на своё изображение</label>
+            <input type="url" class="form-input" id="iconImage"
+              placeholder="https://i.imgur.com/... (оставь пустым для смайла)"
+              oninput="onIconImageInput(this.value)"/>
+            <div class="form-hint">Квадратное изображение, минимум 64×64px</div>
+          </div>
+        </div>
       </div>
 
       <div class="grid-2">
@@ -195,6 +208,28 @@ EMOJIS.forEach(function(e){
   grid.appendChild(btn);
 });
 
+function onIconImageInput(url) {
+  var emoji = document.getElementById('iconPreviewEmoji');
+  var img   = document.getElementById('iconPreviewImg');
+  var wrap  = document.getElementById('iconPreviewWrap');
+  if (url && url.startsWith('http')) {
+    img.src = url;
+    img.style.display = 'block';
+    emoji.style.display = 'none';
+    img.onerror = function() {
+      img.style.display = 'none';
+      emoji.style.display = 'block';
+    };
+    wrap.style.borderColor = 'var(--accent)';
+  } else {
+    img.style.display = 'none';
+    emoji.style.display = 'block';
+    wrap.style.borderColor = 'var(--border2)';
+    // Восстанавливаем выбранный emoji
+    emoji.textContent = selectedEmoji;
+  }
+}
+
 function previewCover(url) {
   var img=document.getElementById('coverPreview');
   if (url&&url.startsWith('http')){
@@ -311,6 +346,10 @@ onAuthReady(async function(user, userData){
       document.getElementById('coverImage').value=d.coverImage||'';
       if (d.coverImage) previewCover(d.coverImage);
       if (d.stage) document.getElementById('stage').value=d.stage;
+      if (d.iconImage) {
+        document.getElementById('iconImage').value=d.iconImage;
+        onIconImageInput(d.iconImage);
+      }
       if (d.category) document.getElementById('category').value=d.category;
       tags=safeArray(d.tags); renderTags();
       selectedEmoji=d.emoji||'🚀';
@@ -355,6 +394,7 @@ async function save(){
     lookingFor: document.getElementById('lookingFor').value.trim(),
     coverImage: document.getElementById('coverImage').value.trim(),
     emoji:    selectedEmoji,
+    iconImage: document.getElementById('iconImage').value.trim(),
     tags:     tags,
     privacy:  selectedPrivacy,
     contentBlocks: contentBlocks,
