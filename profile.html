@@ -11,17 +11,18 @@
     .profile-wrap{max-width:860px;margin:0 auto;padding:0 24px}
     .profile-top{display:flex;gap:24px;align-items:flex-end;margin-top:-56px;padding-bottom:28px;border-bottom:1px solid var(--border);position:relative;z-index:1}
     .profile-top img{width:112px;height:112px;border-radius:50%;object-fit:cover;border:4px solid var(--bg);background:var(--bg3);display:block;cursor:pointer}
-    .avatar-edit{position:absolute;bottom:32px;left:88px;width:28px;height:28px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;z-index:2}
+    .avatar-edit{position:absolute;bottom:32px;left:84px;width:28px;height:28px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer}
     .profile-info{flex:1;padding-bottom:4px}
     .profile-name{font-family:var(--font-head);font-size:26px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
     .profile-body{display:grid;grid-template-columns:1fr 280px;gap:24px;padding:32px 0}
-    @media(max-width:768px){.profile-body{grid-template-columns:1fr}.profile-top{flex-direction:column;align-items:center;margin-top:-40px;text-align:center}.avatar-edit{bottom:36px;left:calc(50% + 20px)}}
+    @media(max-width:768px){.profile-body{grid-template-columns:1fr}.profile-top{flex-direction:column;align-items:center;margin-top:-40px;text-align:center}.avatar-edit{left:calc(50% + 20px);bottom:36px}}
     .skill-tag{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border2);border-radius:20px;font-size:13px;padding:5px 14px;margin:3px}
     .skill-tag button{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:0}
     .skill-tag button:hover{color:var(--danger)}
-    .contact-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;text-decoration:none;color:inherit;transition:color .2s}
-    .contact-row:last-child{border-bottom:none}
-    .contact-row:hover{color:var(--accent)}
+    .contact-link{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px;text-decoration:none;color:inherit;word-break:break-all}
+    .contact-link:last-child{border-bottom:none}
+    .contact-link:hover{color:var(--accent)}
+    .contact-icon{font-size:16px;flex-shrink:0}
   </style>
 </head>
 <body>
@@ -30,23 +31,24 @@
   <div class="nav__user">
     <a href="dashboard.html" class="btn btn--ghost btn--sm">← Дашборд</a>
     <span class="nav__role" id="navRole"></span>
-    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="window.location='profile.html'"/>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="window.location.href='profile.html'"/>
     <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
   </div>
 </nav>
 
-<div id="loadingState" style="padding:160px 0;text-align:center"><div class="spinner"></div><p style="color:var(--text2);margin-top:16px;font-size:14px">Загрузка профиля...</p></div>
+<div id="loadingState" style="padding:160px 0;text-align:center"><div class="spinner"></div><p style="color:var(--text2);margin-top:16px;font-size:14px">Загрузка...</p></div>
+
 <div id="pageContent" style="display:none">
   <div class="profile-cover"></div>
   <div class="profile-wrap">
     <div class="profile-top">
       <div style="position:relative;flex-shrink:0">
         <img id="profileAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="openAvatarModal()"/>
-        <div class="avatar-edit" onclick="openAvatarModal()">✏️</div>
+        <div class="avatar-edit" onclick="openAvatarModal()">📷</div>
       </div>
       <div class="profile-info">
         <h1 class="profile-name" id="profileName"></h1>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <span class="nav__role" id="profileRole"></span>
           <span style="font-size:13px;color:var(--text2)" id="profileEmail"></span>
         </div>
@@ -62,19 +64,26 @@
             <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px">О себе</h3>
             <p id="viewBio" style="color:var(--text2);font-size:14px;line-height:1.8;white-space:pre-wrap"></p>
           </div>
-          <div class="card">
+          <div class="card" style="margin-bottom:20px">
             <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px">Навыки</h3>
             <div id="viewSkills"></div>
           </div>
+          <div class="card" id="portfolioViewCard" style="display:none">
+            <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px">Портфолио</h3>
+            <div id="viewPortfolio"></div>
+          </div>
         </div>
+
         <!-- EDIT -->
         <div id="editMode" style="display:none">
           <div class="card">
             <h2 style="font-family:var(--font-head);font-size:20px;font-weight:700;margin-bottom:24px">Редактировать профиль</h2>
+
             <div class="form-group">
               <label class="form-label">Имя и фамилия *</label>
               <input type="text" class="form-input" id="editName" maxlength="80"/>
             </div>
+
             <div class="form-group">
               <label class="form-label">Роль на платформе</label>
               <select class="form-select" id="editRole">
@@ -84,10 +93,12 @@
               </select>
               <div class="form-hint">Смена роли влияет на доступные функции</div>
             </div>
+
             <div class="form-group">
               <label class="form-label">О себе</label>
               <textarea class="form-textarea" id="editBio" placeholder="Опыт, цели, чем занимаешься..."></textarea>
             </div>
+
             <div class="form-group">
               <label class="form-label">Навыки</label>
               <div style="display:flex;gap:8px">
@@ -97,18 +108,21 @@
               </div>
               <div id="editSkills" style="margin-top:10px"></div>
             </div>
+
             <div class="form-group">
-              <label class="form-label">Telegram</label>
-              <input type="text" class="form-input" id="editTelegram" placeholder="@username"/>
+              <label class="form-label">Контакты</label>
+              <input type="text" class="form-input" id="editContacts"
+                placeholder="Telegram: @username, Email: you@mail.com, WhatsApp: +7..."/>
+              <div class="form-hint">Любой способ связи в свободной форме</div>
             </div>
-            <div class="form-group">
-              <label class="form-label">LinkedIn</label>
-              <input type="url" class="form-input" id="editLinkedIn" placeholder="https://linkedin.com/in/..."/>
-            </div>
+
             <div class="form-group" style="margin-bottom:0">
-              <label class="form-label">GitHub</label>
-              <input type="url" class="form-input" id="editGitHub" placeholder="https://github.com/..."/>
+              <label class="form-label">Портфолио / ссылки</label>
+              <textarea class="form-textarea" id="editPortfolio" style="min-height:80px"
+                placeholder="https://github.com/username&#10;https://behance.net/username&#10;https://mysite.com"></textarea>
+              <div class="form-hint">Каждая ссылка с новой строки</div>
             </div>
+
             <div style="display:flex;gap:12px;margin-top:24px">
               <button class="btn btn--primary btn--lg" type="button" onclick="saveProfile()">💾 Сохранить</button>
               <button class="btn btn--ghost" type="button" onclick="toggleEdit()">Отмена</button>
@@ -121,7 +135,7 @@
       <div>
         <div class="card" style="margin-bottom:20px">
           <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Контакты</h3>
-          <div id="viewContacts"></div>
+          <div id="viewContacts"><span style="color:var(--text3);font-size:14px">Не указаны</span></div>
         </div>
         <div class="card" id="myStartupsCard" style="display:none">
           <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Мои стартапы</h3>
@@ -140,7 +154,7 @@
       <button class="modal__close" type="button" onclick="document.getElementById('avatarModal').classList.remove('open')">×</button>
     </div>
     <p style="font-size:13px;color:var(--text2);margin-bottom:16px">
-      Вставь прямую ссылку на фото. Загрузи на <a href="https://imgur.com" target="_blank" style="color:var(--accent)">imgur.com</a> и скопируй прямую ссылку (правая кнопка → «Копировать адрес изображения»).
+      Загрузи фото на <a href="https://imgur.com" target="_blank" style="color:var(--accent)">imgur.com</a> и вставь прямую ссылку.
     </p>
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:20px">
       <img id="avatarPreview" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);background:var(--bg3);flex-shrink:0" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
@@ -158,7 +172,6 @@
 </div>
 
 <div id="toast" class="toast"></div>
-
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -166,63 +179,59 @@
 <script>
 requireAuth('login.html');
 
-var uData = null;
+var uData  = null;
 var skills = [];
 
 onAuthReady(async function(user, userData) {
   if (!user) return;
-
-  // Если документа нет — создаём базовый (могло не создаться при регистрации)
   if (!userData) {
     await db.collection('users').doc(user.uid).set({
-      uid: user.uid,
-      name: user.displayName || user.email.split('@')[0],
-      email: user.email,
-      role: 'user',
-      bio: '', skills: [], avatar: '',
-      telegram: '', linkedIn: '', gitHub: '',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      uid:user.uid, name:user.email.split('@')[0], email:user.email,
+      role:'user', bio:'', skills:[], avatar:'', contacts:'', portfolio:'',
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
     });
-    var snap2 = await db.collection('users').doc(user.uid).get();
-    userData = snap2.data();
+    var s2 = await db.collection('users').doc(user.uid).get();
+    userData = s2.data();
   }
-
   uData  = userData;
   skills = safeArray(userData.skills);
-
   renderNav(userData);
 
   var av = userData.avatar ||
-    'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' +
-    encodeURIComponent(userData.name || 'U');
-
-  document.getElementById('profileAvatar').src = av;
-  document.getElementById('avatarPreview').src  = av;
+    'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(userData.name||'U');
+  document.getElementById('profileAvatar').src   = av;
+  document.getElementById('avatarPreview').src   = av;
   document.getElementById('profileName').textContent  = userData.name  || '';
   document.getElementById('profileEmail').textContent = userData.email || '';
-
   var pr = document.getElementById('profileRole');
-  pr.textContent = ROLE_LABELS[userData.role] || userData.role;
-  pr.className   = 'nav__role nav__role--' + userData.role;
+  pr.textContent = ROLE_LABELS[userData.role]||userData.role;
+  pr.className   = 'nav__role nav__role--'+userData.role;
 
-  // Bio
   document.getElementById('viewBio').textContent =
     userData.bio || 'Пока ничего не написано.';
 
-  // Skills
   document.getElementById('viewSkills').innerHTML = skills.length
-    ? skills.map(function(s){ return '<span class="badge badge--gray">' + escHtml(s) + '</span>'; }).join(' ')
+    ? skills.map(function(s){return '<span class="badge badge--gray">'+esc(s)+'</span>';}).join(' ')
     : '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
 
-  // Contacts
-  var c = [];
-  if (userData.telegram) c.push('<a class="contact-row" href="https://t.me/' + userData.telegram.replace('@','') + '" target="_blank"><span style="font-size:18px;width:24px;text-align:center">📱</span>' + escHtml(userData.telegram) + '</a>');
-  if (userData.linkedIn)  c.push('<a class="contact-row" href="' + escHtml(userData.linkedIn) + '" target="_blank"><span style="font-size:18px;width:24px;text-align:center">💼</span>LinkedIn</a>');
-  if (userData.gitHub)    c.push('<a class="contact-row" href="' + escHtml(userData.gitHub) + '" target="_blank"><span style="font-size:18px;width:24px;text-align:center">🐙</span>GitHub</a>');
-  document.getElementById('viewContacts').innerHTML = c.join('') ||
-    '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
+  // Контакты
+  document.getElementById('viewContacts').innerHTML = userData.contacts
+    ? '<p style="font-size:14px;color:var(--text2);white-space:pre-wrap;line-height:1.7">'+esc(userData.contacts)+'</p>'
+    : '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
 
-  // My startups (startup role)
+  // Портфолио — каждая строка как ссылка
+  if (userData.portfolio) {
+    document.getElementById('portfolioViewCard').style.display = 'block';
+    var links = userData.portfolio.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+    document.getElementById('viewPortfolio').innerHTML = links.map(function(l){
+      var isUrl = l.startsWith('http');
+      return isUrl
+        ? '<a class="contact-link" href="'+esc(l)+'" target="_blank"><span class="contact-icon">🔗</span>'+esc(l)+'</a>'
+        : '<div class="contact-link"><span class="contact-icon">•</span>'+esc(l)+'</div>';
+    }).join('');
+  }
+
+  // Мои стартапы
   if (userData.role === 'startup') {
     try {
       var sSnap = await db.collection('startups').where('ownerUid','==',user.uid).get();
@@ -230,10 +239,13 @@ onAuthReady(async function(user, userData) {
         document.getElementById('myStartupsCard').style.display = 'block';
         document.getElementById('myStartupsList').innerHTML = sSnap.docs.map(function(d){
           var s = d.data();
-          return '<a href="startup.html?id=' + d.id + '" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px"><span style="font-size:22px">' + (s.emoji||'🚀') + '</span><div><div style="font-size:14px;font-weight:500">' + escHtml(s.name||'') + '</div><div style="font-size:12px;color:var(--text2)">' + escHtml(s.stage||'') + '</div></div></a>';
+          return '<a href="startup.html?id='+d.id+'" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px">'+
+            '<span style="font-size:22px">'+(s.emoji||'🚀')+'</span>'+
+            '<div><div style="font-size:14px;font-weight:500">'+esc(s.name||'')+'</div>'+
+            '<div style="font-size:12px;color:var(--text2)">'+esc(s.stage||'')+'</div></div></a>';
         }).join('');
       }
-    } catch(e) { console.warn('startups load:', e.message); }
+    } catch(e){console.warn(e.message);}
   }
 
   document.getElementById('loadingState').style.display = 'none';
@@ -247,12 +259,11 @@ function toggleEdit() {
     document.getElementById('viewMode').style.display = 'block';
     document.getElementById('editBtn').textContent    = '✏️ Редактировать';
   } else {
-    document.getElementById('editName').value     = uData.name     || '';
-    document.getElementById('editRole').value     = uData.role     || 'user';
-    document.getElementById('editBio').value      = uData.bio      || '';
-    document.getElementById('editTelegram').value = uData.telegram || '';
-    document.getElementById('editLinkedIn').value = uData.linkedIn || '';
-    document.getElementById('editGitHub').value   = uData.gitHub   || '';
+    document.getElementById('editName').value      = uData.name      || '';
+    document.getElementById('editRole').value      = uData.role      || 'user';
+    document.getElementById('editBio').value       = uData.bio       || '';
+    document.getElementById('editContacts').value  = uData.contacts  || '';
+    document.getElementById('editPortfolio').value = uData.portfolio || '';
     skills = safeArray(uData.skills).slice();
     renderEditSkills();
     document.getElementById('editMode').style.display = 'block';
@@ -264,85 +275,83 @@ function toggleEdit() {
 function addSkill() {
   var inp = document.getElementById('skillInput');
   var v   = inp.value.trim();
-  if (v && skills.indexOf(v) === -1 && skills.length < 15) {
-    skills.push(v); renderEditSkills();
-  }
-  inp.value = '';
+  if (v && skills.indexOf(v)===-1 && skills.length<15) { skills.push(v); renderEditSkills(); }
+  inp.value='';
 }
-
-function removeSkill(idx) {
-  skills.splice(idx, 1); renderEditSkills();
-}
-
+function removeSkill(i) { skills.splice(i,1); renderEditSkills(); }
 function renderEditSkills() {
-  document.getElementById('editSkills').innerHTML = skills.map(function(s, i){
-    return '<span class="skill-tag">' + escHtml(s) +
-      '<button type="button" onclick="removeSkill(' + i + ')">×</button></span>';
+  document.getElementById('editSkills').innerHTML = skills.map(function(s,i){
+    return '<span class="skill-tag">'+esc(s)+
+      '<button type="button" onclick="removeSkill('+i+')">×</button></span>';
   }).join('');
 }
 
 async function saveProfile() {
   var name = document.getElementById('editName').value.trim();
-  if (!name) { showToast('Введи имя', 'error'); return; }
+  if (!name) { showToast('Введи имя','error'); return; }
   var newRole = document.getElementById('editRole').value;
   var upd = {
-    name:      name,
-    role:      newRole,
+    name, role:newRole,
     bio:       document.getElementById('editBio').value.trim(),
     skills:    skills.slice(),
-    telegram:  document.getElementById('editTelegram').value.trim(),
-    linkedIn:  document.getElementById('editLinkedIn').value.trim(),
-    gitHub:    document.getElementById('editGitHub').value.trim(),
+    contacts:  document.getElementById('editContacts').value.trim(),
+    portfolio: document.getElementById('editPortfolio').value.trim(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   try {
     await db.collection('users').doc(currentUser.uid).update(upd);
     Object.assign(uData, upd);
-    showToast('Профиль сохранён!', 'success');
-    // Обновляем бейдж роли
-    var pr = document.getElementById('profileRole');
-    pr.textContent = ROLE_LABELS[newRole] || newRole;
-    pr.className   = 'nav__role nav__role--' + newRole;
-    var nr = document.getElementById('navRole');
-    if (nr) { nr.textContent = ROLE_LABELS[newRole] || newRole; nr.className = 'nav__role nav__role--' + newRole; }
-    toggleEdit();
+    showToast('Профиль сохранён!','success');
+    // Обновляем отображение без перезагрузки
     document.getElementById('profileName').textContent = name;
-    document.getElementById('viewBio').textContent = upd.bio || 'Пока ничего не написано.';
+    document.getElementById('viewBio').textContent = upd.bio||'Пока ничего не написано.';
     document.getElementById('viewSkills').innerHTML = upd.skills.length
-      ? safeArray(upd.skills).map(function(s){ return '<span class="badge badge--gray">' + escHtml(s) + '</span>'; }).join(' ')
+      ? safeArray(upd.skills).map(function(s){return '<span class="badge badge--gray">'+esc(s)+'</span>';}).join(' ')
       : '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
-  } catch(e) {
-    showToast('Ошибка: ' + e.message, 'error');
-  }
+    document.getElementById('viewContacts').innerHTML = upd.contacts
+      ? '<p style="font-size:14px;color:var(--text2);white-space:pre-wrap;line-height:1.7">'+esc(upd.contacts)+'</p>'
+      : '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
+    var pr = document.getElementById('profileRole');
+    pr.textContent = ROLE_LABELS[newRole]||newRole; pr.className='nav__role nav__role--'+newRole;
+    var nr = document.getElementById('navRole');
+    if (nr){nr.textContent=ROLE_LABELS[newRole]||newRole; nr.className='nav__role nav__role--'+newRole;}
+    // Портфолио
+    if (upd.portfolio) {
+      document.getElementById('portfolioViewCard').style.display='block';
+      var ls = upd.portfolio.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+      document.getElementById('viewPortfolio').innerHTML = ls.map(function(l){
+        return l.startsWith('http')
+          ? '<a class="contact-link" href="'+esc(l)+'" target="_blank"><span class="contact-icon">🔗</span>'+esc(l)+'</a>'
+          : '<div class="contact-link"><span class="contact-icon">•</span>'+esc(l)+'</div>';
+      }).join('');
+    } else {
+      document.getElementById('portfolioViewCard').style.display='none';
+    }
+    toggleEdit();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
 function openAvatarModal() {
-  var av = uData && uData.avatar ? uData.avatar : '';
-  document.getElementById('avatarUrlInput').value = av;
-  document.getElementById('avatarPreview').src = av ||
+  document.getElementById('avatarUrlInput').value = uData&&uData.avatar?uData.avatar:'';
+  document.getElementById('avatarPreview').src = (uData&&uData.avatar)||
     'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U';
   document.getElementById('avatarModal').classList.add('open');
 }
-
 async function doSaveAvatar() {
   var url = document.getElementById('avatarUrlInput').value.trim();
-  if (!url)                      { showToast('Вставь ссылку', 'error'); return; }
-  if (!url.startsWith('http'))   { showToast('Ссылка должна начинаться с http', 'error'); return; }
+  if (!url){showToast('Вставь ссылку','error');return;}
+  if (!url.startsWith('http')){showToast('Ссылка должна начинаться с http','error');return;}
   try {
-    await db.collection('users').doc(currentUser.uid).update({ avatar: url });
-    uData.avatar = url;
-    document.getElementById('profileAvatar').src = url;
-    document.getElementById('navAvatar').src     = url;
+    await db.collection('users').doc(currentUser.uid).update({avatar:url});
+    uData.avatar=url;
+    document.getElementById('profileAvatar').src=url;
+    document.getElementById('navAvatar').src=url;
     document.getElementById('avatarModal').classList.remove('open');
-    showToast('Аватар обновлён!', 'success');
-  } catch(e) {
-    showToast('Ошибка: ' + e.message, 'error');
-  }
+    showToast('Аватар обновлён!','success');
+  } catch(e){showToast('Ошибка: '+e.message,'error');}
 }
 
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 </script>
 </body>
 </html>

@@ -244,14 +244,15 @@ function renderActions(user, userData, inviteStatus) {
 
   if (isOwner || isAdmin) {
     el.innerHTML =
+      '<a href="roadmap.html?id=' + startupId + '" class="btn btn--outline">🗺 Roadmap</a>' +
       '<a href="create-startup.html?edit=' + startupId + '" class="btn btn--outline">✏️ Редактировать</a>' +
       '<a href="update-startup.html?id='   + startupId + '" class="btn btn--primary">+ Обновление</a>';
     document.getElementById('ownerUpdateBtn').style.display = 'block';
     document.getElementById('addUpdateLink').href = 'update-startup.html?id=' + startupId;
 
   } else if (role === 'investor') {
-    // Инвестор → написать основателю
     el.innerHTML =
+      '<a href="roadmap.html?id=' + startupId + '" class="btn btn--ghost btn--sm">🗺 Roadmap</a>' +
       '<button class="btn btn--investor" onclick="writeToFounder()">💬 Написать основателю</button>';
 
   } else if (role === 'user') {
@@ -262,7 +263,9 @@ function renderActions(user, userData, inviteStatus) {
     } else if (inviteStatus === 'rejected') {
       el.innerHTML = '<span class="badge badge--red" style="padding:8px 16px;font-size:13px">❌ Заявка отклонена</span>';
     } else {
-      el.innerHTML = '<button class="btn btn--primary" onclick="openInviteModal()">👋 Подать заявку</button>';
+      el.innerHTML =
+        '<a href="roadmap.html?id=' + startupId + '" class="btn btn--ghost btn--sm">🗺 Roadmap</a>' +
+        '<button class="btn btn--primary" onclick="openInviteModal()">👋 Подать заявку</button>';
     }
 
   } else if (!user) {
@@ -381,7 +384,12 @@ async function loadTeam() {
             '<div style="font-size:14px;font-weight:500">' + esc(m.name||'—') + (isMe?' <span style="font-size:11px;color:var(--text3)">(вы)</span>':'') + '</div>' +
             '<div style="font-size:12px;color:var(--text2)">' + esc(m._teamRole||'') + '</div>' +
           '</div>' +
-          (m._isOwner ? '<span style="font-size:16px">👑</span>' : '') +
+          (m._isOwner ? '<span style="font-size:16px">👑</span>' :
+            // Кнопка удаления — только для владельца/admin
+            ((pageUser && startupData && (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin')))
+              ? '<button class="btn btn--danger btn--sm" onclick="removeFromTeam(''+esc(m.uid||'')+'',''+esc(m.name||'')+'')">✕</button>'
+              : '')
+          ) +
         '</div>';
       }).join('') +
     '</div>';
@@ -437,6 +445,29 @@ async function writeToFounder() {
 }
 
 // ── HELPERS ───────────────────────────────────────────
+
+// ── REMOVE FROM TEAM ─────────────────────────────────
+async function removeFromTeam(uid, name) {
+  if (!confirm('Удалить ' + name + ' из команды?')) return;
+  try {
+    // Удаляем из subcollection team
+    var teamSnap = await db.collection('startups').doc(startupId)
+      .collection('team').where('uid','==',uid).get();
+    for (var i = 0; i < teamSnap.docs.length; i++) {
+      await teamSnap.docs[i].ref.delete();
+    }
+    // Также меняем статус invite на removed
+    var invSnap = await db.collection('invites')
+      .where('fromUid','==',uid)
+      .where('startupId','==',startupId).get();
+    for (var j = 0; j < invSnap.docs.length; j++) {
+      await invSnap.docs[j].ref.update({ status: 'removed' });
+    }
+    showToast(name + ' удалён из команды', 'success');
+    await loadTeam();
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
+}
+
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
