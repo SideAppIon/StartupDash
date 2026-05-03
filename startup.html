@@ -376,6 +376,11 @@ async function loadTeam() {
           'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(m.name||'U');
         // Используем pageUser — НЕ user из замыкания
         var isMe = pageUser && m.uid === pageUser.uid;
+        var removeBtn = '';
+        if (!m._isOwner && pageUser && startupData &&
+            (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'))) {
+          removeBtn = '<button class="btn btn--danger btn--sm" onclick="removeFromTeam(this)" data-uid="' + esc(m.uid||'') + '" data-name="' + esc(m.name||'') + '">✕</button>';
+        }
         return '<div class="team-member">' +
           '<a href="member.html?uid=' + esc(m.uid||'') + '" style="display:contents">' +
             '<img src="' + esc(av) + '" class="avatar avatar--sm"/>' +
@@ -384,12 +389,7 @@ async function loadTeam() {
             '<div style="font-size:14px;font-weight:500">' + esc(m.name||'—') + (isMe?' <span style="font-size:11px;color:var(--text3)">(вы)</span>':'') + '</div>' +
             '<div style="font-size:12px;color:var(--text2)">' + esc(m._teamRole||'') + '</div>' +
           '</div>' +
-          (m._isOwner ? '<span style="font-size:16px">👑</span>' :
-            // Кнопка удаления — только для владельца/admin
-            ((pageUser && startupData && (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin')))
-              ? '<button class="btn btn--danger btn--sm" onclick="removeFromTeam(''+esc(m.uid||'')+'',''+esc(m.name||'')+'')">✕</button>'
-              : '')
-          ) +
+          (m._isOwner ? '<span style="font-size:16px">👑</span>' : removeBtn) +
         '</div>';
       }).join('') +
     '</div>';
@@ -447,7 +447,10 @@ async function writeToFounder() {
 // ── HELPERS ───────────────────────────────────────────
 
 // ── REMOVE FROM TEAM ─────────────────────────────────
-async function removeFromTeam(uid, name) {
+async function removeFromTeam(btn) {
+  var uid  = btn.getAttribute('data-uid');
+  var name = btn.getAttribute('data-name');
+  if (!uid) return;
   if (!confirm('Удалить ' + name + ' из команды?')) return;
   try {
     // Удаляем из subcollection team
