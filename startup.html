@@ -187,7 +187,33 @@ onAuthReady(async function(user, userData) {
         '<a href="' + esc(startupData.website) + '" target="_blank" style="color:var(--accent);font-size:13px">🔗 Сайт</a>';
     }
 
-    document.getElementById('sDesc').textContent = startupData.description || '';
+    // Описание — либо contentBlocks либо простой текст
+    var descEl = document.getElementById('sDesc');
+    var cBlocks = safeArray(startupData.contentBlocks);
+    if (cBlocks.length) {
+      descEl.innerHTML = cBlocks.map(function(b) {
+        if (b.type === 'text') {
+          return '<p style="color:var(--text2);font-size:14px;line-height:1.8;white-space:pre-wrap;margin-bottom:16px">' + esc(b.content||'') + '</p>';
+        } else if (b.type === 'image' && b.content) {
+          return '<img src="' + esc(b.content) + '" style="width:100%;border-radius:var(--radius);margin-bottom:16px;display:block" onerror="this.style.display='none'"/>';
+        } else if (b.type === 'video' && b.content) {
+          return '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-bottom:16px">' +
+            '<iframe src="' + esc(b.content) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
+        }
+        return '';
+      }).join('');
+    } else {
+      descEl.textContent = startupData.description || '';
+    }
+
+    // Обложка стартапа
+    if (startupData.coverImage) {
+      var coverEl = document.createElement('img');
+      coverEl.src = startupData.coverImage;
+      coverEl.style.cssText = 'width:100%;max-height:320px;object-fit:cover;border-radius:var(--radius-lg);margin-bottom:20px;display:block';
+      coverEl.onerror = function(){ coverEl.remove(); };
+      document.getElementById('panel0').querySelector('.card').insertBefore(coverEl, document.getElementById('sDesc'));
+    }
 
     if (startupData.lookingFor) {
       document.getElementById('sLookingFor').style.display = 'block';
@@ -199,6 +225,33 @@ onAuthReady(async function(user, userData) {
       document.getElementById('tagsCard').style.display = 'block';
       document.getElementById('tagsList').innerHTML =
         tags.map(function(t){ return '<span class="badge badge--gray">' + esc(t) + '</span>'; }).join('');
+    }
+
+    // Проверка приватности
+    var privacy   = startupData.privacy || 'public';
+    var isTeamMember = false;
+    if (user) {
+      // Проверяем принят ли в команду
+      try {
+        var myInvSnap = await db.collection('invites')
+          .where('fromUid','==', user.uid)
+          .where('startupId','==', startupId)
+          .where('status','==','accepted').get();
+        isTeamMember = !myInvSnap.empty;
+      } catch(e) {}
+    }
+    var isOwnerOrAdmin = user && (user.uid === startupData.ownerUid || (userData && userData.role === 'admin'));
+    var hasFullAccess  = isOwnerOrAdmin || isTeamMember;
+
+    if (privacy === 'private' && !hasFullAccess) {
+      // Скрываем вкладки обновлений и команды
+      document.querySelectorAll('.tab')[1].style.display = 'none';
+      document.querySelectorAll('.tab')[2].style.display = 'none';
+      // Показываем плашку
+      var lockBanner = document.createElement('div');
+      lockBanner.style.cssText = 'background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:14px 18px;font-size:13px;color:var(--text2);margin-bottom:16px;display:flex;align-items:center;gap:10px';
+      lockBanner.innerHTML = '<span style="font-size:20px">🔒</span><span>Детали проекта доступны только участникам команды</span>';
+      document.getElementById('panel0').querySelector('.card').appendChild(lockBanner);
     }
 
     // Кнопки действий — проверяем статус заявки текущего пользователя
@@ -316,6 +369,7 @@ async function loadUpdates() {
         '</div>' +
         '<div class="update-card__date">' + formatDate(u.createdAt) + '</div>' +
         '<div class="update-card__body">' + esc(u.body||'') + '</div>' +
+        (u.imageUrl ? '<img src="' + esc(u.imageUrl) + '" style="width:100%;max-height:300px;object-fit:cover;border-radius:var(--radius);margin-top:12px;display:block" onerror="this.style.display='none'"/>' : '') +
       '</div>';
     }).join('');
   } catch(e) {

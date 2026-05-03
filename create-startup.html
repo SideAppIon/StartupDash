@@ -1,57 +1,68 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Создать стартап — LaunchPad</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <link rel="stylesheet" href="styles.css"/>
   <style>
-    .emoji-grid { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px; }
-    .emoji-opt {
-      width:42px;height:42px;border-radius:10px;background:var(--bg3);border:2px solid var(--border2);
-      font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-      transition:all .15s;
-    }
-    .emoji-opt.selected { border-color:var(--accent);background:var(--accent-dim); }
-    .tag-input-wrap { display:flex;gap:8px; }
-    .tags-list { display:flex;flex-wrap:wrap;gap:8px;margin-top:8px; }
-    .tag-item {
-      background:var(--bg3);border:1px solid var(--border2);border-radius:20px;
-      font-size:13px;padding:4px 12px;display:flex;align-items:center;gap:6px;
-    }
-    .tag-item button { background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1; }
-    .tag-item button:hover { color:var(--danger); }
+    .emoji-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+    .emoji-opt{width:42px;height:42px;border-radius:10px;background:var(--bg3);border:2px solid var(--border2);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+    .emoji-opt.selected{border-color:var(--accent);background:var(--accent-dim)}
+    .tag-input-wrap{display:flex;gap:8px}
+    .tags-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .tag-item{background:var(--bg3);border:1px solid var(--border2);border-radius:20px;font-size:13px;padding:4px 12px;display:flex;align-items:center;gap:6px}
+    .tag-item button{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1}
+    .tag-item button:hover{color:var(--danger)}
+    /* Блоки контента */
+    .content-block{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:12px;position:relative}
+    .content-block__header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .content-block__type{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+    .content-block__del{position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1}
+    .content-block__del:hover{color:var(--danger)}
+    .block-add-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .block-add-btn{padding:6px 14px;border:1px dashed var(--border2);border-radius:var(--radius);font-size:13px;color:var(--text2);cursor:pointer;background:none;transition:all .2s}
+    .block-add-btn:hover{border-color:var(--accent);color:var(--accent)}
+    /* Приватность */
+    .privacy-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .privacy-opt{border:2px solid var(--border2);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .2s;background:var(--bg3);text-align:center}
+    .privacy-opt:hover{border-color:var(--border2);transform:translateY(-1px)}
+    .privacy-opt.selected{border-color:var(--accent);background:var(--accent-dim)}
+    .privacy-opt__icon{font-size:24px;margin-bottom:6px}
+    .privacy-opt__name{font-size:13px;font-weight:600;margin-bottom:4px}
+    .privacy-opt__desc{font-size:11px;color:var(--text2);line-height:1.4}
+    .img-preview-small{width:100%;max-height:180px;object-fit:cover;border-radius:var(--radius);margin-top:8px;display:none}
+    .img-preview-small.show{display:block}
   </style>
 </head>
 <body>
-
 <nav class="nav">
   <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
   <div class="nav__user">
     <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
-    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(()=>window.location.href='index.html')">Выйти</button>
+    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
   </div>
 </nav>
 
 <div class="page">
   <div class="container--md">
     <div style="margin-bottom:32px">
-      <a href="dashboard.html" style="color:var(--text2);font-size:14px;text-decoration:none;">← Назад</a>
+      <a href="dashboard.html" style="color:var(--text2);font-size:14px;text-decoration:none">← Назад</a>
       <h1 class="page-title" id="pageTitle" style="margin-top:12px">Создать стартап</h1>
-      <p class="page-subtitle">Заполни информацию о своём проекте</p>
     </div>
 
-    <div class="card">
-      <!-- Emoji -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:16px">Основная информация</h3>
+
       <div class="form-group">
-        <label class="form-label">Иконка проекта</label>
+        <label class="form-label">Иконка</label>
         <div class="emoji-grid" id="emojiGrid"></div>
       </div>
 
       <div class="grid-2">
         <div class="form-group">
-          <label class="form-label">Название стартапа *</label>
+          <label class="form-label">Название *</label>
           <input type="text" class="form-input" id="name" placeholder="Название проекта" maxlength="60"/>
         </div>
         <div class="form-group">
@@ -67,29 +78,26 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Короткое описание (слоган) *</label>
+        <label class="form-label">Слоган *</label>
         <input type="text" class="form-input" id="tagline" placeholder="Uber для котиков" maxlength="120"/>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Полное описание *</label>
-        <textarea class="form-textarea" id="description" placeholder="Расскажи о проблеме, которую решаешь, и как именно..." style="min-height:160px"></textarea>
+        <label class="form-label">Обложка стартапа (ссылка на изображение)</label>
+        <input type="url" class="form-input" id="coverImage"
+          placeholder="https://i.imgur.com/..."
+          oninput="previewCover(this.value)"/>
+        <div class="form-hint">Загрузи на imgur.com → правая кнопка → «Копировать адрес изображения»</div>
+        <img id="coverPreview" class="img-preview-small" alt="Обложка"/>
       </div>
 
       <div class="grid-2">
         <div class="form-group">
           <label class="form-label">Категория</label>
           <select class="form-select" id="category">
-            <option>FinTech</option>
-            <option>EdTech</option>
-            <option>HealthTech</option>
-            <option>E-commerce</option>
-            <option>SaaS</option>
-            <option>AI / ML</option>
-            <option>Gaming</option>
-            <option>GreenTech</option>
-            <option>Marketplace</option>
-            <option>Другое</option>
+            <option>FinTech</option><option>EdTech</option><option>HealthTech</option>
+            <option>E-commerce</option><option>SaaS</option><option>AI / ML</option>
+            <option>Gaming</option><option>GreenTech</option><option>Marketplace</option><option>Другое</option>
           </select>
         </div>
         <div class="form-group">
@@ -101,158 +109,284 @@
       <div class="form-group">
         <label class="form-label">Теги</label>
         <div class="tag-input-wrap">
-          <input type="text" class="form-input" id="tagInput" placeholder="Введи тег и нажми Enter" onkeydown="addTagOnEnter(event)"/>
-          <button class="btn btn--outline" onclick="addTag()">Добавить</button>
+          <input type="text" class="form-input" id="tagInput" placeholder="Введи тег и нажми Enter"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();addTag()}"/>
+          <button class="btn btn--outline" type="button" onclick="addTag()">+</button>
         </div>
         <div class="tags-list" id="tagsList"></div>
       </div>
 
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:0">
         <label class="form-label">Ищем в команду</label>
-        <textarea class="form-textarea" id="lookingFor" placeholder="Разработчик React, Дизайнер, Маркетолог..." style="min-height:80px"></textarea>
-        <div class="form-hint">Кого ты хочешь привлечь в проект</div>
+        <textarea class="form-textarea" id="lookingFor" style="min-height:72px"
+          placeholder="Разработчик React, Дизайнер, Маркетолог..."></textarea>
       </div>
+    </div>
 
-      <div id="formError" class="form-error" style="display:none;margin-bottom:12px;"></div>
+    <!-- БЛОКИ КОНТЕНТА -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:6px">Описание проекта</h3>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Добавляй блоки текста, картинки и видео в любом порядке</p>
 
-      <div style="display:flex;gap:12px;justify-content:flex-end;">
-        <a href="dashboard.html" class="btn btn--ghost">Отмена</a>
-        <button class="btn btn--primary btn--lg" id="submitBtn" onclick="saveStartup()">
-          🚀 Опубликовать стартап
-        </button>
+      <div id="contentBlocks"></div>
+
+      <div class="block-add-btns">
+        <button class="block-add-btn" type="button" onclick="addBlock('text')">+ Текст</button>
+        <button class="block-add-btn" type="button" onclick="addBlock('image')">🖼 Картинка</button>
+        <button class="block-add-btn" type="button" onclick="addBlock('video')">▶ Видео ВКонтакте</button>
       </div>
+    </div>
+
+    <!-- ПРИВАТНОСТЬ -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:16px">Приватность</h3>
+      <div class="privacy-opts" id="privacyOpts">
+        <div class="privacy-opt selected" data-val="public" onclick="selectPrivacy(this)">
+          <div class="privacy-opt__icon">🌍</div>
+          <div class="privacy-opt__name">Для всех</div>
+          <div class="privacy-opt__desc">Виден всем в каталоге, все могут смотреть</div>
+        </div>
+        <div class="privacy-opt" data-val="private" onclick="selectPrivacy(this)">
+          <div class="privacy-opt__icon">🔒</div>
+          <div class="privacy-opt__name">Частный</div>
+          <div class="privacy-opt__desc">В каталоге видна основная инфо. Детали — только приглашённым</div>
+        </div>
+        <div class="privacy-opt" data-val="closed" onclick="selectPrivacy(this)">
+          <div class="privacy-opt__icon">🔐</div>
+          <div class="privacy-opt__name">Закрытый</div>
+          <div class="privacy-opt__desc">Не отображается в каталоге. Доступ только по прямой ссылке</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="formError" class="form-error" style="display:none;margin-bottom:12px"></div>
+    <div style="display:flex;gap:12px;justify-content:flex-end;margin-bottom:40px">
+      <a href="dashboard.html" class="btn btn--ghost">Отмена</a>
+      <button class="btn btn--primary btn--lg" id="submitBtn" type="button" onclick="save()">🚀 Опубликовать</button>
     </div>
   </div>
 </div>
 
 <div id="toast" class="toast"></div>
-
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
 <script src="firebase-config.js"></script>
 <script>
-  requireAuth('login.html');
+requireAuth('login.html');
 
-  const EMOJIS = ['🚀','💡','🔬','⚡','🌍','🤖','🎮','📱','💰','🌱','🏥','📚','🛒','✈️','🎵','🔐'];
-  let selectedEmoji = '🚀';
-  let tags = [];
-  let editId = getUrlParam('edit');
+var EMOJIS=['🚀','💡','🔬','⚡','🌍','🤖','🎮','📱','💰','🌱','🏥','📚','🛒','✈️','🎵','🔐'];
+var selectedEmoji='🚀';
+var tags=[];
+var blocks=[]; // [{type,content}]
+var selectedPrivacy='public';
+var editId=getUrlParam('edit');
 
-  // Render emojis
-  const grid = document.getElementById('emojiGrid');
-  EMOJIS.forEach(e => {
-    const btn = document.createElement('div');
-    btn.className = 'emoji-opt' + (e === selectedEmoji ? ' selected' : '');
-    btn.textContent = e;
-    btn.onclick = () => {
-      document.querySelectorAll('.emoji-opt').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      selectedEmoji = e;
-    };
-    grid.appendChild(btn);
-  });
+// Emoji grid
+var grid=document.getElementById('emojiGrid');
+EMOJIS.forEach(function(e){
+  var btn=document.createElement('div');
+  btn.className='emoji-opt'+(e===selectedEmoji?' selected':'');
+  btn.textContent=e;
+  btn.onclick=function(){
+    document.querySelectorAll('.emoji-opt').forEach(function(b){b.classList.remove('selected');});
+    btn.classList.add('selected'); selectedEmoji=e;
+  };
+  grid.appendChild(btn);
+});
 
-  onAuthReady(async (user, userData) => {
-    if (!user) return;
-    if (userData?.role !== 'startup' && userData?.role !== 'admin') {
-      window.location.href = 'dashboard.html'; return;
+function previewCover(url) {
+  var img=document.getElementById('coverPreview');
+  if (url&&url.startsWith('http')){
+    img.src=url; img.className='img-preview-small show';
+    img.onerror=function(){img.className='img-preview-small';};
+  } else { img.className='img-preview-small'; }
+}
+
+function selectPrivacy(el) {
+  document.querySelectorAll('.privacy-opt').forEach(function(o){o.classList.remove('selected');});
+  el.classList.add('selected');
+  selectedPrivacy=el.getAttribute('data-val');
+}
+
+// Tags
+function addTag(){
+  var inp=document.getElementById('tagInput'), v=inp.value.trim();
+  if (v&&tags.indexOf(v)===-1&&tags.length<8){tags.push(v);renderTags();}
+  inp.value='';
+}
+function removeTag(t){tags=tags.filter(function(x){return x!==t;});renderTags();}
+function renderTags(){
+  document.getElementById('tagsList').innerHTML=tags.map(function(t){
+    return '<span class="tag-item">'+esc(t)+'<button type="button" onclick="removeTag(\''+esc(t)+'\')">×</button></span>';
+  }).join('');
+}
+
+// Content blocks
+var blockId=0;
+function addBlock(type){
+  var id='block-'+(blockId++);
+  blocks.push({id:id, type:type, content:'', extra:''});
+  renderBlocks();
+  // Фокус на новый блок
+  setTimeout(function(){
+    var el=document.getElementById('inp-'+id);
+    if (el) el.focus();
+  },50);
+}
+function removeBlock(id){
+  blocks=blocks.filter(function(b){return b.id!==id;});
+  renderBlocks();
+}
+function updateBlock(id, field, val){
+  var b=blocks.find(function(b){return b.id===id;});
+  if (b) b[field]=val;
+}
+function renderBlocks(){
+  var container=document.getElementById('contentBlocks');
+  if (!blocks.length){
+    container.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px 0">Нет блоков — добавь текст или картинку</div>';
+    return;
+  }
+  container.innerHTML=blocks.map(function(b){
+    var inner='';
+    if (b.type==='text'){
+      inner='<textarea id="inp-'+b.id+'" class="form-textarea" style="min-height:100px" '+
+        'placeholder="Опиши идею, проблему, решение..." '+
+        'oninput="updateBlock(\''+b.id+'\',\'content\',this.value)">'+esc(b.content)+'</textarea>';
+    } else if (b.type==='image'){
+      inner='<input id="inp-'+b.id+'" type="url" class="form-input" placeholder="https://i.imgur.com/..." '+
+        'value="'+esc(b.content)+'" '+
+        'oninput="updateBlock(\''+b.id+'\',\'content\',this.value);previewBlockImg(\'prev-'+b.id+'\',this.value)"/>'+
+        '<img id="prev-'+b.id+'" class="img-preview-small'+(b.content?' show':'')+'\" src="'+esc(b.content)+'" onerror="this.className=\'img-preview-small\'" alt=""/>';
+    } else if (b.type==='video'){
+      inner='<input id="inp-'+b.id+'" type="url" class="form-input" '+
+        'placeholder="https://vk.com/video_ext.php?oid=...&id=...&hd=2" '+
+        'value="'+esc(b.content)+'" '+
+        'oninput="updateBlock(\''+b.id+'\',\'content\',this.value)"/>'+
+        '<div class="form-hint">Ссылку для встраивания: ВКонтакте → видео → Поделиться → Код для вставки → извлеки src из iframe</div>';
     }
+    var icons={'text':'📝','image':'🖼','video':'▶'};
+    var labels={'text':'Текст','image':'Картинка','video':'Видео ВК'};
+    return '<div class="content-block">'+
+      '<div class="content-block__header">'+
+        '<span>'+icons[b.type]+'</span>'+
+        '<span class="content-block__type">'+labels[b.type]+'</span>'+
+      '</div>'+
+      '<button class="content-block__del" type="button" onclick="removeBlock(\''+b.id+'\')" title="Удалить блок">×</button>'+
+      inner+
+    '</div>';
+  }).join('');
+}
+function previewBlockImg(previewId, url){
+  var img=document.getElementById(previewId);
+  if (!img) return;
+  if (url&&url.startsWith('http')){
+    img.src=url; img.className='img-preview-small show';
+    img.onerror=function(){img.className='img-preview-small';};
+  } else { img.className='img-preview-small'; }
+}
 
-    if (editId) {
-      document.getElementById('pageTitle').textContent = 'Редактировать стартап';
-      document.getElementById('submitBtn').textContent = '💾 Сохранить';
-      const snap = await db.collection('startups').doc(editId).get();
-      if (snap.exists) {
-        const d = snap.data();
-        document.getElementById('name').value = d.name || '';
-        document.getElementById('tagline').value = d.tagline || '';
-        document.getElementById('description').value = d.description || '';
-        document.getElementById('stage').value = d.stage || 'Идея';
-        document.getElementById('category').value = d.category || 'Другое';
-        document.getElementById('website').value = d.website || '';
-        document.getElementById('lookingFor').value = d.lookingFor || '';
-        tags = d.tags || [];
-        renderTags();
-        if (d.emoji) {
-          selectedEmoji = d.emoji;
-          document.querySelectorAll('.emoji-opt').forEach(b => {
-            b.classList.toggle('selected', b.textContent === d.emoji);
-          });
-        }
+renderBlocks(); // показываем пустое состояние
+
+// Load for edit
+onAuthReady(async function(user, userData){
+  if (!user) return;
+  if (userData&&userData.role!=='startup'&&userData.role!=='admin'){
+    window.location.href='dashboard.html'; return;
+  }
+  var av=userData&&userData.avatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U';
+  document.getElementById('navAvatar').src=av;
+
+  if (editId){
+    document.getElementById('pageTitle').textContent='Редактировать стартап';
+    document.getElementById('submitBtn').textContent='💾 Сохранить';
+    var snap=await db.collection('startups').doc(editId).get();
+    if (snap.exists){
+      var d=snap.data();
+      document.getElementById('name').value=d.name||'';
+      document.getElementById('tagline').value=d.tagline||'';
+      document.getElementById('website').value=d.website||'';
+      document.getElementById('lookingFor').value=d.lookingFor||'';
+      document.getElementById('coverImage').value=d.coverImage||'';
+      if (d.coverImage) previewCover(d.coverImage);
+      if (d.stage) document.getElementById('stage').value=d.stage;
+      if (d.category) document.getElementById('category').value=d.category;
+      tags=safeArray(d.tags); renderTags();
+      selectedEmoji=d.emoji||'🚀';
+      document.querySelectorAll('.emoji-opt').forEach(function(b){
+        b.classList.toggle('selected',b.textContent===selectedEmoji);
+      });
+      // Приватность
+      if (d.privacy){
+        selectedPrivacy=d.privacy;
+        document.querySelectorAll('.privacy-opt').forEach(function(o){
+          o.classList.toggle('selected',o.getAttribute('data-val')===d.privacy);
+        });
+      }
+      // Блоки контента
+      if (d.contentBlocks&&d.contentBlocks.length){
+        blocks=d.contentBlocks.map(function(b,i){return Object.assign({id:'block-'+i},b);});
+        blockId=blocks.length;
+        renderBlocks();
       }
     }
-  });
+  }
+});
 
-  function addTagOnEnter(e) { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }
+async function save(){
+  var name=document.getElementById('name').value.trim();
+  var tagline=document.getElementById('tagline').value.trim();
+  if (!name){showFormErr('Введи название');return;}
+  if (!tagline){showFormErr('Введи слоган');return;}
+  var btn=document.getElementById('submitBtn');
+  btn.disabled=true; btn.textContent='Сохранение...';
 
-  function addTag() {
-    const input = document.getElementById('tagInput');
-    const val = input.value.trim();
-    if (val && !tags.includes(val) && tags.length < 8) {
-      tags.push(val); renderTags();
+  // Сериализуем блоки (убираем id — временный)
+  var contentBlocks=blocks.map(function(b){
+    return {type:b.type,content:b.content};
+  }).filter(function(b){return b.content&&b.content.trim();});
+
+  var data={
+    name, tagline,
+    stage:    document.getElementById('stage').value,
+    category: document.getElementById('category').value,
+    website:  document.getElementById('website').value.trim(),
+    lookingFor: document.getElementById('lookingFor').value.trim(),
+    coverImage: document.getElementById('coverImage').value.trim(),
+    emoji:    selectedEmoji,
+    tags:     tags,
+    privacy:  selectedPrivacy,
+    contentBlocks: contentBlocks,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try {
+    var id;
+    if (editId){
+      await db.collection('startups').doc(editId).update(data);
+      id=editId;
+    } else {
+      data.ownerUid=currentUser.uid;
+      data.ownerName=currentUserData.name;
+      data.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+      var ref=await db.collection('startups').add(data);
+      id=ref.id;
     }
-    input.value = '';
+    showToast('Стартап сохранён!','success');
+    setTimeout(function(){window.location.href='startup.html?id='+id;},800);
+  } catch(e){
+    showFormErr('Ошибка: '+e.message);
+    btn.disabled=false; btn.textContent=editId?'💾 Сохранить':'🚀 Опубликовать';
   }
+}
 
-  function removeTag(tag) { tags = tags.filter(t => t !== tag); renderTags(); }
-
-  function renderTags() {
-    document.getElementById('tagsList').innerHTML = tags.map(t =>
-      `<span class="tag-item">${t}<button onclick="removeTag('${t}')">×</button></span>`
-    ).join('');
-  }
-
-  async function saveStartup() {
-    const name = document.getElementById('name').value.trim();
-    const tagline = document.getElementById('tagline').value.trim();
-    const description = document.getElementById('description').value.trim();
-    const err = document.getElementById('formError');
-    const btn = document.getElementById('submitBtn');
-
-    err.style.display = 'none';
-    if (!name) { showFormErr('Введи название'); return; }
-    if (!tagline) { showFormErr('Введи короткое описание'); return; }
-    if (!description) { showFormErr('Введи описание проекта'); return; }
-
-    btn.disabled = true; btn.textContent = 'Сохранение...';
-
-    const data = {
-      name, tagline, description,
-      stage: document.getElementById('stage').value,
-      category: document.getElementById('category').value,
-      website: document.getElementById('website').value.trim(),
-      lookingFor: document.getElementById('lookingFor').value.trim(),
-      emoji: selectedEmoji,
-      tags,
-      ownerUid: currentUser.uid,
-      ownerName: currentUserData.name,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
-    try {
-      let id;
-      if (editId) {
-        await db.collection('startups').doc(editId).update(data);
-        id = editId;
-      } else {
-        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-        const ref = await db.collection('startups').add(data);
-        id = ref.id;
-      }
-      showToast('Стартап сохранён!');
-      setTimeout(() => window.location.href = `startup.html?id=${id}`, 800);
-    } catch(e) {
-      showFormErr('Ошибка сохранения: ' + e.message);
-      btn.disabled = false; btn.textContent = editId ? '💾 Сохранить' : '🚀 Опубликовать';
-    }
-  }
-
-  function showFormErr(msg) {
-    const el = document.getElementById('formError');
-    el.textContent = msg; el.style.display = 'block';
-  }
+function showFormErr(msg){
+  var el=document.getElementById('formError');
+  el.textContent=msg; el.style.display='block';
+  el.scrollIntoView({behavior:'smooth',block:'center'});
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 </script>
 </body>
 </html>

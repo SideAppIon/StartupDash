@@ -114,8 +114,10 @@
       `;
     }
 
-    const snap = await db.collection('startups').orderBy('createdAt','desc').get();
-    allStartups = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const snap = await db.collection('startups').get();
+    allStartups = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      // closed стартапы не показываем в каталоге
+      .filter(s => s.privacy !== 'closed');
     applyFilters();
   });
 
