@@ -220,29 +220,31 @@
 
         if (visibleStartups.length) {
           document.getElementById('startupsSection').style.display = 'block';
-          document.getElementById('memberStartups').innerHTML = visibleStartups.map(function(d) {
+          var html = '';
+          visibleStartups.forEach(function(d) {
             var s = d.data();
             var isClickable = viewerIsAdmin || !s.privacy || s.privacy === 'public';
             var logo = s.iconImage
               ? '<img src="'+esc(s.iconImage)+'" style="width:36px;height:36px;border-radius:8px;object-fit:cover"/>'
               : '<span style="font-size:28px;">'+(s.emoji||'🚀')+'</span>';
             var privBadge = s.privacy==='private'
-              ? '<span class="badge badge--gray" style="font-size:11px;margin-left:6px">🔒 Частный</span>'
+              ? '<span class="badge badge--gray" style="font-size:11px;margin-left:6px">🔒</span>'
               : s.privacy==='closed'
-              ? '<span class="badge badge--gray" style="font-size:11px;margin-left:6px">🔐 Закрытый</span>' : '';
+              ? '<span class="badge badge--gray" style="font-size:11px;margin-left:6px">🔐</span>' : '';
             var inner = logo +
               '<div style="flex:1">' +
                 '<div style="font-family:var(--font-head);font-size:15px;font-weight:700;">' + esc(s.name||'') + privBadge + '</div>' +
                 '<div style="font-size:12px;color:var(--text2);">' + esc(s.tagline||'') + '</div>' +
               '</div>' +
               '<span class="badge badge--green" style="margin-left:auto;">' + esc(s.stage||'Идея') + '</span>';
-            var style = 'display:flex;gap:12px;align-items:center;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;text-decoration:none;color:inherit;transition:border-color .2s;' + (!isClickable?'opacity:.7;cursor:default':'');
+            var baseStyle = 'display:flex;gap:12px;align-items:center;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;text-decoration:none;color:inherit;transition:border-color .2s;';
             if (isClickable) {
-              return '<a href="startup.html?id='+d.id+'" style="'+style+'" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">'+inner+'</a>';
+              html += '<a href="startup.html?id='+d.id+'" style="'+baseStyle+'">'+inner+'</a>';
             } else {
-              return '<div style="'+style+'">'+inner+'</div>';
+              html += '<div style="'+baseStyle+'opacity:.7;cursor:default">'+inner+'</div>';
             }
-          }).join('');
+          });
+          document.getElementById('memberStartups').innerHTML = html;
         }
       }
     }

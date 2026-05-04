@@ -95,7 +95,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
 <script src="firebase-config.js"></script>
 <script>
   let allStartups = [];
@@ -108,10 +107,6 @@
         <a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>
       `;
     }
-
-    // Загружаем фильтры из настроек платформы
-    fillFilterSelect('categoryFilter', 'category');
-    fillFilterSelect('stageFilter', 'stage');
 
     const snap = await db.collection('startups').get();
     allStartups = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -139,7 +134,18 @@
     renderList(filtered);
   }
 
-  function renderList(items) {
+  // Загружаем фильтры как только страница готова — не зависит от auth
+window.addEventListener('DOMContentLoaded', function() {
+  // Небольшая задержка чтобы firebase-config.js успел выполниться
+  setTimeout(function() {
+    if (typeof fillFilterSelect === 'function') {
+      fillFilterSelect('categoryFilter', 'category');
+      fillFilterSelect('stageFilter', 'stage');
+    }
+  }, 100);
+});
+
+function renderList(items) {
     const el = document.getElementById('startupsList');
     if (items.length === 0) {
       el.innerHTML = `
