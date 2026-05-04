@@ -1,64 +1,27 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Профиль участника — LaunchPad</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <link rel="stylesheet" href="styles.css"/>
   <style>
-    .profile-cover {
-      height: 180px;
-      background: linear-gradient(135deg, rgba(0,230,118,.15) 0%, rgba(180,139,255,.1) 50%, rgba(61,142,245,.1) 100%);
-      border-bottom: 1px solid var(--border);
-      position: relative;
-    }
-    .profile-cover::after {
-      content: '';
-      position: absolute; inset: 0;
-      background-image: radial-gradient(circle at 20% 50%, rgba(0,230,118,.08) 0%, transparent 50%),
-                        radial-gradient(circle at 80% 50%, rgba(180,139,255,.08) 0%, transparent 50%);
-    }
-    .profile-main {
-      max-width: 860px; margin: 0 auto; padding: 0 24px;
-    }
-    .profile-top {
-      display: flex; gap: 24px; align-items: flex-end;
-      margin-top: -52px; padding-bottom: 28px;
-      border-bottom: 1px solid var(--border);
-      position: relative; z-index: 1;
-    }
-    .profile-avatar-wrap img {
-      width: 104px; height: 104px; border-radius: 50%;
-      object-fit: cover; border: 4px solid var(--bg);
-      background: var(--bg3);
-    }
-    .profile-info { flex: 1; padding-bottom: 4px; }
-    .profile-name {
-      font-family: var(--font-head); font-size: 28px; font-weight: 800;
-      letter-spacing: -.5px; margin-bottom: 6px;
-    }
-    .profile-meta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    .profile-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-    .profile-body {
-      display: grid; grid-template-columns: 1fr 280px; gap: 24px;
-      padding: 32px 0;
-    }
-    @media(max-width:768px){ .profile-body{grid-template-columns:1fr;} .profile-top{flex-direction:column;align-items:center;text-align:center;} }
-    .stat-pill {
-      display: flex; align-items: center; gap: 6px;
-      font-size: 13px; color: var(--text2);
-    }
-    .stat-pill strong { color: var(--text); font-weight: 600; }
-    .contact-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 0; border-bottom: 1px solid var(--border);
-      font-size: 14px; text-decoration: none; color: inherit;
-      transition: color .2s;
-    }
-    .contact-row:last-child { border-bottom: none; }
-    .contact-row:hover { color: var(--accent); }
-    .contact-icon { font-size: 18px; width: 24px; text-align: center; }
+    .profile-cover{height:180px;background:linear-gradient(135deg,rgba(0,230,118,.15),rgba(180,139,255,.1) 50%,rgba(61,142,245,.1));border-bottom:1px solid var(--border)}
+    .profile-main{max-width:860px;margin:0 auto;padding:0 24px}
+    .profile-top{display:flex;gap:24px;align-items:flex-end;margin-top:-52px;padding-bottom:28px;border-bottom:1px solid var(--border);position:relative;z-index:1}
+    .profile-top img{width:104px;height:104px;border-radius:50%;object-fit:cover;border:4px solid var(--bg);background:var(--bg3)}
+    .profile-info{flex:1;padding-bottom:4px}
+    .profile-name{font-family:var(--font-head);font-size:28px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
+    .profile-body{display:grid;grid-template-columns:1fr 280px;gap:24px;padding:32px 0}
+    @media(max-width:768px){.profile-body{grid-template-columns:1fr}.profile-top{flex-direction:column;align-items:center;text-align:center}}
+    .contact-link{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px;text-decoration:none;color:inherit;word-break:break-all}
+    .contact-link:last-child{border-bottom:none}
+    .contact-link:hover{color:var(--accent)}
+    .startup-item{display:flex;gap:12px;align-items:center;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;transition:border-color .2s}
+    .startup-item--link{text-decoration:none;color:inherit;cursor:pointer}
+    .startup-item--link:hover{border-color:var(--accent)}
+    .startup-item--muted{opacity:.7;cursor:default}
   </style>
 </head>
 <body>
@@ -72,51 +35,57 @@
   </div>
 </nav>
 
-<div id="loadingState" style="padding:140px 0;text-align:center;"><div class="spinner"></div></div>
+<div id="loadingState" style="padding:140px 0;text-align:center">
+  <div class="spinner"></div>
+  <p style="color:var(--text2);margin-top:14px;font-size:14px">Загрузка профиля...</p>
+</div>
 
-<div id="pageContent" style="display:none;">
+<div id="pageContent" style="display:none">
   <div class="profile-cover"></div>
   <div class="profile-main">
+
     <div class="profile-top">
-      <div class="profile-avatar-wrap">
-        <img id="memberAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
-      </div>
+      <div><img id="memberAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/></div>
       <div class="profile-info">
         <h1 class="profile-name" id="memberName"></h1>
-        <div class="profile-meta">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <span class="nav__role" id="memberRole"></span>
-          <span class="stat-pill" id="memberSkillsCount"></span>
-          <span class="stat-pill" id="memberJoined"></span>
+          <span id="memberSkillCount" style="font-size:13px;color:var(--text2)"></span>
+          <span id="memberJoined" style="font-size:13px;color:var(--text2)"></span>
         </div>
       </div>
-      <div class="profile-actions" id="profileActions"></div>
+      <div id="profileActions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
     </div>
 
     <div class="profile-body">
       <!-- Left -->
       <div>
-        <div class="card" style="margin-bottom:20px;">
-          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px;">О себе</h3>
-          <p id="memberBio" style="color:var(--text2);font-size:14px;line-height:1.8;white-space:pre-wrap;"></p>
+        <div class="card" style="margin-bottom:20px">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">О себе</h3>
+          <p id="memberBio" style="color:var(--text2);font-size:14px;line-height:1.8;white-space:pre-wrap"></p>
         </div>
-        <div class="card" style="margin-bottom:20px;" id="skillsCard">
-          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px;">Навыки</h3>
-          <div id="memberSkills" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <div class="card" style="margin-bottom:20px">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Навыки</h3>
+          <div id="memberSkills"></div>
         </div>
-        <div id="startupsSection" style="display:none;">
-          <h3 class="section-title" style="margin-bottom:16px;">Проекты</h3>
+        <div id="portfolioCard" style="display:none" class="card" style="margin-bottom:20px">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Портфолио</h3>
+          <div id="memberPortfolio"></div>
+        </div>
+        <div id="startupsSection" style="display:none">
+          <h3 class="section-title" style="margin-bottom:14px">Проекты</h3>
           <div id="memberStartups"></div>
         </div>
       </div>
 
       <!-- Right -->
       <div>
-        <div class="card" style="margin-bottom:20px;">
-          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px;">Контакты</h3>
+        <div class="card" style="margin-bottom:20px">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Контакты</h3>
           <div id="memberContacts"></div>
         </div>
-        <div id="teamOfCard" style="display:none;" class="card">
-          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px;">Участник в</h3>
+        <div id="teamOfCard" style="display:none" class="card">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Участник в</h3>
           <div id="teamOfList"></div>
         </div>
       </div>
@@ -124,208 +93,268 @@
   </div>
 </div>
 
+<!-- Invite to startup modal -->
+<div class="modal-overlay" id="inviteModal">
+  <div class="modal">
+    <div class="modal__header">
+      <div class="modal__title" id="inviteModalTitle">Пригласить в команду</div>
+      <button class="modal__close" onclick="document.getElementById('inviteModal').classList.remove('open')">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Выбери стартап</label>
+      <select class="form-select" id="invStartup"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Роль в команде</label>
+      <input type="text" class="form-input" id="invRole" placeholder="Разработчик, Дизайнер..."/>
+    </div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center" onclick="sendInviteFromStartup()">Отправить приглашение</button>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js">function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-</script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js">function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-</script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js">function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-</script>
-
-<script src="firebase-config.js">function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-</script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <script>
-  const profileUid = getUrlParam('uid');
-  if (!profileUid) window.location.href = 'members.html';
+var profileUid = getUrlParam('uid');
+if (!profileUid) window.location.href = 'members.html';
 
-  onAuthReady(async (user, myData) => {
-    // Nav
-    const navUser = document.getElementById('navUser');
-    if (user && myData) {
-      navUser.innerHTML = `
-        <span class="nav__role nav__role--${myData.role}">${ROLE_LABELS[myData.role]}</span>
-        <img class="nav__avatar" src="${myData.avatar||`https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(myData.name)}`}" onclick="window.location='profile.html'"/>
-        <a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>
-      `;
-    }
+var pageViewer     = null;
+var pageViewerData = null;
+var profileData    = null;
+var toInviteUid    = null;
+var toInviteName   = null;
 
-    // If viewing own profile, redirect
-    if (user && user.uid === profileUid) {
-      window.location.href = 'profile.html'; return;
-    }
+onAuthReady(async function(user, userData) {
+  pageViewer     = user;
+  pageViewerData = userData;
 
-    const snap = await db.collection('users').doc(profileUid).get();
-    if (!snap.exists) { window.location.href = 'members.html'; return; }
-    const m = snap.data();
-
-    const av = m.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(m.name||'U')}`;
-    document.getElementById('memberAvatar').src = av;
-    document.getElementById('memberName').textContent = m.name || 'Без имени';
-    document.title = (m.name || 'Участник') + ' — LaunchPad';
-
-    const roleEl = document.getElementById('memberRole');
-    roleEl.textContent = ROLE_LABELS[m.role] || m.role;
-    roleEl.className = `nav__role nav__role--${m.role}`;
-
-    const skills = safeArray(m.skills);
-    document.getElementById('memberSkillsCount').innerHTML = `<strong>${skills.length}</strong> навыков`;
-    if (m.createdAt) {
-      document.getElementById('memberJoined').innerHTML = `На платформе с <strong>${formatDate(m.createdAt)}</strong>`;
-    }
-
-    document.getElementById('memberBio').textContent = m.bio || 'Пользователь пока ничего не написал о себе.';
-
-    if (skills.length) {
-      document.getElementById('memberSkills').innerHTML = skills.map(s =>
-        `<span class="badge badge--gray">${s}</span>`).join('');
-    } else {
-      document.getElementById('memberSkills').innerHTML = '<span style="color:var(--text3);font-size:14px;">Не указаны</span>';
-    }
-
-    // Contacts
-    const contacts = [];
-    if (m.telegram) contacts.push(`<a class="contact-row" href="https://t.me/${m.telegram.replace('@','')}" target="_blank"><span class="contact-icon">📱</span>${m.telegram}</a>`);
-    if (m.linkedIn) contacts.push(`<a class="contact-row" href="${m.linkedIn}" target="_blank"><span class="contact-icon">💼</span>LinkedIn</a>`);
-    if (m.gitHub)   contacts.push(`<a class="contact-row" href="${m.gitHub}" target="_blank"><span class="contact-icon">🐙</span>GitHub</a>`);
-    document.getElementById('memberContacts').innerHTML = contacts.join('') || '<p style="color:var(--text3);font-size:14px;">Контакты не указаны</p>';
-
-    // Action buttons
-    const actionsEl = document.getElementById('profileActions');
-    if (user) {
-      const isInvestor = myData?.role === 'investor';
-      const isStartup  = myData?.role === 'startup';
-      actionsEl.innerHTML = `<button class="btn btn--outline" onclick="window.location.href='messages.html?to=${profileUid}'">💬 Написать</button>`;
-      if (isStartup) {
-        actionsEl.innerHTML += `<button class="btn btn--primary" onclick="inviteToStartup('${profileUid}','${m.name}')">+ Пригласить в команду</button>`;
-      }
-    } else {
-      actionsEl.innerHTML = `<a href="login.html" class="btn btn--outline">Войти</a>`;
-    }
-
-    // Стартапы участника — с учётом приватности
-    if (m.role === 'startup') {
-      var sSnap = await db.collection('startups').where('ownerUid','==',profileUid).get();
-      if (!sSnap.empty) {
-        var viewerIsAdmin = myData && myData.role === 'admin';
-        // Фильтруем по приватности
-        var visibleStartups = sSnap.docs.filter(function(d) {
-          var s = d.data();
-          if (viewerIsAdmin) return true;         // admin видит все
-          if (!s.privacy || s.privacy === 'public') return true;   // public — всем
-          if (s.privacy === 'private') return true;  // private — показываем, но без деталей
-          // closed — не показываем никому кроме владельца
-          return user && user.uid === profileUid;
-        });
-
-        if (visibleStartups.length) {
-          document.getElementById('startupsSection').style.display = 'block';
-          var html = '';
-          visibleStartups.forEach(function(d) {
-            var s = d.data();
-            var isClickable = viewerIsAdmin || !s.privacy || s.privacy === 'public';
-            var logo = s.iconImage
-              ? '<img src="'+esc(s.iconImage)+'" style="width:36px;height:36px;border-radius:8px;object-fit:cover"/>'
-              : '<span style="font-size:28px;">'+(s.emoji||'🚀')+'</span>';
-            var privBadge = s.privacy==='private'
-              ? '<span class="badge badge--gray" style="font-size:11px;margin-left:6px">🔒</span>'
-              : s.privacy==='closed'
-              ? '<span class="badge badge--gray" style="font-size:11px;margin-left:6px">🔐</span>' : '';
-            var inner = logo +
-              '<div style="flex:1">' +
-                '<div style="font-family:var(--font-head);font-size:15px;font-weight:700;">' + esc(s.name||'') + privBadge + '</div>' +
-                '<div style="font-size:12px;color:var(--text2);">' + esc(s.tagline||'') + '</div>' +
-              '</div>' +
-              '<span class="badge badge--green" style="margin-left:auto;">' + esc(s.stage||'Идея') + '</span>';
-            var baseStyle = 'display:flex;gap:12px;align-items:center;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;text-decoration:none;color:inherit;transition:border-color .2s;';
-            if (isClickable) {
-              html += '<a href="startup.html?id='+d.id+'" style="'+baseStyle+'">'+inner+'</a>';
-            } else {
-              html += '<div style="'+baseStyle+'opacity:.7;cursor:default">'+inner+'</div>';
-            }
-          });
-          document.getElementById('memberStartups').innerHTML = html;
-        }
-      }
-    }
-
-    // Check if member of any startup teams
-    try {
-      const teamSnaps = await db.collectionGroup('team').where('uid','==',profileUid).get();
-      if (!teamSnaps.empty) {
-        document.getElementById('teamOfCard').style.display = 'block';
-        const listEl = document.getElementById('teamOfList');
-        const items = [];
-        for (const d of teamSnaps.docs) {
-          const startupId = d.ref.parent.parent.id;
-          const sSnap = await db.collection('startups').doc(startupId).get();
-          if (sSnap.exists) {
-            const s = sSnap.data();
-            items.push('<a href="startup.html?id=' + startupId + '" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;margin-bottom:8px;"><span style="font-size:20px;">' + (s.emoji||'🚀') + '</span><span style="font-size:14px;font-weight:500;">' + s.name + '</span></a>');
-          }
-        }
-        listEl.innerHTML = items.join('');
-      }
-    } catch(e) {
-      // collectionGroup requires a Firestore index — see ИНСТРУКЦИЯ.md
-      console.log('collectionGroup index not ready:', e.message);
-    }
-
-    document.getElementById('loadingState').style.display = 'none';
-    document.getElementById('pageContent').style.display = 'block';
-  });
-
-  // Modal for inviting to startup
-  async function inviteToStartup(toUid, toName) {
-    if (!currentUser) return;
-    const myStartups = await db.collection('startups').where('ownerUid','==',currentUser.uid).get();
-    if (myStartups.empty) { showToast('У тебя нет стартапов', 'warn'); return; }
-
-    const options = myStartups.docs.map(d => `<option value="${d.id}">${d.data().name}</option>`).join('');
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay open';
-    overlay.innerHTML = `
-      <div class="modal">
-        <div class="modal__header">
-          <div class="modal__title">Пригласить ${toName}</div>
-          <button class="modal__close" onclick="this.closest('.modal-overlay').remove()">×</button>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Выбери стартап</label>
-          <select class="form-select" id="invStartup">${options}</select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Роль в команде</label>
-          <input type="text" class="form-input" id="invRole" placeholder="Разработчик, Дизайнер..."/>
-        </div>
-        <button class="btn btn--primary" style="width:100%;justify-content:center;" onclick="sendInviteFromStartup('${toUid}','${toName}',this)">Отправить приглашение</button>
-      </div>`;
-    document.body.appendChild(overlay);
+  // Обновляем nav
+  var navUser = document.getElementById('navUser');
+  if (user && userData) {
+    var av = userData.avatar ||
+      'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(userData.name||'U');
+    navUser.innerHTML =
+      '<span class="nav__role nav__role--'+userData.role+'">' + (ROLE_LABELS[userData.role]||userData.role) + '</span>' +
+      '<img class="nav__avatar" src="'+esc(av)+'" onclick="window.location.href=\'profile.html\'"/>' +
+      '<a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>';
   }
 
-  async function sendInviteFromStartup(toUid, toName, btn) {
-    const startupId = document.getElementById('invStartup').value;
-    const role = document.getElementById('invRole').value.trim() || 'Участник';
-    btn.disabled = true; btn.textContent = 'Отправка...';
+  // Если смотрим свой профиль — редиректим
+  if (user && user.uid === profileUid) {
+    window.location.href = 'profile.html';
+    return;
+  }
 
-    const sSnap = await db.collection('startups').doc(startupId).get();
-    await db.collection('invites').add({
-      type: 'from_startup',
-      fromUid: currentUser.uid,
-      fromName: currentUserData.name,
-      toUid, toName,
-      startupId,
-      startupName: sSnap.data().name,
-      startupOwner: currentUser.uid,
-      role,
-      status: 'pending',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  // Загружаем профиль
+  var snap = await db.collection('users').doc(profileUid).get();
+  if (!snap.exists) { window.location.href = 'members.html'; return; }
+  profileData = snap.data();
+
+  document.title = (profileData.name || 'Участник') + ' — LaunchPad';
+
+  // Аватар
+  var mav = profileData.avatar ||
+    'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(profileData.name||'U');
+  document.getElementById('memberAvatar').src = mav;
+
+  // Имя
+  document.getElementById('memberName').textContent = profileData.name || 'Без имени';
+
+  // Роль
+  var roleEl = document.getElementById('memberRole');
+  roleEl.textContent = ROLE_LABELS[profileData.role] || profileData.role || '';
+  roleEl.className   = 'nav__role nav__role--' + (profileData.role||'user');
+
+  // Навыки счётчик
+  var skills = safeArray(profileData.skills);
+  document.getElementById('memberSkillCount').textContent = skills.length ? skills.length + ' навыков' : '';
+
+  // Дата
+  if (profileData.createdAt) {
+    document.getElementById('memberJoined').textContent = 'С ' + formatDate(profileData.createdAt);
+  }
+
+  // О себе
+  document.getElementById('memberBio').textContent = profileData.bio || 'Пользователь пока ничего не написал.';
+
+  // Навыки
+  document.getElementById('memberSkills').innerHTML = skills.length
+    ? skills.map(function(s) { return '<span class="badge badge--gray">' + esc(s) + '</span>'; }).join(' ')
+    : '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
+
+  // Портфолио
+  if (profileData.portfolio) {
+    document.getElementById('portfolioCard').style.display = 'block';
+    var links = profileData.portfolio.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+    document.getElementById('memberPortfolio').innerHTML = links.map(function(l) {
+      if (l.startsWith('http')) {
+        return '<a class="contact-link" href="' + esc(l) + '" target="_blank">🔗 ' + esc(l) + '</a>';
+      }
+      return '<div class="contact-link">• ' + esc(l) + '</div>';
+    }).join('');
+  }
+
+  // Контакты
+  if (profileData.contacts) {
+    document.getElementById('memberContacts').innerHTML =
+      '<p style="font-size:14px;color:var(--text2);white-space:pre-wrap;line-height:1.7">' + esc(profileData.contacts) + '</p>';
+  } else {
+    document.getElementById('memberContacts').innerHTML =
+      '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
+  }
+
+  // Кнопки действий
+  renderActions(user, userData);
+
+  // Стартапы (если role=startup)
+  if (profileData.role === 'startup') {
+    await loadMemberStartups(user, userData);
+  }
+
+  // Команды через collectionGroup
+  await loadTeamOf();
+
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('pageContent').style.display  = 'block';
+});
+
+function renderActions(user, userData) {
+  var el = document.getElementById('profileActions');
+  if (!user) {
+    el.innerHTML = '<a href="login.html" class="btn btn--outline btn--sm">Войти</a>';
+    return;
+  }
+  var btns = '';
+  // Написать сообщение
+  btns += '<button class="btn btn--outline btn--sm" onclick="window.location.href=\'messages.html?to=' + profileUid + '\'">💬 Написать</button>';
+  // Пригласить в команду (только стартаперы)
+  if (userData && userData.role === 'startup') {
+    btns += '<button class="btn btn--primary btn--sm" onclick="openInviteModal()">+ Пригласить</button>';
+  }
+  el.innerHTML = btns;
+}
+
+async function loadMemberStartups(user, userData) {
+  try {
+    var sSnap = await db.collection('startups').where('ownerUid','==',profileUid).get();
+    if (sSnap.empty) return;
+
+    var viewerIsAdmin = userData && userData.role === 'admin';
+    var items = '';
+
+    sSnap.docs.forEach(function(d) {
+      var s = d.data();
+      // Фильтрация по приватности
+      if (!viewerIsAdmin) {
+        // closed — не показываем
+        if (s.privacy === 'closed') return;
+      }
+
+      var isClickable = viewerIsAdmin || (!s.privacy || s.privacy === 'public');
+      var logo = s.iconImage
+        ? '<img src="' + esc(s.iconImage) + '" style="width:36px;height:36px;border-radius:8px;object-fit:cover" onerror="this.style.display=&quot;none&quot;"/>'
+        : '<span style="font-size:26px">' + esc(s.emoji||'🚀') + '</span>';
+      var privBadge = s.privacy === 'private'
+        ? ' <span class="badge badge--gray" style="font-size:10px">🔒</span>'
+        : s.privacy === 'closed'
+        ? ' <span class="badge badge--gray" style="font-size:10px">🔐</span>'
+        : '';
+      var inner =
+        logo +
+        '<div style="flex:1">' +
+          '<div style="font-family:var(--font-head);font-size:15px;font-weight:700">' + esc(s.name||'') + privBadge + '</div>' +
+          '<div style="font-size:12px;color:var(--text2)">' + esc(s.tagline||'') + '</div>' +
+        '</div>' +
+        '<span class="badge badge--green">' + esc(s.stage||'Идея') + '</span>';
+
+      if (isClickable) {
+        items += '<a class="startup-item startup-item--link" href="startup.html?id=' + d.id + '">' + inner + '</a>';
+      } else {
+        items += '<div class="startup-item startup-item--muted">' + inner + '</div>';
+      }
     });
 
-    btn.closest('.modal-overlay').remove();
-    showToast('Приглашение отправлено!', 'success');
+    if (items) {
+      document.getElementById('startupsSection').style.display = 'block';
+      document.getElementById('memberStartups').innerHTML = items;
+    }
+  } catch(e) { console.warn('loadMemberStartups:', e.message); }
+}
+
+async function loadTeamOf() {
+  try {
+    var teamSnaps = await db.collectionGroup('team').where('uid','==',profileUid).get();
+    if (teamSnaps.empty) return;
+    document.getElementById('teamOfCard').style.display = 'block';
+    var items = '';
+    for (var i = 0; i < teamSnaps.docs.length; i++) {
+      var startupId = teamSnaps.docs[i].ref.parent.parent.id;
+      try {
+        var sSnap = await db.collection('startups').doc(startupId).get();
+        if (sSnap.exists) {
+          var s = sSnap.data();
+          items += '<a href="startup.html?id=' + startupId + '" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;margin-bottom:8px">' +
+            '<span style="font-size:20px">' + esc(s.emoji||'🚀') + '</span>' +
+            '<span style="font-size:14px;font-weight:500">' + esc(s.name||'') + '</span>' +
+          '</a>';
+        }
+      } catch(e2) {}
+    }
+    document.getElementById('teamOfList').innerHTML = items || '<span style="color:var(--text3);font-size:14px">Нет данных</span>';
+  } catch(e) {
+    console.log('collectionGroup error:', e.message);
   }
-function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+}
+
+// ── INVITE ────────────────────────────────────────────
+async function openInviteModal() {
+  if (!pageViewer) return;
+  toInviteUid  = profileUid;
+  toInviteName = profileData ? profileData.name : '';
+  document.getElementById('inviteModalTitle').textContent = 'Пригласить ' + toInviteName;
+
+  var myStartups = await db.collection('startups').where('ownerUid','==',pageViewer.uid).get();
+  if (myStartups.empty) { showToast('У тебя нет стартапов','warn'); return; }
+
+  document.getElementById('invStartup').innerHTML = myStartups.docs.map(function(d) {
+    return '<option value="' + d.id + '">' + esc(d.data().name||'') + '</option>';
+  }).join('');
+  document.getElementById('invRole').value = '';
+  document.getElementById('inviteModal').classList.add('open');
+}
+
+async function sendInviteFromStartup() {
+  var startupId = document.getElementById('invStartup').value;
+  var role      = document.getElementById('invRole').value.trim() || 'Участник';
+  if (!startupId || !toInviteUid) return;
+
+  try {
+    var sSnap = await db.collection('startups').doc(startupId).get();
+    await db.collection('invites').add({
+      type:        'from_startup',
+      fromUid:     pageViewer.uid,
+      fromName:    pageViewerData ? pageViewerData.name : '',
+      toUid:       toInviteUid,
+      toName:      toInviteName,
+      startupId:   startupId,
+      startupName: sSnap.data().name,
+      startupOwner:pageViewer.uid,
+      role:        role,
+      status:      'pending',
+      createdAt:   firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('inviteModal').classList.remove('open');
+    showToast('Приглашение отправлено!','success');
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>
 </body>
 </html>
