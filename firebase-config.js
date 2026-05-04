@@ -109,3 +109,70 @@ function renderNav(userData) {
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ─────────────────────────────────────────────────────
+// НАСТРОЙКИ ПЛАТФОРМЫ (категории, стадии)
+// ─────────────────────────────────────────────────────
+var DEFAULT_CATEGORIES = ['FinTech','EdTech','HealthTech','E-commerce','SaaS','AI / ML','Gaming','GreenTech','Marketplace','Другое'];
+var DEFAULT_STAGES = [
+  {name:'Идея',icon:'💡'},{name:'MVP',icon:'⚡'},{name:'Бета',icon:'🔬'},
+  {name:'Запущен',icon:'🚀'},{name:'Масштабирование',icon:'📈'}
+];
+
+var _platformConfig = null;
+
+async function loadPlatformConfig() {
+  if (_platformConfig) return _platformConfig;
+  try {
+    var snap = await db.collection('_config').doc('platform').get();
+    if (snap.exists && snap.data().categories && snap.data().categories.length) {
+      _platformConfig = {
+        categories: snap.data().categories,
+        stages:     snap.data().stages || DEFAULT_STAGES
+      };
+    } else {
+      _platformConfig = { categories: DEFAULT_CATEGORIES, stages: DEFAULT_STAGES };
+    }
+  } catch(e) {
+    _platformConfig = { categories: DEFAULT_CATEGORIES, stages: DEFAULT_STAGES };
+  }
+  return _platformConfig;
+}
+
+// Заполнить <select> категориями
+function fillCategorySelect(selectId, selectedVal) {
+  loadPlatformConfig().then(function(cfg) {
+    var el = document.getElementById(selectId);
+    if (!el) return;
+    var cur = selectedVal || el.value;
+    el.innerHTML = cfg.categories.map(function(cat) {
+      return '<option value="'+esc(cat)+'"'+(cat===cur?' selected':'')+'>'+esc(cat)+'</option>';
+    }).join('');
+  });
+}
+
+// Заполнить <select> стадиями
+function fillStageSelect(selectId, selectedVal) {
+  loadPlatformConfig().then(function(cfg) {
+    var el = document.getElementById(selectId);
+    if (!el) return;
+    var cur = selectedVal || el.value;
+    el.innerHTML = cfg.stages.map(function(st) {
+      return '<option value="'+esc(st.name)+'"'+(st.name===cur?' selected':'')+'>'+esc(st.icon)+' '+esc(st.name)+'</option>';
+    }).join('');
+  });
+}
+
+// Заполнить фильтр-селект (с опцией «Все»)
+function fillFilterSelect(selectId, type, selectedVal) {
+  loadPlatformConfig().then(function(cfg) {
+    var el = document.getElementById(selectId);
+    if (!el) return;
+    var items = type === 'category' ? cfg.categories : cfg.stages.map(function(s){return s.name;});
+    var cur = selectedVal || '';
+    el.innerHTML = '<option value="">Все '+(type==='category'?'категории':'стадии')+'</option>' +
+      items.map(function(item) {
+        return '<option value="'+esc(item)+'"'+(item===cur?' selected':'')+'>'+esc(item)+'</option>';
+      }).join('');
+  });
+}

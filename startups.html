@@ -68,14 +68,9 @@
       <input type="text" class="search-input" id="searchInput" placeholder="🔍 Поиск стартапов..." oninput="applyFilters()"/>
       <select class="filter-select" id="categoryFilter" onchange="applyFilters()">
         <option value="">Все категории</option>
-        <option>FinTech</option><option>EdTech</option><option>HealthTech</option>
-        <option>E-commerce</option><option>SaaS</option><option>AI / ML</option>
-        <option>Gaming</option><option>GreenTech</option><option>Marketplace</option><option>Другое</option>
       </select>
       <select class="filter-select" id="stageFilter" onchange="applyFilters()">
         <option value="">Все стадии</option>
-        <option>Идея</option><option>MVP</option><option>Бета</option>
-        <option>Запущен</option><option>Масштабирование</option>
       </select>
       <span class="count-label" id="countLabel"></span>
     </div>
@@ -114,9 +109,12 @@
       `;
     }
 
+    // Загружаем фильтры из настроек платформы
+    fillFilterSelect('categoryFilter', 'category');
+    fillFilterSelect('stageFilter', 'stage');
+
     const snap = await db.collection('startups').get();
     allStartups = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      // closed стартапы не показываем в каталоге
       .filter(s => s.privacy !== 'closed');
     applyFilters();
   });

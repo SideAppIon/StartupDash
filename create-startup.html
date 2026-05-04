@@ -82,10 +82,6 @@
           <label class="form-label">Стадия</label>
           <select class="form-select" id="stage">
             <option value="Идея">💡 Идея</option>
-            <option value="MVP">⚡ MVP</option>
-            <option value="Бета">🔬 Бета</option>
-            <option value="Запущен">🚀 Запущен</option>
-            <option value="Масштабирование">📈 Масштабирование</option>
           </select>
         </div>
       </div>
@@ -108,9 +104,7 @@
         <div class="form-group">
           <label class="form-label">Категория</label>
           <select class="form-select" id="category">
-            <option>FinTech</option><option>EdTech</option><option>HealthTech</option>
-            <option>E-commerce</option><option>SaaS</option><option>AI / ML</option>
-            <option>Gaming</option><option>GreenTech</option><option>Marketplace</option><option>Другое</option>
+            <option>FinTech</option>
           </select>
         </div>
         <div class="form-group">
@@ -333,6 +327,10 @@ onAuthReady(async function(user, userData){
   var av=userData&&userData.avatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U';
   document.getElementById('navAvatar').src=av;
 
+  // Загружаем динамические категории и стадии
+  fillCategorySelect('category');
+  fillStageSelect('stage');
+
   if (editId){
     document.getElementById('pageTitle').textContent='Редактировать стартап';
     document.getElementById('submitBtn').textContent='💾 Сохранить';
@@ -345,12 +343,18 @@ onAuthReady(async function(user, userData){
       document.getElementById('lookingFor').value=d.lookingFor||'';
       document.getElementById('coverImage').value=d.coverImage||'';
       if (d.coverImage) previewCover(d.coverImage);
-      if (d.stage) document.getElementById('stage').value=d.stage;
+      if (d.stage) {
+        fillStageSelect('stage', d.stage);
+        setTimeout(function(){ document.getElementById('stage').value=d.stage; }, 200);
+      }
       if (d.iconImage) {
         document.getElementById('iconImage').value=d.iconImage;
         onIconImageInput(d.iconImage);
       }
-      if (d.category) document.getElementById('category').value=d.category;
+      if (d.category) {
+        fillCategorySelect('category', d.category);
+        setTimeout(function(){ document.getElementById('category').value=d.category; }, 200);
+      }
       tags=safeArray(d.tags); renderTags();
       selectedEmoji=d.emoji||'🚀';
       document.querySelectorAll('.emoji-opt').forEach(function(b){

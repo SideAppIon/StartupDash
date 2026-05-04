@@ -126,11 +126,15 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js">function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+</script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js">function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+</script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js">function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+</script>
 
-<script src="firebase-config.js"></script>
+<script src="firebase-config.js">function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+</script>
 <script>
   const profileUid = getUrlParam('uid');
   if (!profileUid) window.location.href = 'members.html';
@@ -199,22 +203,47 @@
       actionsEl.innerHTML = `<a href="login.html" class="btn btn--outline">Войти</a>`;
     }
 
-    // If startup role — show their startups
+    // Стартапы участника — с учётом приватности
     if (m.role === 'startup') {
-      const sSnap = await db.collection('startups').where('ownerUid','==',profileUid).get();
+      var sSnap = await db.collection('startups').where('ownerUid','==',profileUid).get();
       if (!sSnap.empty) {
-        document.getElementById('startupsSection').style.display = 'block';
-        document.getElementById('memberStartups').innerHTML = sSnap.docs.map(d => {
-          const s = d.data();
-          return `<a href="startup.html?id=${d.id}" style="display:flex;gap:12px;align-items:center;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;text-decoration:none;color:inherit;transition:border-color .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:28px;">${s.emoji||'🚀'}</span>
-            <div>
-              <div style="font-family:var(--font-head);font-size:15px;font-weight:700;">${s.name}</div>
-              <div style="font-size:12px;color:var(--text2);">${s.tagline||''}</div>
-            </div>
-            <span class="badge badge--green" style="margin-left:auto;">${s.stage||'Идея'}</span>
-          </a>`;
-        }).join('');
+        var viewerIsAdmin = myData && myData.role === 'admin';
+        // Фильтруем по приватности
+        var visibleStartups = sSnap.docs.filter(function(d) {
+          var s = d.data();
+          if (viewerIsAdmin) return true;         // admin видит все
+          if (!s.privacy || s.privacy === 'public') return true;   // public — всем
+          if (s.privacy === 'private') return true;  // private — показываем, но без деталей
+          // closed — не показываем никому кроме владельца
+          return user && user.uid === profileUid;
+        });
+
+        if (visibleStartups.length) {
+          document.getElementById('startupsSection').style.display = 'block';
+          document.getElementById('memberStartups').innerHTML = visibleStartups.map(function(d) {
+            var s = d.data();
+            var isClickable = viewerIsAdmin || !s.privacy || s.privacy === 'public';
+            var logo = s.iconImage
+              ? '<img src="'+esc(s.iconImage)+'" style="width:36px;height:36px;border-radius:8px;object-fit:cover"/>'
+              : '<span style="font-size:28px;">'+(s.emoji||'🚀')+'</span>';
+            var privBadge = s.privacy==='private'
+              ? '<span class="badge badge--gray" style="font-size:11px;margin-left:6px">🔒 Частный</span>'
+              : s.privacy==='closed'
+              ? '<span class="badge badge--gray" style="font-size:11px;margin-left:6px">🔐 Закрытый</span>' : '';
+            var inner = logo +
+              '<div style="flex:1">' +
+                '<div style="font-family:var(--font-head);font-size:15px;font-weight:700;">' + esc(s.name||'') + privBadge + '</div>' +
+                '<div style="font-size:12px;color:var(--text2);">' + esc(s.tagline||'') + '</div>' +
+              '</div>' +
+              '<span class="badge badge--green" style="margin-left:auto;">' + esc(s.stage||'Идея') + '</span>';
+            var style = 'display:flex;gap:12px;align-items:center;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;text-decoration:none;color:inherit;transition:border-color .2s;' + (!isClickable?'opacity:.7;cursor:default':'');
+            if (isClickable) {
+              return '<a href="startup.html?id='+d.id+'" style="'+style+'" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">'+inner+'</a>';
+            } else {
+              return '<div style="'+style+'">'+inner+'</div>';
+            }
+          }).join('');
+        }
       }
     }
 
@@ -294,6 +323,7 @@
     btn.closest('.modal-overlay').remove();
     showToast('Приглашение отправлено!', 'success');
   }
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 </script>
 </body>
 </html>

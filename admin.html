@@ -1,119 +1,140 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Админ-панель — LaunchPad</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <link rel="stylesheet" href="styles.css"/>
   <style>
-    .admin-header {
-      background: linear-gradient(135deg, rgba(255,71,87,.1) 0%, rgba(255,71,87,.03) 100%);
-      border-bottom: 1px solid rgba(255,71,87,.2);
-      padding: 32px 0;
-      margin-bottom: 32px;
-    }
-    .admin-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(255,71,87,.15); border: 1px solid rgba(255,71,87,.3);
-      color: var(--danger); font-size: 12px; font-weight: 700;
-      padding: 4px 12px; border-radius: 20px; letter-spacing: .5px;
-      margin-bottom: 12px;
-    }
-    .stat-cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 32px; }
-    @media(max-width:768px){.stat-cards{grid-template-columns:repeat(2,1fr);}}
-    .stat-card {
-      background: var(--bg2); border: 1px solid var(--border);
-      border-radius: var(--radius-lg); padding: 20px;
-    }
-    .stat-card__num { font-family: var(--font-head); font-size: 36px; font-weight: 800; }
-    .stat-card__label { font-size: 12px; color: var(--text2); margin-top: 4px; }
-    .user-row {
-      display: flex; align-items: center; gap: 14px;
-      padding: 14px 0; border-bottom: 1px solid var(--border);
-    }
-    .user-row:last-child { border-bottom: none; }
-    .user-row__info { flex: 1; }
-    .user-row__name { font-size: 14px; font-weight: 500; }
-    .user-row__email { font-size: 12px; color: var(--text2); }
-    .user-row__actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .tabs-admin { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
-    .tab-a {
-      font-size: 14px; font-weight: 500; padding: 10px 20px;
-      color: var(--text2); cursor: pointer; border: none; background: none;
-      border-bottom: 2px solid transparent; margin-bottom: -1px;
-      transition: all .2s;
-    }
-    .tab-a.active { color: var(--danger); border-bottom-color: var(--danger); }
-    .tab-a:hover:not(.active) { color: var(--text); }
-    .search-bar {
-      background: var(--bg3); border: 1px solid var(--border2);
-      border-radius: var(--radius); color: var(--text);
-      font-family: var(--font-body); font-size: 14px;
-      padding: 10px 16px; outline: none; width: 100%;
-      margin-bottom: 20px; transition: border-color .2s;
-    }
-    .search-bar:focus { border-color: var(--danger); }
-    .search-bar::placeholder { color: var(--text3); }
+    .admin-header{background:linear-gradient(135deg,rgba(255,71,87,.08),rgba(255,71,87,.02));border-bottom:1px solid rgba(255,71,87,.2);padding:32px 0;margin-bottom:28px}
+    .admin-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,71,87,.15);border:1px solid rgba(255,71,87,.3);color:var(--danger);font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:.5px;margin-bottom:12px}
+    .stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
+    @media(max-width:768px){.stat-cards{grid-template-columns:repeat(2,1fr)}}
+    .stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px}
+    .stat-card__num{font-family:var(--font-head);font-size:32px;font-weight:800}
+    .stat-card__label{font-size:12px;color:var(--text2);margin-top:4px}
+    .tabs-admin{display:flex;border-bottom:1px solid var(--border);margin-bottom:24px;gap:4px;flex-wrap:wrap}
+    .tab-a{font-size:13px;font-weight:500;padding:9px 16px;color:var(--text2);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s}
+    .tab-a.active{color:var(--danger);border-bottom-color:var(--danger)}
+    .tab-a:hover:not(.active){color:var(--text)}
+    .search-bar{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:14px;padding:10px 16px;outline:none;width:100%;margin-bottom:16px;transition:border-color .2s}
+    .search-bar:focus{border-color:var(--danger)}
+    .user-row{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+    .user-row:last-child{border-bottom:none}
+    .user-row__info{flex:1;min-width:0}
+    .user-row__name{font-size:14px;font-weight:500}
+    .user-row__email{font-size:12px;color:var(--text2)}
+    .user-row__actions{display:flex;gap:6px;flex-wrap:wrap}
+    /* Settings */
+    .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    @media(max-width:700px){.settings-grid{grid-template-columns:1fr}}
+    .settings-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px}
+    .settings-card h3{font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:16px}
+    .item-list{list-style:none;margin-bottom:12px}
+    .item-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
+    .item-row:last-child{border-bottom:none}
+    .item-row__icon{font-size:18px;width:28px;text-align:center;flex-shrink:0;cursor:pointer;border-radius:6px;padding:2px}
+    .item-row__icon:hover{background:var(--bg3)}
+    .item-row__name{flex:1;font-size:14px}
+    .item-row__del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:2px 6px;border-radius:4px;transition:all .15s}
+    .item-row__del:hover{color:var(--danger);background:rgba(255,71,87,.1)}
+    .add-row{display:flex;gap:8px;margin-top:8px}
+    .add-row input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:13px;padding:8px 12px;outline:none;transition:border-color .2s}
+    .add-row input:focus{border-color:var(--accent)}
+    .emoji-pick-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;background:var(--bg3);border-radius:var(--radius);padding:10px}
+    .ep-btn{width:34px;height:34px;border-radius:8px;background:none;border:1px solid var(--border2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+    .ep-btn:hover,.ep-btn.sel{background:var(--accent-dim);border-color:var(--accent)}
   </style>
 </head>
 <body>
-
 <nav class="nav">
   <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
   <div class="nav__user">
     <a href="dashboard.html" class="btn btn--ghost btn--sm">← Дашборд</a>
-    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=A"/>
-    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(()=>window.location.href='index.html')">Выйти</button>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=ff4757&name=A"/>
+    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
   </div>
 </nav>
 
 <div class="page">
   <div class="container">
-    <div class="admin-header" style="margin:-32px -0 32px;padding:32px 0;">
-      <div class="container">
-        <div class="admin-badge">🛡️ ADMIN PANEL</div>
-        <h1 class="page-title">Панель администратора</h1>
-        <p class="page-subtitle">Полный контроль над платформой</p>
-      </div>
+    <div class="admin-header" style="margin:-32px 0 28px;padding:32px 0">
+      <div class="admin-badge">🛡️ ADMIN PANEL</div>
+      <h1 class="page-title">Панель администратора</h1>
+      <p class="page-subtitle">Полный контроль над платформой</p>
     </div>
 
-    <!-- Stats -->
-    <div class="stat-cards" id="statCards">
+    <div class="stat-cards">
       <div class="stat-card"><div class="stat-card__num" id="statUsers">—</div><div class="stat-card__label">Пользователей</div></div>
       <div class="stat-card"><div class="stat-card__num" id="statStartups">—</div><div class="stat-card__label">Стартапов</div></div>
       <div class="stat-card"><div class="stat-card__num" id="statInvestors">—</div><div class="stat-card__label">Инвесторов</div></div>
-      <div class="stat-card"><div class="stat-card__num" id="statConvs">—</div><div class="stat-card__label">Диалогов</div></div>
+      <div class="stat-card"><div class="stat-card__num" id="statPublic">—</div><div class="stat-card__label">Публичных</div></div>
     </div>
 
-    <!-- Tabs -->
     <div class="tabs-admin">
       <button class="tab-a active" onclick="showTab('users',this)">👥 Пользователи</button>
       <button class="tab-a" onclick="showTab('startups',this)">🚀 Стартапы</button>
+      <button class="tab-a" onclick="showTab('settings',this)">⚙️ Настройки</button>
     </div>
 
-    <!-- Users tab -->
+    <!-- USERS -->
     <div id="tab-users">
       <input type="text" class="search-bar" id="userSearch" placeholder="🔍 Поиск по имени или email..." oninput="filterUsers()"/>
       <div id="usersList"><div class="spinner"></div></div>
     </div>
 
-    <!-- Startups tab -->
-    <div id="tab-startups" style="display:none;">
+    <!-- STARTUPS -->
+    <div id="tab-startups" style="display:none">
       <input type="text" class="search-bar" id="startupSearch" placeholder="🔍 Поиск стартапов..." oninput="filterStartups()"/>
       <div id="startupsList"><div class="spinner"></div></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="tab-settings" style="display:none">
+      <div class="settings-grid">
+
+        <!-- Категории -->
+        <div class="settings-card">
+          <h3>📁 Категории стартапов</h3>
+          <ul class="item-list" id="catList"></ul>
+          <div class="add-row">
+            <input type="text" id="catInput" placeholder="Новая категория..." maxlength="40"
+              onkeydown="if(event.key==='Enter')addCat()"/>
+            <button class="btn btn--primary btn--sm" onclick="addCat()">+</button>
+          </div>
+        </div>
+
+        <!-- Стадии -->
+        <div class="settings-card">
+          <h3>📊 Стадии проекта</h3>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Нажми на иконку стадии чтобы изменить её</p>
+          <ul class="item-list" id="stageList"></ul>
+          <div class="add-row">
+            <input type="text" id="stageInput" placeholder="Название стадии..." maxlength="40"
+              onkeydown="if(event.key==='Enter')addStage()"/>
+            <button class="btn btn--primary btn--sm" onclick="addStage()">+</button>
+          </div>
+          <!-- Выбор иконки -->
+          <div id="iconPickerWrap" style="display:none;margin-top:12px">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Выбери иконку для стадии:</div>
+            <div class="emoji-pick-row" id="emojiPicker"></div>
+          </div>
+        </div>
+
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Role change modal -->
+<!-- Role modal -->
 <div class="modal-overlay" id="roleModal">
   <div class="modal">
     <div class="modal__header">
       <div class="modal__title">Изменить роль</div>
       <button class="modal__close" onclick="closeModal()">×</button>
     </div>
-    <p id="roleModalName" style="color:var(--text2);margin-bottom:20px;font-size:14px;"></p>
+    <p id="roleModalName" style="color:var(--text2);margin-bottom:20px;font-size:14px"></p>
     <div class="form-group">
       <label class="form-label">Новая роль</label>
       <select class="form-select" id="newRoleSelect">
@@ -123,182 +144,283 @@
         <option value="admin">Администратор</option>
       </select>
     </div>
-    <button class="btn btn--primary" style="width:100%;justify-content:center;" onclick="applyRoleChange()">Сохранить</button>
+    <button class="btn btn--primary" style="width:100%;justify-content:center" onclick="applyRole()">Сохранить</button>
   </div>
 </div>
 
-<!-- Reset password modal -->
+<!-- Reset pwd modal -->
 <div class="modal-overlay" id="pwdModal">
   <div class="modal">
     <div class="modal__header">
       <div class="modal__title">Сброс пароля</div>
       <button class="modal__close" onclick="closePwdModal()">×</button>
     </div>
-    <p style="color:var(--text2);font-size:14px;margin-bottom:20px;">Письмо для сброса пароля будет отправлено на: <strong id="pwdEmail"></strong></p>
-    <button class="btn btn--danger" style="width:100%;justify-content:center;" onclick="confirmResetPwd()">Отправить письмо</button>
+    <p style="color:var(--text2);font-size:14px;margin-bottom:20px">Письмо для сброса будет отправлено на: <strong id="pwdEmail"></strong></p>
+    <button class="btn btn--danger" style="width:100%;justify-content:center" onclick="confirmReset()">Отправить письмо</button>
   </div>
 </div>
 
 <div id="toast" class="toast"></div>
-
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
 <script src="firebase-config.js"></script>
 <script>
-  requireAuth('login.html');
+requireAuth('login.html');
 
-  const ROLE_CLASSES = {startup:'badge--green',investor:'badge--purple',user:'badge--blue',admin:'badge--red'};
+var ROLE_CLASSES = {startup:'badge--green',investor:'badge--purple',user:'badge--blue',admin:'badge--red'};
 
-  let allUsers = [];
-  let allStartupsAdmin = [];
-  let selectedUid = null;
-  let resetEmail = null;
+// Дефолтные категории и стадии (используются если в Firestore ещё нет)
+var DEFAULT_CATS   = ['FinTech','EdTech','HealthTech','E-commerce','SaaS','AI / ML','Gaming','GreenTech','Marketplace','Другое'];
+var DEFAULT_STAGES = [
+  {name:'Идея',icon:'💡'},{name:'MVP',icon:'⚡'},{name:'Бета',icon:'🔬'},
+  {name:'Запущен',icon:'🚀'},{name:'Масштабирование',icon:'📈'}
+];
+var ICON_OPTS = ['💡','⚡','🔬','🚀','📈','🎯','🔥','💎','🌱','🏆','✅','🔑','🌍','💰','🤖','🎮'];
 
-  onAuthReady(async (user, userData) => {
-    if (!user) return;
-    if (userData?.role !== 'admin') { window.location.href = 'dashboard.html'; return; }
+var allUsers    = [];
+var allStartups = [];
+var selUid      = null;
+var resetEmail  = null;
+// Settings state
+var cats   = [];
+var stages = [];
+var editingStageIdx = null; // индекс стадии для которой меняем иконку
 
-    const av = userData.avatar || `https://ui-avatars.com/api/?background=181c24&color=ff4757&name=A`;
-    document.getElementById('navAvatar').src = av;
+onAuthReady(async function(user, userData) {
+  if (!user) return;
+  if (userData && userData.role !== 'admin') { window.location.href = 'dashboard.html'; return; }
+  document.getElementById('navAvatar').src = userData && userData.avatar
+    ? userData.avatar
+    : 'https://ui-avatars.com/api/?background=181c24&color=ff4757&name=A';
 
-    await Promise.all([loadStats(), loadUsers(), loadStartupsAdmin()]);
+  await Promise.all([loadStats(), loadUsers(), loadStartupsAdmin(), loadSettings()]);
+});
+
+// ── STATS ─────────────────────────────────────────────
+async function loadStats() {
+  var [u, s] = await Promise.all([
+    db.collection('users').get(),
+    db.collection('startups').get()
+  ]);
+  document.getElementById('statUsers').textContent    = u.size;
+  document.getElementById('statStartups').textContent = s.size;
+  document.getElementById('statInvestors').textContent= u.docs.filter(function(d){return d.data().role==='investor';}).length;
+  document.getElementById('statPublic').textContent   = s.docs.filter(function(d){return !d.data().privacy||d.data().privacy==='public';}).length;
+}
+
+// ── USERS ─────────────────────────────────────────────
+async function loadUsers() {
+  var snap = await db.collection('users').get();
+  allUsers = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+  renderUsers(allUsers);
+}
+function filterUsers() {
+  var q = document.getElementById('userSearch').value.toLowerCase();
+  renderUsers(allUsers.filter(function(u){ return (u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q); }));
+}
+function renderUsers(users) {
+  var el = document.getElementById('usersList');
+  if (!users.length) { el.innerHTML='<p style="color:var(--text2);font-size:14px">Нет пользователей</p>'; return; }
+  el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' +
+    users.map(function(u) {
+      var av = u.avatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(u.name||'U');
+      return '<div class="user-row">'+
+        '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
+        '<div class="user-row__info">'+
+          '<div class="user-row__name">'+esc(u.name||'—')+'</div>'+
+          '<div class="user-row__email">'+esc(u.email||'—')+'</div>'+
+        '</div>'+
+        '<span class="badge '+(ROLE_CLASSES[u.role]||'badge--gray')+'">'+esc(ROLE_LABELS[u.role]||u.role||'')+'</span>'+
+        '<div class="user-row__actions">'+
+          '<a href="member.html?uid='+esc(u.uid||'')+'" class="btn btn--ghost btn--sm">👁</a>'+
+          '<button class="btn btn--outline btn--sm" onclick="openRoleModal(\''+esc(u.uid||'')+'\',\''+esc(u.name||'')+'\',\''+esc(u.role||'')+'\')">Роль</button>'+
+          '<button class="btn btn--ghost btn--sm" onclick="openPwdModal(\''+esc(u.email||'')+'\')">🔑</button>'+
+          '<button class="btn btn--danger btn--sm" onclick="delUser(\''+esc(u.uid||'')+'\',\''+esc(u.name||'')+'\')">✕</button>'+
+        '</div>'+
+      '</div>';
+    }).join('') + '</div>';
+}
+
+// ── STARTUPS ──────────────────────────────────────────
+async function loadStartupsAdmin() {
+  var snap = await db.collection('startups').get();
+  allStartups = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+  renderStartups(allStartups);
+}
+function filterStartups() {
+  var q = document.getElementById('startupSearch').value.toLowerCase();
+  renderStartups(allStartups.filter(function(s){ return (s.name||'').toLowerCase().includes(q); }));
+}
+function renderStartups(list) {
+  var el = document.getElementById('startupsList');
+  if (!list.length) { el.innerHTML='<p style="color:var(--text2);font-size:14px">Нет стартапов</p>'; return; }
+  el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' +
+    list.map(function(s) {
+      var privBadge = s.privacy==='private'?'🔒 ':s.privacy==='closed'?'🔐 ':'';
+      return '<div class="user-row">'+
+        '<span style="font-size:24px">'+(s.emoji||'🚀')+'</span>'+
+        '<div class="user-row__info">'+
+          '<div class="user-row__name">'+privBadge+esc(s.name||'')+'</div>'+
+          '<div class="user-row__email">'+esc(s.ownerName||'?')+' · '+esc(s.category||'')+'</div>'+
+        '</div>'+
+        '<span class="badge badge--green">'+esc(s.stage||'Идея')+'</span>'+
+        '<div class="user-row__actions">'+
+          '<a href="startup.html?id='+s.id+'" class="btn btn--outline btn--sm" target="_blank">Открыть</a>'+
+          '<button class="btn btn--danger btn--sm" onclick="delStartup(\''+s.id+'\',\''+esc(s.name||'')+'\')">✕</button>'+
+        '</div>'+
+      '</div>';
+    }).join('') + '</div>';
+}
+
+// ── SETTINGS ──────────────────────────────────────────
+async function loadSettings() {
+  // Загружаем из Firestore, fallback на дефолтные
+  try {
+    var snap = await db.collection('_config').doc('platform').get();
+    if (snap.exists && snap.data().categories) {
+      cats   = snap.data().categories;
+      stages = snap.data().stages || DEFAULT_STAGES;
+    } else {
+      cats   = DEFAULT_CATS.slice();
+      stages = DEFAULT_STAGES.map(function(s){ return Object.assign({},s); });
+    }
+  } catch(e) {
+    cats   = DEFAULT_CATS.slice();
+    stages = DEFAULT_STAGES.map(function(s){ return Object.assign({},s); });
+  }
+  renderCats();
+  renderStages();
+  renderIconPicker();
+}
+
+async function saveSettings() {
+  try {
+    await db.collection('_config').doc('platform').set({ categories: cats, stages: stages });
+  } catch(e) { console.warn('saveSettings:', e.message); }
+}
+
+// Категории
+function renderCats() {
+  document.getElementById('catList').innerHTML = cats.map(function(cat, i) {
+    return '<li class="item-row">'+
+      '<span class="item-row__name">'+esc(cat)+'</span>'+
+      '<button class="item-row__del" onclick="removeCat('+i+')" title="Удалить">✕</button>'+
+    '</li>';
+  }).join('');
+}
+function addCat() {
+  var inp = document.getElementById('catInput');
+  var v   = inp.value.trim();
+  if (!v || cats.includes(v)) { inp.focus(); return; }
+  cats.push(v); inp.value='';
+  renderCats(); saveSettings();
+  showToast('Категория добавлена','success');
+}
+function removeCat(i) {
+  if (!confirm('Удалить категорию «'+cats[i]+'»?')) return;
+  cats.splice(i,1); renderCats(); saveSettings();
+  showToast('Категория удалена','success');
+}
+
+// Стадии
+function renderStages() {
+  document.getElementById('stageList').innerHTML = stages.map(function(st, i) {
+    return '<li class="item-row">'+
+      '<span class="item-row__icon" onclick="openIconPicker('+i+')" title="Изменить иконку">'+esc(st.icon||'⚡')+'</span>'+
+      '<span class="item-row__name">'+esc(st.name)+'</span>'+
+      '<button class="item-row__del" onclick="removeStage('+i+')" title="Удалить">✕</button>'+
+    '</li>';
+  }).join('');
+}
+function addStage() {
+  var inp = document.getElementById('stageInput');
+  var v   = inp.value.trim();
+  if (!v) { inp.focus(); return; }
+  if (stages.some(function(s){ return s.name===v; })) { showToast('Такая стадия уже есть','warn'); return; }
+  stages.push({ name:v, icon:'⚡' });
+  inp.value='';
+  renderStages(); saveSettings();
+  showToast('Стадия добавлена','success');
+}
+function removeStage(i) {
+  if (!confirm('Удалить стадию «'+stages[i].name+'»?')) return;
+  stages.splice(i,1); renderStages(); saveSettings();
+  showToast('Стадия удалена','success');
+}
+
+// Icon picker
+function renderIconPicker() {
+  document.getElementById('emojiPicker').innerHTML = ICON_OPTS.map(function(e) {
+    return '<button class="ep-btn" onclick="pickIcon(\''+e+'\')" title="'+e+'">'+e+'</button>';
+  }).join('');
+}
+function openIconPicker(idx) {
+  editingStageIdx = idx;
+  var wrap = document.getElementById('iconPickerWrap');
+  wrap.style.display = 'block';
+  // Подсвечиваем текущую
+  document.querySelectorAll('.ep-btn').forEach(function(btn) {
+    btn.classList.toggle('sel', btn.textContent === stages[idx].icon);
   });
+  wrap.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function pickIcon(emoji) {
+  if (editingStageIdx === null) return;
+  stages[editingStageIdx].icon = emoji;
+  renderStages(); saveSettings();
+  document.getElementById('iconPickerWrap').style.display='none';
+  editingStageIdx=null;
+  showToast('Иконка обновлена','success');
+}
 
-  async function loadStats() {
-    const [users, startups, convs] = await Promise.all([
-      db.collection('users').get(),
-      db.collection('startups').get(),
-      db.collection('conversations').get()
-    ]);
-    document.getElementById('statUsers').textContent = users.size;
-    document.getElementById('statStartups').textContent = startups.size;
-    document.getElementById('statInvestors').textContent = users.docs.filter(d=>d.data().role==='investor').length;
-    document.getElementById('statConvs').textContent = convs.size;
-  }
+// ── MODALS ────────────────────────────────────────────
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-a').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.getElementById('tab-users').style.display    = name==='users'    ?'block':'none';
+  document.getElementById('tab-startups').style.display = name==='startups' ?'block':'none';
+  document.getElementById('tab-settings').style.display = name==='settings' ?'block':'none';
+}
+function openRoleModal(uid, name, role) {
+  selUid = uid;
+  document.getElementById('roleModalName').textContent = 'Пользователь: '+name;
+  document.getElementById('newRoleSelect').value = role;
+  document.getElementById('roleModal').classList.add('open');
+}
+function closeModal() { document.getElementById('roleModal').classList.remove('open'); }
+async function applyRole() {
+  var r = document.getElementById('newRoleSelect').value;
+  await db.collection('users').doc(selUid).update({ role:r });
+  closeModal(); showToast('Роль обновлена','success');
+  await loadUsers(); await loadStats();
+}
+function openPwdModal(email) {
+  resetEmail=email;
+  document.getElementById('pwdEmail').textContent=email;
+  document.getElementById('pwdModal').classList.add('open');
+}
+function closePwdModal() { document.getElementById('pwdModal').classList.remove('open'); }
+async function confirmReset() {
+  try {
+    await auth.sendPasswordResetEmail(resetEmail);
+    closePwdModal(); showToast('Письмо отправлено','success');
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+async function delUser(uid, name) {
+  if (!confirm('Удалить пользователя «'+name+'»?')) return;
+  await db.collection('users').doc(uid).delete();
+  showToast('Удалён','success');
+  await loadUsers(); await loadStats();
+}
+async function delStartup(id, name) {
+  if (!confirm('Удалить стартап «'+name+'»?')) return;
+  await db.collection('startups').doc(id).delete();
+  showToast('Удалён','success');
+  await loadStartupsAdmin(); await loadStats();
+}
 
-  async function loadUsers() {
-    const snap = await db.collection('users').orderBy('createdAt','desc').get();
-    allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderUsers(allUsers);
-  }
-
-  async function loadStartupsAdmin() {
-    const snap = await db.collection('startups').orderBy('createdAt','desc').get();
-    allStartupsAdmin = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderStartups(allStartupsAdmin);
-  }
-
-  function filterUsers() {
-    const q = document.getElementById('userSearch').value.toLowerCase();
-    renderUsers(allUsers.filter(u => u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)));
-  }
-
-  function filterStartups() {
-    const q = document.getElementById('startupSearch').value.toLowerCase();
-    renderStartups(allStartupsAdmin.filter(s => s.name?.toLowerCase().includes(q)));
-  }
-
-  function renderUsers(users) {
-    const el = document.getElementById('usersList');
-    if (!users.length) { el.innerHTML = '<p style="color:var(--text2);font-size:14px;">Нет пользователей</p>'; return; }
-    el.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">' +
-      users.map(u => {
-        const av = u.avatar || `https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(u.name||'U')}`;
-        return `
-          <div class="user-row" style="padding:14px 24px;">
-            <img src="${av}" class="avatar avatar--sm"/>
-            <div class="user-row__info">
-              <div class="user-row__name">${u.name || '—'}</div>
-              <div class="user-row__email">${u.email || '—'} &nbsp;·&nbsp; UID: ${u.uid?.substring(0,8)}...</div>
-            </div>
-            <span class="badge ${ROLE_CLASSES[u.role]||'badge--gray'}">${ROLE_LABELS[u.role]||u.role}</span>
-            <div class="user-row__actions">
-              <a href="member.html?uid=${u.uid}" class="btn btn--ghost btn--sm">👁</a>
-              <button class="btn btn--outline btn--sm" onclick="openRoleModal('${u.uid}','${u.name}','${u.role}')">Роль</button>
-              <button class="btn btn--ghost btn--sm" onclick="openPwdModal('${u.email}')">🔑 Пароль</button>
-              <button class="btn btn--danger btn--sm" onclick="deleteUser('${u.uid}','${u.name}')">✕</button>
-            </div>
-          </div>`;
-      }).join('') + '</div>';
-  }
-
-  function renderStartups(startups) {
-    const el = document.getElementById('startupsList');
-    if (!startups.length) { el.innerHTML = '<p style="color:var(--text2);font-size:14px;">Нет стартапов</p>'; return; }
-    el.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">' +
-      startups.map(s => `
-        <div class="user-row" style="padding:14px 24px;">
-          <span style="font-size:28px;">${s.emoji||'🚀'}</span>
-          <div class="user-row__info">
-            <div class="user-row__name">${s.name}</div>
-            <div class="user-row__email">${s.ownerName||'?'} · ${s.category||''} · ${formatDate(s.createdAt)}</div>
-          </div>
-          <span class="badge badge--green">${s.stage||'Идея'}</span>
-          <div class="user-row__actions">
-            <a href="startup.html?id=${s.id}" class="btn btn--outline btn--sm" target="_blank">Открыть</a>
-            <button class="btn btn--danger btn--sm" onclick="deleteStartup('${s.id}','${s.name}')">✕ Удалить</button>
-          </div>
-        </div>`).join('') + '</div>';
-  }
-
-  function showTab(name, btn) {
-    document.querySelectorAll('.tab-a').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-users').style.display = name === 'users' ? 'block' : 'none';
-    document.getElementById('tab-startups').style.display = name === 'startups' ? 'block' : 'none';
-  }
-
-  // Role modal
-  function openRoleModal(uid, name, currentRole) {
-    selectedUid = uid;
-    document.getElementById('roleModalName').textContent = `Пользователь: ${name}`;
-    document.getElementById('newRoleSelect').value = currentRole;
-    document.getElementById('roleModal').classList.add('open');
-  }
-  function closeModal() { document.getElementById('roleModal').classList.remove('open'); }
-
-  async function applyRoleChange() {
-    const newRole = document.getElementById('newRoleSelect').value;
-    await db.collection('users').doc(selectedUid).update({ role: newRole });
-    closeModal();
-    showToast('Роль обновлена', 'success');
-    await loadUsers();
-  }
-
-  // Password reset
-  function openPwdModal(email) {
-    resetEmail = email;
-    document.getElementById('pwdEmail').textContent = email;
-    document.getElementById('pwdModal').classList.add('open');
-  }
-  function closePwdModal() { document.getElementById('pwdModal').classList.remove('open'); }
-  async function confirmResetPwd() {
-    try {
-      await auth.sendPasswordResetEmail(resetEmail);
-      closePwdModal();
-      showToast('Письмо отправлено', 'success');
-    } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
-  }
-
-  // Delete user
-  async function deleteUser(uid, name) {
-    if (!confirm(`Удалить пользователя "${name}"? Это действие нельзя отменить.`)) return;
-    await db.collection('users').doc(uid).delete();
-    showToast('Пользователь удалён', 'success');
-    await loadUsers();
-    await loadStats();
-  }
-
-  // Delete startup
-  async function deleteStartup(id, name) {
-    if (!confirm(`Удалить стартап "${name}"?`)) return;
-    await db.collection('startups').doc(id).delete();
-    showToast('Стартап удалён', 'success');
-    await loadStartupsAdmin();
-    await loadStats();
-  }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 </body>
 </html>
