@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Лента новостей — LaunchPad</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .feed-layout { display: grid; grid-template-columns: 1fr 300px; gap: 24px; }
+    @media(max-width: 900px) { .feed-layout { grid-template-columns: 1fr; } }
+
+    /* Update card */
+    .feed-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 24px; margin-bottom: 16px;
+      transition: border-color .2s;
+    }
+    .feed-card:hover { border-color: var(--border2); }
+    .feed-card__header { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
+    .feed-card__logo {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0; overflow: hidden;
+    }
+    .feed-card__logo img { width: 100%; height: 100%; object-fit: cover; }
+    .feed-card__meta { flex: 1; min-width: 0; }
+    .feed-card__startup {
+      font-size: 13px; font-weight: 600; color: var(--accent);
+      text-decoration: none; display: block; margin-bottom: 2px;
+    }
+    .feed-card__startup:hover { text-decoration: underline; }
+    .feed-card__date { font-size: 12px; color: var(--text3); }
+    .feed-card__title {
+      font-family: var(--font-head); font-size: 18px; font-weight: 700;
+      margin-bottom: 10px; line-height: 1.3;
+    }
+    .feed-card__body {
+      font-size: 14px; color: var(--text2); line-height: 1.75;
+      white-space: pre-wrap; margin-bottom: 12px;
+    }
+    .feed-card__img {
+      width: 100%; max-height: 320px; object-fit: cover;
+      border-radius: var(--radius); margin-top: 8px; display: block;
+    }
+    .feed-card__footer { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+
+    /* Sidebar */
+    .sidebar-sticky { position: sticky; top: calc(var(--nav-h) + 20px); }
+    .trending-item {
+      display: flex; gap: 12px; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+      text-decoration: none; color: inherit; transition: color .2s;
+    }
+    .trending-item:last-child { border-bottom: none; }
+    .trending-item:hover { color: var(--accent); }
+    .trending-item__logo {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0; overflow: hidden;
+    }
+    .trending-item__logo img { width: 100%; height: 100%; object-fit: cover; }
+    .trending-item__name { font-size: 13px; font-weight: 600; }
+    .trending-item__count { font-size: 11px; color: var(--text3); }
+
+    /* Filters */
+    .feed-filters {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 24px; align-items: center;
+    }
+    .feed-filter {
+      padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 500;
+      border: 1px solid var(--border2); background: var(--bg3); color: var(--text2);
+      cursor: pointer; transition: all .2s;
+    }
+    .feed-filter.active { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+    .feed-filter:hover:not(.active) { border-color: var(--border2); color: var(--text); }
+
+    /* Empty */
+    .feed-empty { text-align: center; padding: 60px 24px; color: var(--text2); }
+    .feed-empty__icon { font-size: 48px; opacity: .3; margin-bottom: 16px; }
+    .feed-empty__title { font-family: var(--font-head); font-size: 18px; color: var(--text); margin-bottom: 8px; }
+
+    /* Load more */
+    .load-more-btn {
+      width: 100%; padding: 14px; border: 1px dashed var(--border2);
+      border-radius: var(--radius-lg); background: none; color: var(--text2);
+      font-size: 14px; cursor: pointer; transition: all .2s; margin-top: 8px;
+    }
+    .load-more-btn:hover { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="startups.html">Стартапы</a>
+  <a href="feed.html" class="active">Лента</a>
+  <a href="members.html">Участники</a>
+  <div class="nav__user" id="navUser">
+    <a href="login.html" class="btn btn--outline btn--sm">Войти</a>
+    <a href="register.html" class="btn btn--primary btn--sm">Регистрация</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="container">
+    <div style="margin-bottom:28px">
+      <h1 class="page-title">Лента новостей</h1>
+      <p class="page-subtitle">Последние обновления от стартапов платформы</p>
+    </div>
+
+    <div class="feed-layout">
+      <!-- Main feed -->
+      <div>
+        <!-- Filters -->
+        <div class="feed-filters">
+          <button class="feed-filter active" onclick="setFilter('',this)">Все</button>
+          <button class="feed-filter" onclick="setFilter('Milestone',this)">🏆 Milestone</button>
+          <button class="feed-filter" onclick="setFilter('MVP',this)">⚡ MVP</button>
+          <button class="feed-filter" onclick="setFilter('Запуск',this)">🚀 Запуск</button>
+          <button class="feed-filter" onclick="setFilter('Финансирование',this)">💰 Финансирование</button>
+          <button class="feed-filter" onclick="setFilter('Команда',this)">👥 Команда</button>
+        </div>
+
+        <div id="feedList">
+          <div class="spinner" style="margin:40px auto"></div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div>
+        <div class="sidebar-sticky">
+          <div class="card" style="margin-bottom:16px">
+            <h3 style="font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:16px">🔥 Активные стартапы</h3>
+            <div id="trendingList">
+              <div class="spinner" style="width:20px;height:20px;border-width:2px;margin:16px auto"></div>
+            </div>
+          </div>
+          <div class="card" id="statsCard">
+            <h3 style="font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:14px">📊 Статистика</h3>
+            <div id="feedStats" style="font-size:13px;color:var(--text2);line-height:2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+var allUpdates   = [];   // все загруженные обновления
+var filteredUpdates = [];
+var activeFilter = '';
+var maxUpdates   = 25;   // задаётся администратором из _config
+
+onAuthReady(async function(user, userData) {
+  // Nav
+  var navUser = document.getElementById('navUser');
+  if (user && userData) {
+    var av = userData.avatar ||
+      'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(userData.name||'U');
+    navUser.innerHTML =
+      '<span class="nav__role nav__role--'+userData.role+'">' + (ROLE_LABELS[userData.role]||userData.role) + '</span>' +
+      '<img class="nav__avatar" src="'+esc(av)+'" onclick="window.location.href=\'profile.html\'"/>' +
+      '<a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>';
+  }
+
+  // Загружаем лимит из настроек платформы
+  try {
+    var cfg = await loadPlatformConfig();
+    if (cfg.feedLimit) maxUpdates = cfg.feedLimit;
+  } catch(e) {}
+
+  await loadFeed();
+  await loadTrending();
+});
+
+async function loadFeed() {
+  try {
+    // Загружаем только публичные стартапы
+    var startupSnap = await db.collection('startups')
+      .where('privacy', 'in', ['public', null])
+      .get();
+
+    // Firestore не поддерживает OR с null — загружаем всё и фильтруем
+    var allStartups = await db.collection('startups').get();
+    var publicStartups = {};
+    allStartups.docs.forEach(function(d) {
+      var s = d.data();
+      // Только открытые стартапы
+      if (!s.privacy || s.privacy === 'public') {
+        publicStartups[d.id] = s;
+      }
+    });
+
+    var startupIds = Object.keys(publicStartups);
+    if (!startupIds.length) {
+      renderEmpty();
+      return;
+    }
+
+    // Загружаем обновления батчами по 10 (ограничение Firestore WHERE IN)
+    var updates = [];
+    for (var i = 0; i < startupIds.length; i += 10) {
+      var batch = startupIds.slice(i, i + 10);
+      try {
+        var updSnap = await db.collectionGroup('updates')
+          .orderBy('createdAt', 'desc')
+          .limit(maxUpdates * 2) // берём с запасом
+          .get();
+
+        updSnap.docs.forEach(function(d) {
+          var startupId = d.ref.parent.parent.id;
+          if (publicStartups[startupId]) {
+            updates.push(Object.assign({
+              _startupId:   startupId,
+              _startupName: publicStartups[startupId].name || '',
+              _startupEmoji:publicStartups[startupId].emoji || '🚀',
+              _startupIconImage: publicStartups[startupId].iconImage || '',
+            }, d.data()));
+          }
+        });
+      } catch(e) { break; } // если нет collectionGroup — пробуем по одному
+    }
+
+    // Если collectionGroup не сработал — загружаем по-одному
+    if (!updates.length) {
+      for (var sid in publicStartups) {
+        try {
+          var uSnap = await db.collection('startups').doc(sid)
+            .collection('updates').orderBy('createdAt','desc').limit(5).get();
+          uSnap.docs.forEach(function(d) {
+            updates.push(Object.assign({
+              _startupId:    sid,
+              _startupName:  publicStartups[sid].name || '',
+              _startupEmoji: publicStartups[sid].emoji || '🚀',
+              _startupIconImage: publicStartups[sid].iconImage || '',
+            }, d.data()));
+          });
+        } catch(e2) {}
+      }
+    }
+
+    // Сортируем по дате, берём maxUpdates
+    updates.sort(function(a, b) {
+      var ta = a.createdAt && a.createdAt.seconds ? a.createdAt.seconds : 0;
+      var tb = b.createdAt && b.createdAt.seconds ? b.createdAt.seconds : 0;
+      return tb - ta;
+    });
+
+    allUpdates = updates.slice(0, maxUpdates);
+    applyFilter();
+    renderStats(allUpdates, Object.keys(publicStartups).length);
+
+  } catch(e) {
+    document.getElementById('feedList').innerHTML =
+      '<div class="feed-empty"><div class="feed-empty__icon">⚠️</div>' +
+      '<div class="feed-empty__title">Ошибка загрузки</div>' +
+      '<p style="font-size:14px">' + esc(e.message) + '</p></div>';
+  }
+}
+
+function setFilter(type, btn) {
+  activeFilter = type;
+  document.querySelectorAll('.feed-filter').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  applyFilter();
+}
+
+function applyFilter() {
+  filteredUpdates = activeFilter
+    ? allUpdates.filter(function(u) { return u.type === activeFilter; })
+    : allUpdates.slice();
+  renderFeed(filteredUpdates);
+}
+
+function renderFeed(updates) {
+  var el = document.getElementById('feedList');
+  if (!updates.length) { renderEmpty(); return; }
+
+  el.innerHTML = updates.map(function(u) {
+    var logo = u._startupIconImage
+      ? '<img src="' + esc(u._startupIconImage) + '" onerror="this.style.display=&quot;none&quot;"/>'
+      : esc(u._startupEmoji || '🚀');
+    var typeBadge = u.type
+      ? '<span class="badge badge--green">' + esc(u.type) + '</span>' : '';
+
+    return '<div class="feed-card">' +
+      '<div class="feed-card__header">' +
+        '<div class="feed-card__logo">' + logo + '</div>' +
+        '<div class="feed-card__meta">' +
+          '<a href="startup.html?id=' + esc(u._startupId) + '" class="feed-card__startup">' +
+            esc(u._startupName) +
+          '</a>' +
+          '<div class="feed-card__date">' + formatDate(u.createdAt) + '</div>' +
+        '</div>' +
+        typeBadge +
+      '</div>' +
+      '<div class="feed-card__title">' + esc(u.title || '') + '</div>' +
+      '<div class="feed-card__body">' + esc(u.body || '') + '</div>' +
+      (u.imageUrl ? '<img src="' + esc(u.imageUrl) + '" class="feed-card__img" onerror="this.style.display=&quot;none&quot;"/>' : '') +
+      '<div class="feed-card__footer">' +
+        '<a href="startup.html?id=' + esc(u._startupId) + '" class="btn btn--ghost btn--sm">Открыть стартап →</a>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderEmpty() {
+  document.getElementById('feedList').innerHTML =
+    '<div class="feed-empty">' +
+    '<div class="feed-empty__icon">📰</div>' +
+    '<div class="feed-empty__title">Нет обновлений</div>' +
+    '<p style="font-size:14px">' + (activeFilter ? 'Нет обновлений с типом «'+esc(activeFilter)+'»' : 'Стартапы ещё не публиковали новости') + '</p>' +
+    '</div>';
+}
+
+function renderStats(updates, startupCount) {
+  var byType = {};
+  updates.forEach(function(u) {
+    var t = u.type || 'Общее';
+    byType[t] = (byType[t] || 0) + 1;
+  });
+  var rows = '<div>📰 Обновлений: <strong>' + updates.length + '</strong></div>' +
+    '<div>🚀 Стартапов: <strong>' + startupCount + '</strong></div>';
+  Object.keys(byType).forEach(function(t) {
+    rows += '<div>' + esc(t) + ': <strong>' + byType[t] + '</strong></div>';
+  });
+  document.getElementById('feedStats').innerHTML = rows;
+}
+
+async function loadTrending() {
+  try {
+    // Стартапы с наибольшим числом обновлений
+    var allPublic = await db.collection('startups').get();
+    var publicList = allPublic.docs
+      .map(function(d) { return Object.assign({id:d.id}, d.data()); })
+      .filter(function(s) { return !s.privacy || s.privacy === 'public'; });
+
+    // Считаем по lastUpdate / используем порядок как есть
+    var byUpdates = {};
+    allUpdates.forEach(function(u) {
+      byUpdates[u._startupId] = (byUpdates[u._startupId] || 0) + 1;
+    });
+
+    publicList.sort(function(a, b) {
+      return (byUpdates[b.id]||0) - (byUpdates[a.id]||0);
+    });
+
+    var top = publicList.slice(0, 7);
+    var el  = document.getElementById('trendingList');
+
+    if (!top.length) { el.innerHTML = '<p style="font-size:13px;color:var(--text2)">Нет стартапов</p>'; return; }
+
+    el.innerHTML = top.map(function(s) {
+      var logo = s.iconImage
+        ? '<img src="' + esc(s.iconImage) + '" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display=&quot;none&quot;"/>'
+        : esc(s.emoji || '🚀');
+      var cnt = byUpdates[s.id] || 0;
+      return '<a href="startup.html?id=' + s.id + '" class="trending-item">' +
+        '<div class="trending-item__logo">' + logo + '</div>' +
+        '<div>' +
+          '<div class="trending-item__name">' + esc(s.name||'') + '</div>' +
+          '<div class="trending-item__count">' + (cnt ? cnt + ' обновл.' : esc(s.stage||'')) + '</div>' +
+        '</div>' +
+      '</a>';
+    }).join('');
+  } catch(e) {
+    document.getElementById('trendingList').innerHTML = '<p style="font-size:13px;color:var(--text2)">Не удалось загрузить</p>';
+  }
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

@@ -128,13 +128,14 @@ async function loadPlatformConfig() {
     if (snap.exists && snap.data().categories && snap.data().categories.length) {
       _platformConfig = {
         categories: snap.data().categories,
-        stages:     snap.data().stages || DEFAULT_STAGES
+        stages:     snap.data().stages || DEFAULT_STAGES,
+        feedLimit:  snap.data().feedLimit || 25
       };
     } else {
-      _platformConfig = { categories: DEFAULT_CATEGORIES, stages: DEFAULT_STAGES };
+      _platformConfig = { categories: DEFAULT_CATEGORIES, stages: DEFAULT_STAGES, feedLimit: 25 };
     }
   } catch(e) {
-    _platformConfig = { categories: DEFAULT_CATEGORIES, stages: DEFAULT_STAGES };
+    _platformConfig = { categories: DEFAULT_CATEGORIES, stages: DEFAULT_STAGES, feedLimit: 25 };
   }
   return _platformConfig;
 }

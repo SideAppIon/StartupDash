@@ -37,6 +37,7 @@
 <nav class="nav">
   <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
   <a href="startups.html">Стартапы</a>
+  <a href="feed.html">Лента</a>
   <a href="members.html">Участники</a>
   <div class="nav__user">
     <a href="messages.html" style="font-size:20px;text-decoration:none">💬</a>
@@ -79,10 +80,10 @@
 requireAuth('login.html');
 
 var NAV = {
-  startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
-  investor: [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
-  user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
-  admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}]
+  startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
+  investor: [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
+  user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
+  admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}]
 };
 
 onAuthReady(async function(user, userData) {

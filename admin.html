@@ -105,6 +105,20 @@
           </div>
         </div>
 
+        <!-- Лимит ленты -->
+        <div class="settings-card" style="grid-column:1/-1;max-width:400px">
+          <h3>📰 Лента новостей</h3>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Максимум обновлений в ленте</label>
+            <div class="add-row">
+              <input type="number" id="feedLimitInput" min="5" max="100" value="25"
+                style="max-width:120px" placeholder="25"/>
+              <button class="btn btn--primary btn--sm" onclick="saveFeedLimit()">Сохранить</button>
+            </div>
+            <div class="form-hint">От 5 до 100. Показываются только обновления публичных стартапов.</div>
+          </div>
+        </div>
+
         <!-- Стадии -->
         <div class="settings-card">
           <h3>📊 Стадии проекта</h3>
@@ -275,12 +289,13 @@ function renderStartups(list) {
 
 // ── SETTINGS ──────────────────────────────────────────
 async function loadSettings() {
-  // Загружаем из Firestore, fallback на дефолтные
   try {
     var snap = await db.collection('_config').doc('platform').get();
     if (snap.exists && snap.data().categories) {
       cats   = snap.data().categories;
       stages = snap.data().stages || DEFAULT_STAGES;
+      var lim = snap.data().feedLimit || 25;
+      document.getElementById('feedLimitInput').value = lim;
     } else {
       cats   = DEFAULT_CATS.slice();
       stages = DEFAULT_STAGES.map(function(s){ return Object.assign({},s); });
@@ -292,6 +307,17 @@ async function loadSettings() {
   renderCats();
   renderStages();
   renderIconPicker();
+}
+
+async function saveFeedLimit() {
+  var val = parseInt(document.getElementById('feedLimitInput').value, 10);
+  if (isNaN(val) || val < 5 || val > 100) {
+    showToast('Введи число от 5 до 100', 'error'); return;
+  }
+  await db.collection('_config').doc('platform').set(
+    { feedLimit: val }, { merge: true }
+  );
+  showToast('Лимит ленты сохранён: ' + val, 'success');
 }
 
 async function saveSettings() {

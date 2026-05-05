@@ -105,21 +105,21 @@
 <script>
   redirectIfAuth('dashboard.html');
 
-  let selectedRole = null;
+  var selectedRole = null;
 
   function selectRole(el, role) {
-    document.querySelectorAll('.role-btn').forEach(b => b.className = 'role-btn');
-    el.classList.add(`selected-${role}`);
+    document.querySelectorAll('.role-btn').forEach(function(b) { b.className = 'role-btn'; });
+    el.classList.add('selected-' + role);
     selectedRole = role;
   }
 
   async function doRegister() {
-    const name  = document.getElementById('nameInput').value.trim();
-    const email = document.getElementById('emailInput').value.trim();
-    const pass  = document.getElementById('passInput').value;
-    const pass2 = document.getElementById('pass2Input').value;
-    const err   = document.getElementById('formError');
-    const btn   = document.getElementById('submitBtn');
+    var name  = document.getElementById('nameInput').value.trim();
+    var email = document.getElementById('emailInput').value.trim();
+    var pass  = document.getElementById('passInput').value;
+    var pass2 = document.getElementById('pass2Input').value;
+    var err   = document.getElementById('formError');
+    var btn   = document.getElementById('submitBtn');
 
     err.style.display = 'none';
 
@@ -134,17 +134,17 @@
     try {
       const cred = await auth.createUserWithEmailAndPassword(email, pass);
       // Создаём документ пользователя в Firestore
+      var roleToSave = selectedRole; // явно сохраняем в локальную переменную
       await db.collection('users').doc(cred.user.uid).set({
         uid:       cred.user.uid,
         name:      name,
         email:     email,
-        role:      selectedRole,
+        role:      roleToSave,
         bio:       '',
         avatar:    '',
         skills:    [],
-        telegram:  '',
-        linkedIn:  '',
-        gitHub:    '',
+        contacts:  '',
+        portfolio: '',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       window.location.href = 'dashboard.html';
