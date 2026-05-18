@@ -1,48 +1,40 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Регистрация — LaunchPad</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <link rel="stylesheet" href="styles.css"/>
   <style>
-    body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
-    .auth-box {
-      width:100%; max-width:460px; padding:24px;
-    }
-    .auth-logo {
-      font-family:var(--font-head); font-size:26px; font-weight:800;
-      color:var(--accent); text-decoration:none; display:block;
-      text-align:center; margin-bottom:32px;
-    }
-    .auth-logo span{color:var(--text);}
-    .auth-title {
-      font-family:var(--font-head); font-size:28px; font-weight:800;
-      letter-spacing:-1px; margin-bottom:6px; text-align:center;
-    }
-    .auth-sub { color:var(--text2); font-size:14px; text-align:center; margin-bottom:32px; }
-    .role-selector { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:24px; }
-    .role-btn {
-      border:2px solid var(--border2); border-radius:var(--radius);
-      padding:16px 10px; text-align:center; cursor:pointer;
-      transition:all .2s; background:var(--bg3);
-    }
-    .role-btn:hover { border-color:var(--border2); transform:translateY(-2px); }
-    .role-btn.selected-startup  { border-color:var(--accent); background:var(--accent-dim); }
-    .role-btn.selected-investor { border-color:var(--investor); background:var(--investor-dim); }
-    .role-btn.selected-user     { border-color:var(--info); background:rgba(61,142,245,.12); }
-    .role-btn__icon { font-size:28px; margin-bottom:6px; }
-    .role-btn__name { font-size:13px; font-weight:600; }
-    .auth-link { text-align:center; font-size:14px; color:var(--text2); margin-top:20px; }
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px 0; }
+    .auth-box { width:100%; max-width:480px; padding:24px; }
+    .auth-logo { font-family:var(--font-head); font-size:26px; font-weight:800; color:var(--accent); text-decoration:none; display:block; text-align:center; margin-bottom:28px; }
+    .auth-logo span { color:var(--text); }
+    .auth-title { font-family:var(--font-head); font-size:26px; font-weight:800; letter-spacing:-1px; margin-bottom:6px; text-align:center; }
+    .auth-sub { color:var(--text2); font-size:14px; text-align:center; margin-bottom:24px; }
+    .auth-link { text-align:center; font-size:14px; color:var(--text2); margin-top:16px; }
     .auth-link a { color:var(--accent); text-decoration:none; font-weight:500; }
-    .divider-text {
-      display:flex; align-items:center; gap:12px;
-      color:var(--text3); font-size:13px; margin:16px 0;
-    }
-    .divider-text::before,.divider-text::after {
-      content:''; flex:1; border-top:1px solid var(--border);
-    }
+    .role-selector { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px; }
+    .role-btn { border:2px solid var(--border2); border-radius:var(--radius); padding:14px 8px; text-align:center; cursor:pointer; transition:all .2s; background:var(--bg3); }
+    .role-btn__icon { font-size:26px; margin-bottom:6px; }
+    .role-btn__name { font-size:13px; font-weight:600; }
+    .role-btn__desc { font-size:11px; color:var(--text3); margin-top:3px; line-height:1.3; }
+    .role-btn.sel-user { border-color:var(--info); background:rgba(61,142,245,.12); }
+    .role-btn.sel-startup { border-color:var(--accent); background:var(--accent-dim); }
+    .role-btn.sel-investor { border-color:var(--investor); background:var(--investor-dim); }
+    .step { display:none; }
+    .step.active { display:block; }
+    .step-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+    .step-num { width:28px; height:28px; border-radius:50%; background:var(--accent); color:#000; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .step-title { font-family:var(--font-head); font-size:16px; font-weight:700; }
+    .step-dots { display:flex; gap:6px; justify-content:center; margin-bottom:20px; }
+    .step-dot { width:8px; height:8px; border-radius:50%; background:var(--border2); transition:background .2s; }
+    .step-dot.active { background:var(--accent); }
+    .checkbox-row { display:flex; align-items:flex-start; gap:10px; font-size:13px; color:var(--text2); margin-bottom:16px; cursor:pointer; }
+    .checkbox-row input[type=checkbox] { margin-top:2px; flex-shrink:0; width:16px; height:16px; accent-color:var(--accent); }
+    .checkbox-row a { color:var(--accent); text-decoration:none; }
+    .checkbox-row a:hover { text-decoration:underline; }
   </style>
 </head>
 <body>
@@ -50,45 +42,132 @@
 <div class="auth-box">
   <a href="index.html" class="auth-logo">Launch<span>Pad</span></a>
   <h1 class="auth-title">Создать аккаунт</h1>
-  <p class="auth-sub">Выбери роль и начни работу</p>
+  <p class="auth-sub">Заполни информацию в 3 шага</p>
 
-  <!-- Роль -->
-  <div class="role-selector" id="roleSelector">
-    <div class="role-btn" data-role="startup" onclick="selectRole(this,'startup')">
-      <div class="role-btn__icon">🚀</div>
-      <div class="role-btn__name">Стартапер</div>
+  <div class="step-dots">
+    <div class="step-dot active" id="dot0"></div>
+    <div class="step-dot" id="dot1"></div>
+    <div class="step-dot" id="dot2"></div>
+  </div>
+
+  <!-- ШАГ 1: Роль и аккаунт -->
+  <div class="step active" id="step0">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-title">Выбери роль</div>
     </div>
-    <div class="role-btn" data-role="investor" onclick="selectRole(this,'investor')">
-      <div class="role-btn__icon">💼</div>
-      <div class="role-btn__name">Инвестор</div>
+
+    <div class="role-selector">
+      <div class="role-btn" id="btn-user" onclick="selectRole('user')">
+        <div class="role-btn__icon">👤</div>
+        <div class="role-btn__name">Специалист</div>
+        <div class="role-btn__desc">Ищу проект в команду</div>
+      </div>
+      <div class="role-btn" id="btn-startup" onclick="selectRole('startup')">
+        <div class="role-btn__icon">🚀</div>
+        <div class="role-btn__name">Стартапер</div>
+        <div class="role-btn__desc">Развиваю свой проект</div>
+      </div>
+      <div class="role-btn" id="btn-investor" onclick="selectRole('investor')">
+        <div class="role-btn__icon">💼</div>
+        <div class="role-btn__name">Инвестор</div>
+        <div class="role-btn__desc">Ищу проекты для вложений</div>
+      </div>
     </div>
-    <div class="role-btn" data-role="user" onclick="selectRole(this,'user')">
-      <div class="role-btn__icon">👤</div>
-      <div class="role-btn__name">Специалист</div>
+
+    <div class="card">
+      <div class="form-group">
+        <label class="form-label">Email *</label>
+        <input type="email" class="form-input" id="emailInput" placeholder="ivan@example.com"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Пароль *</label>
+        <input type="password" class="form-input" id="passInput" placeholder="Минимум 6 символов"/>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Повтори пароль *</label>
+        <input type="password" class="form-input" id="pass2Input" placeholder="Повтори пароль"/>
+      </div>
+    </div>
+
+    <div id="err0" class="form-error" style="display:none;margin:10px 0"></div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:14px" onclick="goStep1()">Далее →</button>
+  </div>
+
+  <!-- ШАГ 2: О себе -->
+  <div class="step" id="step1">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-title">Расскажи о себе</div>
+    </div>
+
+    <div class="card">
+      <div class="form-group">
+        <label class="form-label">Имя и фамилия *</label>
+        <input type="text" class="form-input" id="nameInput" placeholder="Иван Петров" maxlength="80"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Чем занимаешься *</label>
+        <textarea class="form-textarea" id="bioInput" style="min-height:90px"
+          placeholder="Кратко о себе: опыт, специализация, цели..."></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Навыки</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="form-input" id="skillInput" placeholder="React, Python, Дизайн..."
+            onkeydown="if(event.key==='Enter'){event.preventDefault();addSkill()}"/>
+          <button class="btn btn--outline" type="button" onclick="addSkill()">+</button>
+        </div>
+        <div id="skillsList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+        <div class="form-hint">Добавь хотя бы 1 навык</div>
+      </div>
+    </div>
+
+    <div id="err1" class="form-error" style="display:none;margin:10px 0"></div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn btn--ghost" style="flex:1;justify-content:center" onclick="goStep(0)">← Назад</button>
+      <button class="btn btn--primary" style="flex:2;justify-content:center" onclick="goStep2()">Далее →</button>
     </div>
   </div>
 
-  <div class="card">
-    <div class="form-group">
-      <label class="form-label">Имя и фамилия</label>
-      <input type="text" class="form-input" id="nameInput" placeholder="Иван Петров"/>
+  <!-- ШАГ 3: Контакты и согласие -->
+  <div class="step" id="step2">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div class="step-title">Контакты и согласие</div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Email</label>
-      <input type="email" class="form-input" id="emailInput" placeholder="ivan@example.com"/>
+
+    <div class="card">
+      <div class="form-group">
+        <label class="form-label">Контакты <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
+        <input type="text" class="form-input" id="contactsInput"
+          placeholder="Telegram: @username, WhatsApp: +7..."/>
+        <div class="form-hint">Любой удобный способ связи</div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Портфолио <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
+        <textarea class="form-textarea" id="portfolioInput" style="min-height:70px"
+          placeholder="https://github.com/...&#10;https://behance.net/..."></textarea>
+        <div class="form-hint">Ссылки на работы, GitHub, сайт — каждая с новой строки</div>
+      </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Пароль</label>
-      <input type="password" class="form-input" id="passInput" placeholder="Минимум 6 символов"/>
+
+    <div style="margin-top:16px">
+      <label class="checkbox-row">
+        <input type="checkbox" id="policyCheck"/>
+        <span>Я прочитал и соглашаюсь с <a href="privacy.html" target="_blank">политикой конфиденциальности</a> и <a href="terms.html" target="_blank">условиями использования</a> платформы LaunchPad</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="ageCheck"/>
+        <span>Мне исполнилось 16 лет</span>
+      </label>
     </div>
-    <div class="form-group" style="margin-bottom:0">
-      <label class="form-label">Подтверди пароль</label>
-      <input type="password" class="form-input" id="pass2Input" placeholder="Повтори пароль"/>
+
+    <div id="err2" class="form-error" style="display:none;margin:10px 0"></div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn btn--ghost" style="flex:1;justify-content:center" onclick="goStep(1)">← Назад</button>
+      <button class="btn btn--primary" style="flex:2;justify-content:center" id="submitBtn" onclick="doRegister()">✓ Зарегистрироваться</button>
     </div>
-    <div id="formError" class="form-error" style="margin-top:12px;display:none;"></div>
-    <button class="btn btn--primary" style="width:100%;margin-top:20px;justify-content:center;" id="submitBtn" onclick="doRegister()">
-      Зарегистрироваться
-    </button>
   </div>
 
   <p class="auth-link">Уже есть аккаунт? <a href="login.html">Войти</a></p>
@@ -96,77 +175,130 @@
 
 <div id="toast" class="toast"></div>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
 <script src="firebase-config.js"></script>
 <script>
-  redirectIfAuth('dashboard.html');
+redirectIfAuth('dashboard.html');
 
-  var selectedRole = null;
+var selectedRole = 'user';
+var skills = [];
+var currentStep = 0;
 
-  function selectRole(el, role) {
-    document.querySelectorAll('.role-btn').forEach(function(b) { b.className = 'role-btn'; });
-    el.classList.add('selected-' + role);
-    selectedRole = role;
+// Выбор роли
+function selectRole(role) {
+  selectedRole = role;
+  document.querySelectorAll('.role-btn').forEach(function(b) {
+    b.className = 'role-btn';
+  });
+  document.getElementById('btn-'+role).classList.add('sel-'+role);
+}
+// По умолчанию выбираем user
+selectRole('user');
+
+// Навигация по шагам
+function goStep(n) {
+  document.getElementById('step'+currentStep).classList.remove('active');
+  document.getElementById('dot'+currentStep).classList.remove('active');
+  currentStep = n;
+  document.getElementById('step'+n).classList.add('active');
+  document.getElementById('dot'+n).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function showErr(stepN, msg) {
+  var el = document.getElementById('err'+stepN);
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function clearErr(stepN) {
+  document.getElementById('err'+stepN).style.display = 'none';
+}
+
+function goStep1() {
+  clearErr(0);
+  var email = document.getElementById('emailInput').value.trim();
+  var pass  = document.getElementById('passInput').value;
+  var pass2 = document.getElementById('pass2Input').value;
+  if (!email)          { showErr(0,'Введи email'); return; }
+  if (pass.length < 6) { showErr(0,'Пароль минимум 6 символов'); return; }
+  if (pass !== pass2)  { showErr(0,'Пароли не совпадают'); return; }
+  goStep(1);
+}
+
+function goStep2() {
+  clearErr(1);
+  var name = document.getElementById('nameInput').value.trim();
+  var bio  = document.getElementById('bioInput').value.trim();
+  if (!name)           { showErr(1,'Введи имя'); return; }
+  if (bio.length < 20) { showErr(1,'Расскажи о себе подробнее (минимум 20 символов)'); return; }
+  if (!skills.length)  { showErr(1,'Добавь хотя бы один навык'); return; }
+  goStep(2);
+}
+
+// Навыки
+function addSkill() {
+  var inp = document.getElementById('skillInput');
+  var v   = inp.value.trim();
+  if (v && skills.indexOf(v) === -1 && skills.length < 15) {
+    skills.push(v);
+    renderSkills();
   }
+  inp.value = '';
+}
+function removeSkill(i) { skills.splice(i,1); renderSkills(); }
+function renderSkills() {
+  document.getElementById('skillsList').innerHTML = skills.map(function(s,i) {
+    return '<span style="background:var(--bg3);border:1px solid var(--border2);border-radius:20px;font-size:12px;padding:3px 10px;display:inline-flex;align-items:center;gap:5px">' +
+      s + '<button type="button" onclick="removeSkill('+i+')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button></span>';
+  }).join('');
+}
 
-  async function doRegister() {
-    var name  = document.getElementById('nameInput').value.trim();
-    var email = document.getElementById('emailInput').value.trim();
-    var pass  = document.getElementById('passInput').value;
-    var pass2 = document.getElementById('pass2Input').value;
-    var err   = document.getElementById('formError');
-    var btn   = document.getElementById('submitBtn');
+// Финальная регистрация
+async function doRegister() {
+  clearErr(2);
+  var policy = document.getElementById('policyCheck').checked;
+  var age    = document.getElementById('ageCheck').checked;
+  if (!policy) { showErr(2,'Необходимо принять политику конфиденциальности'); return; }
+  if (!age)    { showErr(2,'Необходимо подтвердить возраст'); return; }
 
-    err.style.display = 'none';
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'Регистрация...';
 
-    if (!selectedRole) { showErr('Выбери роль'); return; }
-    if (!name)  { showErr('Введи имя'); return; }
-    if (!email) { showErr('Введи email'); return; }
-    if (pass.length < 6) { showErr('Пароль минимум 6 символов'); return; }
-    if (pass !== pass2)  { showErr('Пароли не совпадают'); return; }
+  var email     = document.getElementById('emailInput').value.trim();
+  var pass      = document.getElementById('passInput').value;
+  var name      = document.getElementById('nameInput').value.trim();
+  var bio       = document.getElementById('bioInput').value.trim();
+  var contacts  = document.getElementById('contactsInput').value.trim();
+  var portfolio = document.getElementById('portfolioInput').value.trim();
+  var roleToSave = selectedRole; // явная копия
 
-    btn.disabled = true; btn.textContent = 'Регистрация...';
-
-    try {
-      const cred = await auth.createUserWithEmailAndPassword(email, pass);
-      // Создаём документ пользователя в Firestore
-      var roleToSave = selectedRole; // явно сохраняем в локальную переменную
-      await db.collection('users').doc(cred.user.uid).set({
-        uid:       cred.user.uid,
-        name:      name,
-        email:     email,
-        role:      roleToSave,
-        bio:       '',
-        avatar:    '',
-        skills:    [],
-        contacts:  '',
-        portfolio: '',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      window.location.href = 'dashboard.html';
-    } catch(e) {
-      showErr(getFirebaseError(e.code));
-      btn.disabled = false; btn.textContent = 'Зарегистрироваться';
-    }
-  }
-
-  function showErr(msg) {
-    const el = document.getElementById('formError');
-    el.textContent = msg; el.style.display = 'block';
-  }
-
-  function getFirebaseError(code) {
-    const map = {
+  try {
+    var cred = await auth.createUserWithEmailAndPassword(email, pass);
+    await db.collection('users').doc(cred.user.uid).set({
+      uid:       cred.user.uid,
+      name:      name,
+      email:     email,
+      role:      roleToSave,
+      bio:       bio,
+      skills:    skills.slice(),
+      contacts:  contacts,
+      portfolio: portfolio,
+      avatar:    '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    window.location.href = 'dashboard.html';
+  } catch(e) {
+    var map = {
       'auth/email-already-in-use': 'Этот email уже используется',
-      'auth/invalid-email': 'Неверный формат email',
-      'auth/weak-password': 'Пароль слишком простой'
+      'auth/invalid-email':        'Неверный формат email',
+      'auth/weak-password':        'Пароль слишком простой'
     };
-    return map[code] || 'Произошла ошибка. Попробуй снова.';
+    showErr(2, map[e.code] || 'Ошибка: ' + e.message);
+    btn.disabled = false; btn.textContent = '✓ Зарегистрироваться';
   }
+}
 </script>
 </body>
 </html>

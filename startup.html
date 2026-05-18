@@ -114,16 +114,45 @@
 
 <!-- Invite modal -->
 <div class="modal-overlay" id="inviteModal">
-  <div class="modal">
+  <div class="modal" style="max-width:560px">
     <div class="modal__header">
       <div class="modal__title">Подать заявку в команду</div>
       <button class="modal__close" onclick="closeModal()">×</button>
     </div>
-    <div class="form-group">
-      <label class="form-label">Сообщение для основателя</label>
-      <textarea class="form-textarea" id="inviteMsg" placeholder="Расскажи о себе и почему хочешь присоединиться..."></textarea>
+
+    <div id="applicationsList" style="margin-bottom:16px"></div>
+
+    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:16px">
+      <div style="font-family:var(--font-head);font-size:14px;font-weight:600;margin-bottom:12px">+ Добавить отклик</div>
+      <div class="form-group">
+        <label class="form-label">Как откликаешься</label>
+        <select class="form-select" id="applyType">
+          <option value="specialist">👤 Как специалист (физическое лицо)</option>
+          <option value="company">🏢 От компании / ООО</option>
+          <option value="freelance">💻 Как фрилансер</option>
+          <option value="partner">🤝 Как партнёр</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Роль в проекте</label>
+        <input type="text" class="form-input" id="applyRole" placeholder="Разработчик, Дизайнер, CTO, Маркетолог..."/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Название / компания <span style="color:var(--text3);font-weight:400">(для компании)</span></label>
+        <input type="text" class="form-input" id="applyCompany" placeholder="ООО Ромашка / Иван Петров" maxlength="80"/>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Сообщение / мини-резюме *</label>
+        <textarea class="form-textarea" id="applyMsg" style="min-height:100px"
+          placeholder="Расскажи о себе: опыт, почему подходишь, что можешь предложить проекту..."></textarea>
+      </div>
     </div>
-    <button class="btn btn--primary" style="width:100%;justify-content:center" onclick="sendInvite()">Отправить заявку</button>
+
+    <div style="display:flex;gap:10px">
+      <button class="btn btn--outline" style="flex:1;justify-content:center" onclick="addApplication()">+ Ещё отклик</button>
+      <button class="btn btn--primary" style="flex:2;justify-content:center" onclick="sendAllInvites()">Отправить заявку</button>
+    </div>
+    <div id="inviteError" class="form-error" style="display:none;margin-top:10px"></div>
   </div>
 </div>
 
@@ -459,9 +488,81 @@ async function loadTeam() {
 }
 
 // ── INVITE ────────────────────────────────────────────
-async function sendInvite() {
+var pendingApplications = []; // несколько откликов до отправки
+
+function openInviteModal() {
+  pendingApplications = [];
+  renderApplicationsList();
+  document.getElementById('applyType').value = 'specialist';
+  document.getElementById('applyRole').value = '';
+  document.getElementById('applyCompany').value = '';
+  document.getElementById('applyMsg').value = '';
+  document.getElementById('inviteError').style.display = 'none';
+  document.getElementById('inviteModal').classList.add('open');
+}
+
+function renderApplicationsList() {
+  var el = document.getElementById('applicationsList');
+  if (!pendingApplications.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div style="margin-bottom:12px">' +
+    pendingApplications.map(function(app, i) {
+      var typeLabels = {specialist:'👤 Специалист',company:'🏢 Компания',freelance:'💻 Фрилансер',partner:'🤝 Партнёр'};
+      return '<div style="background:var(--accent-dim);border:1px solid rgba(0,230,118,.2);border-radius:var(--radius);padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">' +
+        '<div style="flex:1">' +
+          '<div style="font-size:13px;font-weight:600">' + esc(typeLabels[app.type]||app.type) + ' · ' + esc(app.role||'') + '</div>' +
+          '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + esc(app.message.substring(0,60)) + (app.message.length>60?'...':'') + '</div>' +
+        '</div>' +
+        '<button onclick="removeApplication('+i+')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1">×</button>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
+function addApplication() {
+  var msg = document.getElementById('applyMsg').value.trim();
+  if (!msg) { showInviteErr('Напиши сообщение / мини-резюме'); return; }
+  pendingApplications.push({
+    type:    document.getElementById('applyType').value,
+    role:    document.getElementById('applyRole').value.trim(),
+    company: document.getElementById('applyCompany').value.trim(),
+    message: msg
+  });
+  document.getElementById('applyMsg').value = '';
+  document.getElementById('applyRole').value = '';
+  document.getElementById('applyCompany').value = '';
+  document.getElementById('inviteError').style.display = 'none';
+  renderApplicationsList();
+}
+
+function removeApplication(i) {
+  pendingApplications.splice(i, 1);
+  renderApplicationsList();
+}
+
+function showInviteErr(msg) {
+  var el = document.getElementById('inviteError');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+async function sendAllInvites() {
   if (!pageUser) { window.location.href = 'login.html'; return; }
-  var msg = document.getElementById('inviteMsg').value.trim();
+  document.getElementById('inviteError').style.display = 'none';
+
+  // Добавляем текущий незавершённый отклик если есть
+  var curMsg = document.getElementById('applyMsg').value.trim();
+  if (curMsg) {
+    pendingApplications.push({
+      type:    document.getElementById('applyType').value,
+      role:    document.getElementById('applyRole').value.trim(),
+      company: document.getElementById('applyCompany').value.trim(),
+      message: curMsg
+    });
+  }
+
+  if (!pendingApplications.length) {
+    showInviteErr('Добавь хотя бы один отклик с сообщением');
+    return;
+  }
 
   try {
     // Проверяем дубль
@@ -475,9 +576,10 @@ async function sendInvite() {
     if (alreadyApplied) {
       var isAccepted = existing.docs.some(function(d){ return d.data().status === 'accepted'; });
       showToast(isAccepted ? '✅ Ты уже в команде этого стартапа' : '⏳ Заявка уже отправлена', 'warn');
-      return;
+      closeModal(); return;
     }
 
+    // Отправляем все отклики как один документ с массивом applications
     await db.collection('invites').add({
       fromUid:      pageUser.uid,
       fromName:     pageUserData ? pageUserData.name : '',
@@ -485,15 +587,17 @@ async function sendInvite() {
       startupId:    startupId,
       startupName:  startupData.name,
       startupOwner: startupData.ownerUid,
-      message:      msg,
+      applications: pendingApplications, // массив откликов
+      message:      pendingApplications[0].message, // для обратной совместимости
       status:       'pending',
       createdAt:    firebase.firestore.FieldValue.serverTimestamp()
     });
 
+    pendingApplications = [];
     closeModal();
     showToast('✅ Заявка отправлена!', 'success');
   } catch(e) {
-    showToast('Ошибка: ' + e.message, 'error');
+    showInviteErr('Ошибка: ' + e.message);
   }
 }
 

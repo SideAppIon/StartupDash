@@ -82,7 +82,7 @@ requireAuth('login.html');
 var NAV = {
   startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   investor: [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
-  user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
+  user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}]
 };
 
@@ -165,7 +165,15 @@ async function renderStartup(el, uid) {
         return '<div class="inv-card">' +
           '<img src="'+(inv.fromAvatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U')+'" class="avatar avatar--sm"/>' +
           '<div class="inv-card__info"><div class="inv-card__name">'+esc(inv.fromName||'')+'</div><div class="inv-card__sub">→ '+esc(inv.startupName||'')+'</div>' +
-          (inv.message?'<div style="font-size:12px;color:var(--text3);margin-top:2px">'+esc(inv.message)+'</div>':'')+'</div>' +
+          (inv.applications && inv.applications.length
+            ? inv.applications.map(function(app){
+                var tl={specialist:'👤 Специалист',company:'🏢 Компания',freelance:'💻 Фрилансер',partner:'🤝 Партнёр'};
+                return '<div style="font-size:12px;color:var(--text2);margin-top:4px;padding:6px 10px;background:var(--bg3);border-radius:6px">'+
+                  '<strong>'+(tl[app.type]||app.type)+(app.role?' · '+esc(app.role):'')+'</strong><br>'+
+                  esc(app.message.substring(0,80))+(app.message.length>80?'...':'')+'</div>';
+              }).join('')
+            : (inv.message?'<div style="font-size:12px;color:var(--text3);margin-top:2px">'+esc(inv.message)+'</div>':'')
+          )+'</div>' +
           '<div style="display:flex;gap:6px">' +
             '<button class="btn btn--primary btn--sm" onclick="answer(\''+inv.id+'\',\'accepted\')">✓</button>' +
             '<button class="btn btn--outline btn--sm" onclick="answer(\''+inv.id+'\',\'rejected\')">✕</button>' +
@@ -201,7 +209,7 @@ async function renderUser(el, uid) {
     .filter(function(s){ return s.privacy !== 'closed'; }).slice(0,4);
   var iSnap = await db.collection('invites').where('fromUid','==',uid).get();
   var invs  = iSnap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
-  el.innerHTML = '<div class="section-header" style="margin-bottom:16px"><div class="section-title">Стартапы</div><a href="startups.html" class="btn btn--outline btn--sm">Все</a></div>' +
+  el.innerHTML = '<div class="section-header" style="margin-bottom:16px"><div class="section-title">Стартапы</div><div style="display:flex;gap:8px"><a href="create-startup.html" class="btn btn--primary btn--sm">+ Создать</a><a href="startups.html" class="btn btn--outline btn--sm">Все</a></div></div>' +
     list.map(function(s){
       return '<a class="s-card" href="startup.html?id='+s.id+'" style="display:flex"><div class="s-card__logo">'+(s.iconImage?'<img src="'+s.iconImage+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.style.display=&quot;none&quot;"/>':'')+(s.iconImage?'':(s.emoji||'🚀'))+'</div><div><div class="s-card__name">'+esc(s.name||'')+'</div><div class="s-card__tagline">'+esc(s.tagline||'')+'</div></div></a>';
     }).join('') +

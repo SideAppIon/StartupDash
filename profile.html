@@ -141,6 +141,10 @@
           <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Мои стартапы</h3>
           <div id="myStartupsList"></div>
         </div>
+        <div class="card" id="myTeamsCard" style="display:none;margin-top:16px">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Участвую в проектах</h3>
+          <div id="myTeamsList"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -364,6 +368,7 @@ async function doSaveAvatar() {
   } catch(e){showToast('Ошибка: '+e.message,'error');}
 }
 
+function escHtml(s){ return esc(s); }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 </script>
 </body>

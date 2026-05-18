@@ -54,9 +54,7 @@ requireAuth('login.html');
 
 onAuthReady(async function(user, userData) {
   if (!user) return;
-  if (userData && userData.role !== 'startup' && userData.role !== 'admin') {
-    window.location.href = 'dashboard.html'; return;
-  }
+  // Все роли могут иметь стартапы
   renderNav(userData);
 
   var el = document.getElementById('content');

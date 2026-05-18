@@ -111,9 +111,7 @@ function previewImage(url) {
 
 onAuthReady(async function(user, userData) {
   if (!user) return;
-  if (userData&&userData.role!=='startup'&&userData.role!=='admin') {
-    window.location.href='dashboard.html'; return;
-  }
+  // Владелец любой роли может постить обновления
   var av = userData&&userData.avatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U';
   document.getElementById('navAvatar').src = av;
 
