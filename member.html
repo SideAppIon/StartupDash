@@ -208,8 +208,22 @@ onAuthReady(async function(user, userData) {
       '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
   }
 
+  // Проверяем уже отправлено ли приглашение
+  var alreadyInvited = false;
+  if (user && userData && userData.role === 'startup') {
+    try {
+      var myStartupsCheck = await db.collection('startups').where('ownerUid','==',user.uid).get();
+      for (var si = 0; si < myStartupsCheck.docs.length; si++) {
+        var sid = myStartupsCheck.docs[si].id;
+        var invCheck = await db.collection('invites')
+          .where('toUid','==', profileUid)
+          .where('startupId','==', sid).get();
+        if (!invCheck.empty) { alreadyInvited = true; break; }
+      }
+    } catch(e) {}
+  }
   // Кнопки действий
-  renderActions(user, userData);
+  renderActions(user, userData, alreadyInvited);
 
   // Стартапы (если role=startup)
   if (profileData.role === 'startup') {
@@ -223,7 +237,7 @@ onAuthReady(async function(user, userData) {
   document.getElementById('pageContent').style.display  = 'block';
 });
 
-function renderActions(user, userData) {
+function renderActions(user, userData, alreadyInvited) {
   var el = document.getElementById('profileActions');
   if (!user) {
     el.innerHTML = '<a href="login.html" class="btn btn--outline btn--sm">Войти</a>';
@@ -232,9 +246,13 @@ function renderActions(user, userData) {
   var btns = '';
   // Написать сообщение
   btns += '<button class="btn btn--outline btn--sm" onclick="window.location.href=\'messages.html?to=' + profileUid + '\'">💬 Написать</button>';
-  // Пригласить в команду (только стартаперы)
+  // Пригласить в команду (только стартаперы, и только если ещё не приглашён)
   if (userData && userData.role === 'startup') {
-    btns += '<button class="btn btn--primary btn--sm" onclick="openInviteModal()">+ Пригласить</button>';
+    if (alreadyInvited) {
+      btns += '<span class="badge badge--gray" style="padding:7px 14px;font-size:13px">✓ Уже приглашён</span>';
+    } else {
+      btns += '<button class="btn btn--primary btn--sm" onclick="openInviteModal()">+ Пригласить</button>';
+    }
   }
   el.innerHTML = btns;
 }

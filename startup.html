@@ -21,7 +21,9 @@
     .update-card__title{font-family:var(--font-head);font-size:17px;font-weight:700;margin-bottom:4px}
     .update-card__date{font-size:12px;color:var(--text3);margin-bottom:12px}
     .update-card__body{font-size:14px;color:var(--text2);line-height:1.75;white-space:pre-wrap}
-  </style>
+      .privacy-opt{border:2px solid var(--border2);border-radius:var(--radius);background:var(--bg3);transition:all .2s}
+    .privacy-opt.selected{border-color:var(--accent);background:var(--accent-dim)}
+</style>
 </head>
 <body>
 
@@ -120,38 +122,35 @@
       <button class="modal__close" onclick="closeModal()">×</button>
     </div>
 
-    <div id="applicationsList" style="margin-bottom:16px"></div>
 
-    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:16px">
-      <div style="font-family:var(--font-head);font-size:14px;font-weight:600;margin-bottom:12px">+ Добавить отклик</div>
-      <div class="form-group">
-        <label class="form-label">Как откликаешься</label>
-        <select class="form-select" id="applyType">
-          <option value="specialist">👤 Как специалист (физическое лицо)</option>
-          <option value="company">🏢 От компании / ООО</option>
-          <option value="freelance">💻 Как фрилансер</option>
-          <option value="partner">🤝 Как партнёр</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Роль в проекте</label>
-        <input type="text" class="form-input" id="applyRole" placeholder="Разработчик, Дизайнер, CTO, Маркетолог..."/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Название / компания <span style="color:var(--text3);font-weight:400">(для компании)</span></label>
-        <input type="text" class="form-input" id="applyCompany" placeholder="ООО Ромашка / Иван Петров" maxlength="80"/>
-      </div>
-      <div class="form-group" style="margin-bottom:0">
-        <label class="form-label">Сообщение / мини-резюме *</label>
-        <textarea class="form-textarea" id="applyMsg" style="min-height:100px"
-          placeholder="Расскажи о себе: опыт, почему подходишь, что можешь предложить проекту..."></textarea>
+    <div class="form-group">
+      <label class="form-label">Кем откликаешься</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
+        <div id="typeSpecBtn" class="privacy-opt selected" style="padding:12px;text-align:center;cursor:pointer" onclick="setApplyType('specialist')">
+          <div style="font-size:22px;margin-bottom:4px">👤</div>
+          <div style="font-size:13px;font-weight:600">Как специалист</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">от себя лично</div>
+        </div>
+        <div id="typeRoleBtn" class="privacy-opt" style="padding:12px;text-align:center;cursor:pointer" onclick="setApplyType('role')">
+          <div style="font-size:22px;margin-bottom:4px">🏷️</div>
+          <div style="font-size:13px;font-weight:600">По роли</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">например: Дизайнер из ООО</div>
+        </div>
       </div>
     </div>
 
-    <div style="display:flex;gap:10px">
-      <button class="btn btn--outline" style="flex:1;justify-content:center" onclick="addApplication()">+ Ещё отклик</button>
-      <button class="btn btn--primary" style="flex:2;justify-content:center" onclick="sendAllInvites()">Отправить заявку</button>
+    <div id="roleNameRow" style="display:none" class="form-group">
+      <label class="form-label">Роль / должность в стартапе</label>
+      <input type="text" class="form-input" id="applyRole" placeholder="Дизайнер, CTO, Разработчик, Маркетолог..." maxlength="80"/>
     </div>
+
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Сообщение / мини-резюме *</label>
+      <textarea class="form-textarea" id="applyMsg" style="min-height:110px"
+        placeholder="Расскажи о себе: опыт, что умеешь, почему хочешь в этот проект..."></textarea>
+    </div>
+
+    <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="sendAllInvites()">Отправить заявку</button>
     <div id="inviteError" class="form-error" style="display:none;margin-top:10px"></div>
   </div>
 </div>
@@ -448,11 +447,18 @@ async function loadTeam() {
       for (var j = 0; j < accSnap.docs.length; j++) {
         var inv = accSnap.docs[j].data();
         if (!inv.fromUid || inv.fromUid === startupData.ownerUid) continue;
-        if (teamUids.indexOf(inv.fromUid) !== -1) continue; // уже есть
+        if (teamUids.indexOf(inv.fromUid) !== -1) continue;
+        // Определяем роль из applications или поля role
+        var invRole = 'Участник';
+        if (inv.applications && inv.applications.length && inv.applications[0].role) {
+          invRole = inv.applications[0].role;
+        } else if (inv.role) {
+          invRole = inv.role;
+        }
         try {
           var iUsnap = await db.collection('users').doc(inv.fromUid).get();
           if (iUsnap.exists) {
-            members.push(Object.assign({ _teamRole: 'Участник' }, iUsnap.data()));
+            members.push(Object.assign({ _teamRole: invRole }, iUsnap.data()));
           }
         } catch(e) { /* пропускаем */ }
       }
@@ -488,55 +494,31 @@ async function loadTeam() {
 }
 
 // ── INVITE ────────────────────────────────────────────
-var pendingApplications = []; // несколько откликов до отправки
+var currentApplyType = 'specialist';
+
+function setApplyType(type) {
+  currentApplyType = type;
+  var specBtn = document.getElementById('typeSpecBtn');
+  var roleBtn = document.getElementById('typeRoleBtn');
+  var roleRow = document.getElementById('roleNameRow');
+  if (type === 'specialist') {
+    specBtn.className = 'privacy-opt selected';
+    roleBtn.className = 'privacy-opt';
+    roleRow.style.display = 'none';
+  } else {
+    specBtn.className = 'privacy-opt';
+    roleBtn.className = 'privacy-opt selected';
+    roleRow.style.display = 'block';
+  }
+}
 
 function openInviteModal() {
-  pendingApplications = [];
-  renderApplicationsList();
-  document.getElementById('applyType').value = 'specialist';
+  currentApplyType = 'specialist';
+  setApplyType('specialist');
   document.getElementById('applyRole').value = '';
-  document.getElementById('applyCompany').value = '';
   document.getElementById('applyMsg').value = '';
   document.getElementById('inviteError').style.display = 'none';
   document.getElementById('inviteModal').classList.add('open');
-}
-
-function renderApplicationsList() {
-  var el = document.getElementById('applicationsList');
-  if (!pendingApplications.length) { el.innerHTML = ''; return; }
-  el.innerHTML = '<div style="margin-bottom:12px">' +
-    pendingApplications.map(function(app, i) {
-      var typeLabels = {specialist:'👤 Специалист',company:'🏢 Компания',freelance:'💻 Фрилансер',partner:'🤝 Партнёр'};
-      return '<div style="background:var(--accent-dim);border:1px solid rgba(0,230,118,.2);border-radius:var(--radius);padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">' +
-        '<div style="flex:1">' +
-          '<div style="font-size:13px;font-weight:600">' + esc(typeLabels[app.type]||app.type) + ' · ' + esc(app.role||'') + '</div>' +
-          '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + esc(app.message.substring(0,60)) + (app.message.length>60?'...':'') + '</div>' +
-        '</div>' +
-        '<button onclick="removeApplication('+i+')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1">×</button>' +
-      '</div>';
-    }).join('') +
-  '</div>';
-}
-
-function addApplication() {
-  var msg = document.getElementById('applyMsg').value.trim();
-  if (!msg) { showInviteErr('Напиши сообщение / мини-резюме'); return; }
-  pendingApplications.push({
-    type:    document.getElementById('applyType').value,
-    role:    document.getElementById('applyRole').value.trim(),
-    company: document.getElementById('applyCompany').value.trim(),
-    message: msg
-  });
-  document.getElementById('applyMsg').value = '';
-  document.getElementById('applyRole').value = '';
-  document.getElementById('applyCompany').value = '';
-  document.getElementById('inviteError').style.display = 'none';
-  renderApplicationsList();
-}
-
-function removeApplication(i) {
-  pendingApplications.splice(i, 1);
-  renderApplicationsList();
 }
 
 function showInviteErr(msg) {
@@ -548,21 +530,10 @@ async function sendAllInvites() {
   if (!pageUser) { window.location.href = 'login.html'; return; }
   document.getElementById('inviteError').style.display = 'none';
 
-  // Добавляем текущий незавершённый отклик если есть
-  var curMsg = document.getElementById('applyMsg').value.trim();
-  if (curMsg) {
-    pendingApplications.push({
-      type:    document.getElementById('applyType').value,
-      role:    document.getElementById('applyRole').value.trim(),
-      company: document.getElementById('applyCompany').value.trim(),
-      message: curMsg
-    });
-  }
-
-  if (!pendingApplications.length) {
-    showInviteErr('Добавь хотя бы один отклик с сообщением');
-    return;
-  }
+  var msg  = document.getElementById('applyMsg').value.trim();
+  var role = document.getElementById('applyRole').value.trim();
+  if (!msg) { showInviteErr('Напиши сообщение / мини-резюме'); return; }
+  if (currentApplyType === 'role' && !role) { showInviteErr('Укажи роль в стартапе'); return; }
 
   try {
     // Проверяем дубль
@@ -579,21 +550,27 @@ async function sendAllInvites() {
       closeModal(); return;
     }
 
-    // Отправляем все отклики как один документ с массивом applications
+    var application = {
+      type:    currentApplyType,  // 'specialist' или 'role'
+      role:    role,              // роль если type=role
+      message: msg
+    };
+
     await db.collection('invites').add({
       fromUid:      pageUser.uid,
       fromName:     pageUserData ? pageUserData.name : '',
       fromAvatar:   pageUserData ? (pageUserData.avatar||'') : '',
+      fromSkills:   pageUserData ? safeArray(pageUserData.skills) : [],
       startupId:    startupId,
       startupName:  startupData.name,
       startupOwner: startupData.ownerUid,
-      applications: pendingApplications, // массив откликов
-      message:      pendingApplications[0].message, // для обратной совместимости
+      applications: [application],
+      role:         role || 'Специалист',
+      message:      msg,
       status:       'pending',
       createdAt:    firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    pendingApplications = [];
     closeModal();
     showToast('✅ Заявка отправлена!', 'success');
   } catch(e) {

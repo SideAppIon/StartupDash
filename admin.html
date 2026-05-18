@@ -105,17 +105,26 @@
           </div>
         </div>
 
-        <!-- Лимит ленты -->
-        <div class="settings-card" style="grid-column:1/-1;max-width:400px">
-          <h3>📰 Лента новостей</h3>
-          <div class="form-group" style="margin-bottom:0">
+        <!-- Лимит ленты + политика -->
+        <div class="settings-card" style="grid-column:1/-1">
+          <h3>⚙️ Общие настройки</h3>
+          <div class="form-group">
             <label class="form-label">Максимум обновлений в ленте</label>
             <div class="add-row">
               <input type="number" id="feedLimitInput" min="5" max="100" value="25"
                 style="max-width:120px" placeholder="25"/>
               <button class="btn btn--primary btn--sm" onclick="saveFeedLimit()">Сохранить</button>
             </div>
-            <div class="form-hint">От 5 до 100. Показываются только обновления публичных стартапов.</div>
+            <div class="form-hint">От 5 до 100. Только обновления публичных стартапов.</div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Ссылка на политику конфиденциальности</label>
+            <div class="add-row">
+              <input type="url" id="policyUrlInput" placeholder="https://example.com/privacy или privacy.html"
+                style="flex:1"/>
+              <button class="btn btn--primary btn--sm" onclick="savePolicyUrl()">Сохранить</button>
+            </div>
+            <div class="form-hint">Отображается в форме регистрации</div>
           </div>
         </div>
 
@@ -296,6 +305,7 @@ async function loadSettings() {
       stages = snap.data().stages || DEFAULT_STAGES;
       var lim = snap.data().feedLimit || 25;
       document.getElementById('feedLimitInput').value = lim;
+      if (snap.data().policyUrl) document.getElementById('policyUrlInput').value = snap.data().policyUrl;
     } else {
       cats   = DEFAULT_CATS.slice();
       stages = DEFAULT_STAGES.map(function(s){ return Object.assign({},s); });
@@ -307,6 +317,13 @@ async function loadSettings() {
   renderCats();
   renderStages();
   renderIconPicker();
+}
+
+async function savePolicyUrl() {
+  var url = document.getElementById('policyUrlInput').value.trim();
+  if (!url) { showToast('Введи ссылку','error'); return; }
+  await db.collection('_config').doc('platform').set({ policyUrl: url }, { merge: true });
+  showToast('Ссылка на политику сохранена','success');
 }
 
 async function saveFeedLimit() {

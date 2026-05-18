@@ -155,12 +155,9 @@
     <div style="margin-top:16px">
       <label class="checkbox-row">
         <input type="checkbox" id="policyCheck"/>
-        <span>Я прочитал и соглашаюсь с <a href="privacy.html" target="_blank">политикой конфиденциальности</a> и <a href="terms.html" target="_blank">условиями использования</a> платформы LaunchPad</span>
+        <span>Я прочитал и соглашаюсь с <a id="policyLink" href="privacy.html" target="_blank">политикой конфиденциальности</a> платформы LaunchPad</span>
       </label>
-      <label class="checkbox-row">
-        <input type="checkbox" id="ageCheck"/>
-        <span>Мне исполнилось 16 лет</span>
-      </label>
+
     </div>
 
     <div id="err2" class="form-error" style="display:none;margin:10px 0"></div>
@@ -181,6 +178,13 @@
 <script src="firebase-config.js"></script>
 <script>
 redirectIfAuth('dashboard.html');
+
+// Загружаем ссылку политики из настроек
+firebase.firestore().collection('_config').doc('platform').get().then(function(snap) {
+  if (snap.exists && snap.data().policyUrl) {
+    document.getElementById('policyLink').href = snap.data().policyUrl;
+  }
+}).catch(function() {});
 
 var selectedRole = 'user';
 var skills = [];
@@ -259,9 +263,7 @@ function renderSkills() {
 async function doRegister() {
   clearErr(2);
   var policy = document.getElementById('policyCheck').checked;
-  var age    = document.getElementById('ageCheck').checked;
   if (!policy) { showErr(2,'Необходимо принять политику конфиденциальности'); return; }
-  if (!age)    { showErr(2,'Необходимо подтвердить возраст'); return; }
 
   var btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = 'Регистрация...';
