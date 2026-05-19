@@ -68,10 +68,7 @@
             <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px">Навыки</h3>
             <div id="viewSkills"></div>
           </div>
-          <div class="card" id="portfolioViewCard" style="display:none">
-            <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px">Портфолио</h3>
-            <div id="viewPortfolio"></div>
-          </div>
+
         </div>
 
         <!-- EDIT -->
@@ -136,6 +133,10 @@
         <div class="card" style="margin-bottom:20px">
           <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Контакты</h3>
           <div id="viewContacts"><span style="color:var(--text3);font-size:14px">Не указаны</span></div>
+        </div>
+        <div class="card" id="portfolioViewCard" style="display:none;margin-bottom:20px">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Портфолио</h3>
+          <div id="viewPortfolio"></div>
         </div>
         <div class="card" id="myStartupsCard" style="display:none">
           <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Мои стартапы</h3>
@@ -235,10 +236,9 @@ onAuthReady(async function(user, userData) {
     }).join('');
   }
 
-  // Мои стартапы
-  if (userData.role === 'startup') {
-    try {
-      var sSnap = await db.collection('startups').where('ownerUid','==',user.uid).get();
+  // Мои стартапы — показываем всем у кого есть стартапы
+  try {
+    var sSnap = await db.collection('startups').where('ownerUid','==',user.uid).get();
       if (!sSnap.empty) {
         // Фильтруем: closed не показываем, private показываем без ссылки
         var visible = sSnap.docs.filter(function(d){ return d.data().privacy !== 'closed'; });
