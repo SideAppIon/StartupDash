@@ -306,26 +306,72 @@ async function loadMemberStartups(user, userData) {
 
 async function loadTeamOf() {
   try {
-    var teamSnaps = await db.collectionGroup('team').where('uid','==',profileUid).get();
-    if (teamSnaps.empty) return;
-    document.getElementById('teamOfCard').style.display = 'block';
     var items = '';
-    for (var i = 0; i < teamSnaps.docs.length; i++) {
-      var startupId = teamSnaps.docs[i].ref.parent.parent.id;
-      try {
-        var sSnap = await db.collection('startups').doc(startupId).get();
-        if (sSnap.exists) {
-          var s = sSnap.data();
-          items += '<a href="startup.html?id=' + startupId + '" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;margin-bottom:8px">' +
-            '<span style="font-size:20px">' + esc(s.emoji||'🚀') + '</span>' +
-            '<span style="font-size:14px;font-weight:500">' + esc(s.name||'') + '</span>' +
-          '</a>';
+    var shownStartups = {};
+
+    // Способ 1: через collectionGroup team
+    try {
+      var teamSnaps = await db.collectionGroup('team').where('uid','==',profileUid).get();
+      for (var i = 0; i < teamSnaps.docs.length; i++) {
+        var td = teamSnaps.docs[i].data();
+        var sid = teamSnaps.docs[i].ref.parent.parent.id;
+        if (shownStartups[sid]) continue;
+        shownStartups[sid] = true;
+        try {
+          var sSnap = await db.collection('startups').doc(sid).get();
+          if (sSnap.exists) {
+            var s = sSnap.data();
+            var memberRole = td.role || 'Участник';
+            var logo = s.iconImage
+              ? '<img src="'+esc(s.iconImage)+'" style="width:28px;height:28px;border-radius:6px;object-fit:cover"/>'
+              : '<span style="font-size:20px">'+(s.emoji||'🚀')+'</span>';
+            items += '<a href="startup.html?id='+sid+'" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px">'+
+              logo+
+              '<div><div style="font-size:14px;font-weight:500">'+esc(s.name||'')+'</div>'+
+              '<div style="font-size:12px;color:var(--accent);font-weight:500">'+esc(memberRole)+'</div></div>'+
+            '</a>';
+          }
+        } catch(e2) {}
+      }
+    } catch(cgErr) { console.log('collectionGroup:', cgErr.message); }
+
+    // Способ 2: через accepted invites (если collectionGroup не дал результатов или не доступен)
+    try {
+      var invSnaps = await db.collection('invites')
+        .where('fromUid','==',profileUid).where('status','==','accepted').get();
+      for (var j = 0; j < invSnaps.docs.length; j++) {
+        var inv = invSnaps.docs[j].data();
+        if (!inv.startupId || shownStartups[inv.startupId]) continue;
+        shownStartups[inv.startupId] = true;
+        var invRole = 'Участник';
+        if (inv.applications && inv.applications.length && inv.applications[0].role) {
+          invRole = inv.applications[0].role;
+        } else if (inv.role && inv.role !== 'Специалист') {
+          invRole = inv.role;
         }
-      } catch(e2) {}
+        try {
+          var sSnap2 = await db.collection('startups').doc(inv.startupId).get();
+          if (sSnap2.exists) {
+            var s2 = sSnap2.data();
+            var logo2 = s2.iconImage
+              ? '<img src="'+esc(s2.iconImage)+'" style="width:28px;height:28px;border-radius:6px;object-fit:cover"/>'
+              : '<span style="font-size:20px">'+(s2.emoji||'🚀')+'</span>';
+            items += '<a href="startup.html?id='+inv.startupId+'" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px">'+
+              logo2+
+              '<div><div style="font-size:14px;font-weight:500">'+esc(s2.name||'')+'</div>'+
+              '<div style="font-size:12px;color:var(--accent);font-weight:500">'+esc(invRole)+'</div></div>'+
+            '</a>';
+          }
+        } catch(e3) {}
+      }
+    } catch(invErr) { console.log('invites:', invErr.message); }
+
+    if (items) {
+      document.getElementById('teamOfCard').style.display = 'block';
+      document.getElementById('teamOfList').innerHTML = items;
     }
-    document.getElementById('teamOfList').innerHTML = items || '<span style="color:var(--text3);font-size:14px">Нет данных</span>';
   } catch(e) {
-    console.log('collectionGroup error:', e.message);
+    console.log('loadTeamOf error:', e.message);
   }
 }
 

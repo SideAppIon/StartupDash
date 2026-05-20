@@ -7,112 +7,104 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <link rel="stylesheet" href="styles.css"/>
   <style>
-    .roadmap-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:32px 0}
-    .roadmap-header__inner{display:flex;align-items:center;gap:20px}
-    .startup-emoji{font-size:44px}
-    .rm-title{font-family:var(--font-head);font-size:26px;font-weight:800;letter-spacing:-.5px}
+    .roadmap-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:calc(var(--nav-h)+32px) 0 28px}
+    .rm-title{font-family:var(--font-head);font-size:24px;font-weight:800;letter-spacing:-.5px}
     .rm-sub{font-size:14px;color:var(--text2);margin-top:4px}
-
-    /* колонки */
-    .board{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:28px}
+    .rm-stats{display:flex;gap:14px;flex-wrap:wrap;margin-top:20px}
+    .rm-stat{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 18px;text-align:center}
+    .rm-stat__num{font-family:var(--font-head);font-size:22px;font-weight:700}
+    .rm-stat__lbl{font-size:11px;color:var(--text3);margin-top:2px}
+    .progress-bar{height:5px;background:var(--bg3);border-radius:3px;margin-top:16px;overflow:hidden}
+    .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .5s}
+    /* Board */
+    .board{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:24px}
     @media(max-width:900px){.board{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:500px){.board{grid-template-columns:1fr}}
-
-    .col{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);display:flex;flex-direction:column;min-height:200px}
-    .col__head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-    .col__title{font-family:var(--font-head);font-size:14px;font-weight:700}
-    .col__count{font-size:12px;color:var(--text3);margin-left:auto;background:var(--bg3);border-radius:10px;padding:1px 8px}
-    .col__body{padding:10px;flex:1;display:flex;flex-direction:column;gap:8px}
-    .col__add{margin:8px 10px 10px;border:1px dashed var(--border2);border-radius:var(--radius);padding:8px;text-align:center;font-size:12px;color:var(--text3);cursor:pointer;transition:all .2s;display:none}
-    .col__add:hover{border-color:var(--accent);color:var(--accent)}
-    .col__add.visible{display:block}
-
-    /* карточки задач */
-    .task-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;transition:border-color .2s;position:relative}
-    .task-card:hover{border-color:var(--border2)}
-    .task-card__title{font-size:13px;font-weight:600;margin-bottom:4px;line-height:1.4}
-    .task-card__desc{font-size:12px;color:var(--text2);line-height:1.5}
-    .task-card__meta{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
-    .task-card__actions{display:none;position:absolute;top:8px;right:8px;gap:4px}
-    .task-card:hover .task-card__actions{display:flex}
-    .task-btn{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text2);font-size:11px;cursor:pointer;padding:2px 6px;line-height:1.6;transition:all .15s}
-    .task-btn:hover{color:var(--text);border-color:var(--text3)}
-    .task-btn--danger:hover{color:var(--danger);border-color:var(--danger)}
-
-    /* приоритеты */
-    .priority-high{border-left:3px solid var(--danger)}
-    .priority-med{border-left:3px solid var(--warn)}
-    .priority-low{border-left:3px solid var(--info)}
-
-    /* статус колонок */
+    .col{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);display:flex;flex-direction:column}
+    .col__head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
     .col--backlog .col__head{border-top:3px solid var(--text3);border-radius:var(--radius-lg) var(--radius-lg) 0 0}
     .col--todo    .col__head{border-top:3px solid var(--info)}
     .col--doing   .col__head{border-top:3px solid var(--warn)}
     .col--done    .col__head{border-top:3px solid var(--accent)}
-
-    /* форма задачи */
-    .task-form{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:12px;margin-bottom:4px}
-    .task-form input,.task-form textarea,.task-form select{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--font-body);font-size:13px;padding:7px 10px;outline:none;margin-bottom:8px;transition:border-color .2s}
+    .col__title{font-family:var(--font-head);font-size:13px;font-weight:700;flex:1}
+    .col__count{font-size:12px;color:var(--text3);background:var(--bg3);border-radius:10px;padding:1px 7px}
+    .col__toggle{font-size:12px;color:var(--text3);transition:transform .2s}
+    .col__body{padding:8px;display:flex;flex-direction:column;gap:7px}
+    .col__body.collapsed{display:none}
+    .col__add{margin:0 8px 8px;border:1px dashed var(--border2);border-radius:var(--radius);padding:7px;text-align:center;font-size:12px;color:var(--text3);cursor:pointer;transition:all .2s;display:none}
+    .col__add:hover{border-color:var(--accent);color:var(--accent)}
+    .col__add.visible{display:block}
+    /* Task card */
+    .task-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;position:relative;transition:border-color .2s}
+    .task-card:hover{border-color:var(--border2)}
+    .task-card.private-task{border-left:3px solid var(--text3);opacity:.85}
+    .task-card__title{font-size:13px;font-weight:600;margin-bottom:4px;line-height:1.4;padding-right:52px}
+    .task-card__desc{font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:6px}
+    .task-card__meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .task-card__assignee{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px}
+    .task-card__actions{position:absolute;top:8px;right:8px;display:none;gap:3px}
+    .task-card:hover .task-card__actions{display:flex}
+    .task-btn{background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;cursor:pointer;padding:2px 6px;line-height:1.6;transition:all .15s}
+    .task-btn:hover{color:var(--text);border-color:var(--text3)}
+    .task-btn--danger:hover{color:var(--danger);border-color:var(--danger)}
+    /* Priority */
+    .priority-high{border-left:3px solid var(--danger)}
+    .priority-med {border-left:3px solid var(--warn)}
+    .priority-low {border-left:3px solid var(--info)}
+    /* Task form */
+    .task-form{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;margin-bottom:4px}
+    .task-form input,.task-form textarea,.task-form select{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--font-body);font-size:12px;padding:6px 9px;outline:none;margin-bottom:7px;transition:border-color .2s}
     .task-form input:focus,.task-form textarea:focus,.task-form select:focus{border-color:var(--accent)}
-    .task-form textarea{min-height:60px;resize:vertical}
+    .task-form textarea{min-height:54px;resize:vertical}
     .task-form__btns{display:flex;gap:6px}
-    .tf-btn{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;transition:all .2s}
-    .tf-btn--save{background:var(--accent);color:#000}
-    .tf-btn--save:hover{background:var(--accent2)}
-    .tf-btn--cancel{background:var(--bg2);border:1px solid var(--border2);color:var(--text2)}
-    .tf-btn--cancel:hover{color:var(--text)}
-
-    .empty-col{padding:20px 10px;text-align:center;font-size:12px;color:var(--text3)}
-
-    /* статистика */
-    .rm-stats{display:flex;gap:16px;flex-wrap:wrap;margin-top:24px;margin-bottom:4px}
-    .rm-stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 20px;text-align:center}
-    .rm-stat__num{font-family:var(--font-head);font-size:24px;font-weight:700}
-    .rm-stat__lbl{font-size:11px;color:var(--text3);margin-top:2px}
-
-    /* прогресс бар */
-    .progress-bar{height:6px;background:var(--bg3);border-radius:3px;margin-top:20px;overflow:hidden}
-    .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .5s ease}
+    .tf-btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;transition:all .2s}
+    .tf-btn--save{background:var(--accent);color:#000}.tf-btn--save:hover{background:var(--accent2)}
+    .tf-btn--cancel{background:var(--bg2);border:1px solid var(--border2);color:var(--text2)}.tf-btn--cancel:hover{color:var(--text)}
+    .tf-check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);margin-bottom:7px;cursor:pointer}
+    .tf-check input{width:14px;height:14px;accent-color:var(--accent);margin:0}
+    .empty-col{padding:16px 10px;text-align:center;font-size:12px;color:var(--text3)}
+    /* Done collapsed */
+    .done-compact{padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+    .done-compact:last-child{border-bottom:none}
+    .done-compact__title{font-size:12px;color:var(--text2);flex:1;text-decoration:line-through}
+    /* My invites collapsible */
+    .collapsible-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:12px 0;user-select:none}
+    .collapsible-header:hover .section-title{color:var(--accent)}
+    .collapsible-body{overflow:hidden;transition:max-height .3s}
   </style>
 </head>
 <body>
 <nav class="nav">
   <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
   <div class="nav__user">
-    <a id="backToStartup" href="startups.html" class="btn btn--ghost btn--sm">← К стартапу</a>
+    <a id="backBtn" href="startups.html" class="btn btn--ghost btn--sm">← К стартапу</a>
     <span class="nav__role" id="navRole"></span>
-    <img class="nav__avatar" id="navAvatar"
-      src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"
-      onclick="window.location.href='profile.html'"/>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="window.location.href='profile.html'"/>
     <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
   </div>
 </nav>
 
 <div id="loadingState" style="padding:160px 0;text-align:center">
   <div class="spinner"></div>
-  <p style="color:var(--text2);margin-top:14px;font-size:14px">Загрузка дорожной карты...</p>
+  <p style="color:var(--text2);margin-top:14px;font-size:14px">Загрузка...</p>
 </div>
 
 <div id="pageContent" style="display:none">
   <div class="roadmap-header">
     <div class="container">
-      <div class="roadmap-header__inner">
-        <div class="startup-emoji" id="rmEmoji">🚀</div>
-        <div>
+      <div style="display:flex;align-items:flex-start;gap:16px">
+        <div style="font-size:44px" id="rmEmoji">🚀</div>
+        <div style="flex:1">
           <div class="rm-title" id="rmTitle">Дорожная карта</div>
           <div class="rm-sub" id="rmSub"></div>
+          <div class="rm-stats">
+            <div class="rm-stat"><div class="rm-stat__num" id="statTotal">0</div><div class="rm-stat__lbl">Всего</div></div>
+            <div class="rm-stat"><div class="rm-stat__num" id="statDone">0</div><div class="rm-stat__lbl">Готово</div></div>
+            <div class="rm-stat"><div class="rm-stat__num" id="statDoing">0</div><div class="rm-stat__lbl">В работе</div></div>
+            <div class="rm-stat"><div class="rm-stat__num" id="statTodo">0</div><div class="rm-stat__lbl">Запланировано</div></div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
         </div>
-      </div>
-
-      <div class="rm-stats">
-        <div class="rm-stat"><div class="rm-stat__num" id="statTotal">0</div><div class="rm-stat__lbl">Всего задач</div></div>
-        <div class="rm-stat"><div class="rm-stat__num" id="statDone">0</div><div class="rm-stat__lbl">Выполнено</div></div>
-        <div class="rm-stat"><div class="rm-stat__num" id="statDoing">0</div><div class="rm-stat__lbl">В работе</div></div>
-        <div class="rm-stat"><div class="rm-stat__num" id="statTodo">0</div><div class="rm-stat__lbl">Запланировано</div></div>
-      </div>
-
-      <div class="progress-bar">
-        <div class="progress-fill" id="progressFill" style="width:0%"></div>
       </div>
     </div>
   </div>
@@ -120,45 +112,41 @@
   <div class="page" style="padding-top:20px">
     <div class="container">
       <div class="board">
-        <!-- Backlog -->
-        <div class="col col--backlog">
-          <div class="col__head">
-            <span>📋</span>
-            <span class="col__title">Backlog</span>
+        <div class="col col--backlog" id="colWrap-backlog">
+          <div class="col__head" onclick="toggleCol('backlog')">
+            <span>📋</span><span class="col__title">Backlog</span>
             <span class="col__count" id="cnt-backlog">0</span>
+            <span class="col__toggle" id="toggle-backlog">▾</span>
           </div>
           <div class="col__body" id="col-backlog"></div>
-          <div class="col__add" id="add-backlog" onclick="showForm('backlog')">+ Добавить задачу</div>
+          <div class="col__add visible" id="add-backlog" onclick="showForm('backlog')">+ Добавить</div>
         </div>
-        <!-- Todo -->
-        <div class="col col--todo">
-          <div class="col__head">
-            <span>📌</span>
-            <span class="col__title">To Do</span>
+        <div class="col col--todo" id="colWrap-todo">
+          <div class="col__head" onclick="toggleCol('todo')">
+            <span>📌</span><span class="col__title">To Do</span>
             <span class="col__count" id="cnt-todo">0</span>
+            <span class="col__toggle" id="toggle-todo">▾</span>
           </div>
           <div class="col__body" id="col-todo"></div>
-          <div class="col__add" id="add-todo" onclick="showForm('todo')">+ Добавить задачу</div>
+          <div class="col__add visible" id="add-todo" onclick="showForm('todo')">+ Добавить</div>
         </div>
-        <!-- In Progress -->
-        <div class="col col--doing">
-          <div class="col__head">
-            <span>⚡</span>
-            <span class="col__title">In Progress</span>
+        <div class="col col--doing" id="colWrap-doing">
+          <div class="col__head" onclick="toggleCol('doing')">
+            <span>⚡</span><span class="col__title">In Progress</span>
             <span class="col__count" id="cnt-doing">0</span>
+            <span class="col__toggle" id="toggle-doing">▾</span>
           </div>
           <div class="col__body" id="col-doing"></div>
-          <div class="col__add" id="add-doing" onclick="showForm('doing')">+ Добавить задачу</div>
+          <div class="col__add visible" id="add-doing" onclick="showForm('doing')">+ Добавить</div>
         </div>
-        <!-- Done -->
-        <div class="col col--done">
-          <div class="col__head">
-            <span>✅</span>
-            <span class="col__title">Done</span>
+        <div class="col col--done" id="colWrap-done">
+          <div class="col__head" onclick="toggleCol('done')">
+            <span>✅</span><span class="col__title">Done</span>
             <span class="col__count" id="cnt-done">0</span>
+            <span class="col__toggle" id="toggle-done">▾</span>
           </div>
           <div class="col__body" id="col-done"></div>
-          <div class="col__add" id="add-done" onclick="showForm('done')">+ Добавить задачу</div>
+          <div class="col__add visible" id="add-done" onclick="showForm('done')">+ Добавить</div>
         </div>
       </div>
     </div>
@@ -178,115 +166,154 @@ var startupData = null;
 var pageUser    = null;
 var pageUserData= null;
 var isOwner     = false;
+var isMember    = false; // участник команды
 var allTasks    = [];
+var teamMembers = []; // [{uid, name}]
+var colCollapsed = { backlog:false, todo:false, doing:false, done:false };
+var formCol     = null;
 
 if (!startupId) window.location.href = 'startups.html';
 
-var COLS = {
-  backlog: { label:'Backlog', icon:'📋' },
-  todo:    { label:'To Do',   icon:'📌' },
-  doing:   { label:'In Progress', icon:'⚡' },
-  done:    { label:'Done',    icon:'✅' }
-};
-
-var PRIORITY = {
-  high: { label:'Высокий', class:'priority-high', badge:'badge--red' },
-  med:  { label:'Средний', class:'priority-med',  badge:'badge--warn' },
-  low:  { label:'Низкий',  class:'priority-low',  badge:'badge--blue' }
-};
+var COLS = { backlog:'Backlog', todo:'To Do', doing:'In Progress', done:'Done' };
+var PRIORITY = { high:{label:'🔴 Высокий',cls:'priority-high',badge:'badge--red'}, med:{label:'🟡 Средний',cls:'priority-med',badge:'badge--warn'}, low:{label:'🔵 Низкий',cls:'priority-low',badge:'badge--blue'} };
 
 onAuthReady(async function(user, userData) {
   if (!user) return;
-  pageUser     = user;
-  pageUserData = userData;
+  pageUser = user; pageUserData = userData;
   renderNav(userData);
 
   try {
     var snap = await db.collection('startups').doc(startupId).get();
     if (!snap.exists) { window.location.href = 'startups.html'; return; }
     startupData = Object.assign({id:snap.id}, snap.data());
-
     isOwner = user.uid === startupData.ownerUid || (userData && userData.role === 'admin');
 
     document.getElementById('rmEmoji').textContent = startupData.emoji || '🚀';
-    document.getElementById('rmTitle').textContent = startupData.name + ' — Дорожная карта';
+    document.getElementById('rmTitle').textContent = startupData.name + ' — Roadmap';
     document.getElementById('rmSub').textContent   = startupData.tagline || '';
-    document.getElementById('backToStartup').href  = 'startup.html?id=' + startupId;
+    document.getElementById('backBtn').href        = 'startup.html?id=' + startupId;
     document.title = startupData.name + ' — Roadmap';
 
-    // Показываем кнопки добавления только владельцу
-    if (isOwner) {
-      document.querySelectorAll('.col__add').forEach(function(el){ el.classList.add('visible'); });
+    // Проверяем участие
+    try {
+      var invCheck = await db.collection('invites')
+        .where('fromUid','==',user.uid).where('startupId','==',startupId).where('status','==','accepted').get();
+      isMember = !invCheck.empty;
+    } catch(e) {}
+
+    var canEdit = isOwner;
+
+    // Кнопки добавления — только владельцу
+    if (!canEdit) {
+      document.querySelectorAll('.col__add').forEach(function(el){ el.classList.remove('visible'); });
     }
+
+    // Загружаем команду для выбора исполнителя
+    await loadTeamMembers();
 
     // Слушаем задачи
     db.collection('startups').doc(startupId).collection('tasks')
       .orderBy('createdAt','asc')
       .onSnapshot(function(snap) {
-        allTasks = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
-        renderBoard();
+        allTasks = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+        // Фильтрация: не-участники видят только публичные
+        if (!isOwner && !isMember) {
+          allTasks = allTasks.filter(function(t){ return t.isPublic !== false; });
+        }
+        renderBoard(canEdit);
       }, function() {
-        // без индекса
-        db.collection('startups').doc(startupId).collection('tasks').get()
-          .then(function(snap){
-            allTasks = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
-            renderBoard();
-          });
+        db.collection('startups').doc(startupId).collection('tasks').get().then(function(snap){
+          allTasks = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+          if (!isOwner && !isMember) allTasks = allTasks.filter(function(t){ return t.isPublic !== false; });
+          renderBoard(canEdit);
+        });
       });
 
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('pageContent').style.display  = 'block';
   } catch(e) {
     document.getElementById('loadingState').innerHTML =
-      '<div class="empty-state"><div class="empty-state__icon">⚠️</div>'+
-      '<div class="empty-state__title">Ошибка загрузки</div>'+
-      '<p style="font-size:14px">'+esc(e.message)+'</p></div>';
+      '<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Ошибка</div><p>' + e.message + '</p></div>';
   }
 });
 
-// ── RENDER BOARD ──────────────────────────────────────
-function renderBoard() {
+async function loadTeamMembers() {
+  teamMembers = [];
+  // Владелец
+  teamMembers.push({ uid: startupData.ownerUid, name: startupData.ownerName || 'Основатель' });
+  // Из subcollection team
+  try {
+    var ts = await db.collection('startups').doc(startupId).collection('team').get();
+    ts.docs.forEach(function(d){ if (d.data().uid) teamMembers.push({ uid:d.data().uid, name:d.data().name||d.data().uid }); });
+  } catch(e) {}
+  // Из accepted invites
+  try {
+    var invs = await db.collection('invites').where('startupId','==',startupId).where('status','==','accepted').get();
+    invs.docs.forEach(function(d){
+      var inv = d.data();
+      if (inv.fromUid && !teamMembers.find(function(m){ return m.uid===inv.fromUid; })) {
+        teamMembers.push({ uid: inv.fromUid, name: inv.fromName||inv.fromUid });
+      }
+    });
+  } catch(e) {}
+}
+
+// ── BOARD RENDER ──────────────────────────────────────
+function renderBoard(canEdit) {
   var byCol = { backlog:[], todo:[], doing:[], done:[] };
-  allTasks.forEach(function(t){
-    if (byCol[t.status]) byCol[t.status].push(t);
-  });
+  allTasks.forEach(function(t){ if (byCol[t.status]) byCol[t.status].push(t); });
 
   Object.keys(byCol).forEach(function(col) {
-    var el  = document.getElementById('col-'+col);
-    var cnt = document.getElementById('cnt-'+col);
     var tasks = byCol[col];
-    cnt.textContent = tasks.length;
-    if (!tasks.length) {
-      el.innerHTML = '<div class="empty-col">Нет задач</div>';
+    document.getElementById('cnt-'+col).textContent = tasks.length;
+    var el = document.getElementById('col-'+col);
+    if (!tasks.length) { el.innerHTML = '<div class="empty-col">Нет задач</div>'; return; }
+
+    // Done — компактный вид если свёрнут
+    if (col === 'done' && colCollapsed[col]) {
+      el.innerHTML = tasks.map(function(t) {
+        return '<div class="done-compact">' +
+          '<span style="color:var(--accent)">✓</span>' +
+          '<span class="done-compact__title">' + esc(t.title||'') + '</span>' +
+          (t.isPublic===false ? '<span title="Приватная" style="font-size:11px;color:var(--text3)">🔒</span>' : '') +
+        '</div>';
+      }).join('');
       return;
     }
+
     el.innerHTML = tasks.map(function(t) {
-      var pr  = PRIORITY[t.priority] || PRIORITY.med;
-      var prLabel = pr ? '<span class="badge '+pr.badge+'" style="font-size:11px">'+pr.label+'</span>' : '';
-      return '<div class="task-card '+pr.class+'" id="task-'+t.id+'">'+
-        (isOwner ? '<div class="task-card__actions">'+
-          '<select class="task-btn" onchange="moveTask(\''+t.id+'\',this.value)" title="Переместить">'+
-            Object.keys(COLS).map(function(c){
-              return '<option value="'+c+'"'+(c===t.status?' selected':'')+'>'+COLS[c].icon+' '+COLS[c].label+'</option>';
-            }).join('')+
-          '</select>'+
-          '<button class="task-btn task-btn--danger" onclick="deleteTask(\''+t.id+'\')" title="Удалить">✕</button>'+
-        '</div>' : '')+
-        '<div class="task-card__title">'+esc(t.title||'')+'</div>'+
-        (t.description?'<div class="task-card__desc">'+esc(t.description)+'</div>':'')+
-        '<div class="task-card__meta">'+
-          prLabel+
-          (t.assignee?'<span class="badge badge--gray" style="font-size:11px">👤 '+esc(t.assignee)+'</span>':'')+
-        '</div>'+
+      var pr    = PRIORITY[t.priority] || PRIORITY.med;
+      var priv  = t.isPublic === false;
+      var asgn  = t.assigneeUid ? teamMembers.find(function(m){ return m.uid===t.assigneeUid; }) : null;
+      var moveOpts = Object.keys(COLS).map(function(c){
+        return '<option value="'+c+'"'+(c===t.status?' selected':'')+'>'+COLS[c]+'</option>';
+      }).join('');
+
+      return '<div class="task-card '+pr.cls+(priv?' private-task':'')+'" id="tc-'+t.id+'">' +
+        (canEdit ? '<div class="task-card__actions">'+
+          '<select class="task-btn" onchange="moveTask(\''+t.id+'\',this.value)" title="Переместить">'+moveOpts+'</select>'+
+          '<button class="task-btn" onclick="editTask(\''+t.id+\')" title="Редактировать">✏️</button>'+
+          '<button class="task-btn task-btn--danger" onclick="deleteTask(\''+t.id+\')" title="Удалить">✕</button>'+
+        '</div>' : '') +
+        '<div class="task-card__title">' + esc(t.title||'') + '</div>' +
+        (t.description ? '<div class="task-card__desc">' + esc(t.description) + '</div>' : '') +
+        '<div class="task-card__meta">' +
+          '<span class="badge '+pr.badge+'" style="font-size:11px">'+pr.label+'</span>' +
+          (asgn ? '<span class="task-card__assignee">👤 '+esc(asgn.name)+'</span>' : '') +
+          (priv ? '<span class="badge badge--gray" style="font-size:10px">🔒 Приватная</span>' : '') +
+        '</div>' +
       '</div>';
     }).join('');
   });
 
-  // Статистика
+  updateStats(byCol);
+}
+
+function updateStats(byCol) {
   var total = allTasks.length;
-  var done  = byCol.done.length;
-  var doing = byCol.doing.length;
-  var todo  = byCol.todo.length;
+  var done  = (byCol&&byCol.done) ? byCol.done.length : allTasks.filter(function(t){return t.status==='done';}).length;
+  var doing = allTasks.filter(function(t){return t.status==='doing';}).length;
+  var todo  = allTasks.filter(function(t){return t.status==='todo';}).length;
   document.getElementById('statTotal').textContent = total;
   document.getElementById('statDone').textContent  = done;
   document.getElementById('statDoing').textContent = doing;
@@ -294,31 +321,41 @@ function renderBoard() {
   document.getElementById('progressFill').style.width = total ? Math.round(done/total*100)+'%' : '0%';
 }
 
-// ── TASK FORM ─────────────────────────────────────────
-var formCol = null;
+// ── COLLAPSE ──────────────────────────────────────────
+function toggleCol(col) {
+  colCollapsed[col] = !colCollapsed[col];
+  var body    = document.getElementById('col-'+col);
+  var toggle  = document.getElementById('toggle-'+col);
+  var addBtn  = document.getElementById('add-'+col);
+  body.classList.toggle('collapsed', colCollapsed[col]);
+  toggle.textContent = colCollapsed[col] ? '▸' : '▾';
+  if (addBtn) addBtn.style.display = colCollapsed[col] ? 'none' : '';
+  // Done — перерисовываем компактно
+  renderBoard(isOwner);
+}
 
+// ── TASK FORM ─────────────────────────────────────────
 function showForm(col) {
-  // Убираем предыдущую форму если есть
   var prev = document.getElementById('active-task-form');
   if (prev) prev.remove();
   if (formCol === col) { formCol = null; return; }
   formCol = col;
 
+  var assigneeOpts = '<option value="">Не назначен</option>' +
+    teamMembers.map(function(m){ return '<option value="'+esc(m.uid)+'">'+esc(m.name)+'</option>'; }).join('');
+
   var form = document.createElement('div');
+  form.id = 'active-task-form';
   form.className = 'task-form';
-  form.id        = 'active-task-form';
   form.innerHTML =
-    '<input id="tf-title" placeholder="Название задачи *" maxlength="120"/>'+
-    '<textarea id="tf-desc" placeholder="Описание (необязательно)"></textarea>'+
-    '<select id="tf-priority">'+
-      '<option value="med">Приоритет: Средний</option>'+
-      '<option value="high">Приоритет: Высокий</option>'+
-      '<option value="low">Приоритет: Низкий</option>'+
-    '</select>'+
-    '<input id="tf-assignee" placeholder="Ответственный (необязательно)" maxlength="60"/>'+
-    '<div class="task-form__btns">'+
-      '<button class="tf-btn tf-btn--save" onclick="saveTask()">Добавить</button>'+
-      '<button class="tf-btn tf-btn--cancel" onclick="cancelForm()">Отмена</button>'+
+    '<input id="tf-title" placeholder="Название задачи *" maxlength="120"/>' +
+    '<textarea id="tf-desc" placeholder="Описание (необязательно)"></textarea>' +
+    '<select id="tf-priority"><option value="med">🟡 Приоритет: Средний</option><option value="high">🔴 Высокий</option><option value="low">🔵 Низкий</option></select>' +
+    '<select id="tf-assignee">'+assigneeOpts+'</select>' +
+    '<label class="tf-check"><input type="checkbox" id="tf-public" checked/> Публичная (видна всем)</label>' +
+    '<div class="task-form__btns">' +
+      '<button class="tf-btn tf-btn--save" onclick="saveTask()">Добавить</button>' +
+      '<button class="tf-btn tf-btn--cancel" onclick="cancelForm()">Отмена</button>' +
     '</div>';
 
   var colBody = document.getElementById('col-'+col);
@@ -327,51 +364,97 @@ function showForm(col) {
 }
 
 function cancelForm() {
-  var f = document.getElementById('active-task-form');
-  if (f) f.remove();
+  var f = document.getElementById('active-task-form'); if (f) f.remove();
   formCol = null;
 }
 
-async function saveTask() {
+async function saveTask(existingId) {
   if (!isOwner) return;
   var title = (document.getElementById('tf-title').value||'').trim();
-  if (!title) { showToast('Введи название задачи','error'); return; }
+  if (!title) { showToast('Введи название','error'); return; }
+
+  var assigneeUid  = document.getElementById('tf-assignee').value || '';
+  var assigneeName = '';
+  if (assigneeUid) {
+    var m = teamMembers.find(function(m){ return m.uid===assigneeUid; });
+    if (m) assigneeName = m.name;
+  }
+
   var data = {
     title,
-    description: (document.getElementById('tf-desc').value||'').trim(),
-    priority:    document.getElementById('tf-priority').value,
-    assignee:    (document.getElementById('tf-assignee').value||'').trim(),
-    status:      formCol,
-    createdAt:   firebase.firestore.FieldValue.serverTimestamp(),
-    updatedAt:   firebase.firestore.FieldValue.serverTimestamp()
+    description:  (document.getElementById('tf-desc').value||'').trim(),
+    priority:     document.getElementById('tf-priority').value,
+    assigneeUid:  assigneeUid,
+    assigneeName: assigneeName,
+    isPublic:     document.getElementById('tf-public').checked,
+    status:       existingId ? undefined : formCol,
+    updatedAt:    firebase.firestore.FieldValue.serverTimestamp()
   };
+  if (!existingId) data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+
+  // Убираем undefined поля
+  Object.keys(data).forEach(function(k){ if (data[k]===undefined) delete data[k]; });
+
   try {
-    await db.collection('startups').doc(startupId).collection('tasks').add(data);
+    if (existingId) {
+      await db.collection('startups').doc(startupId).collection('tasks').doc(existingId).update(data);
+    } else {
+      await db.collection('startups').doc(startupId).collection('tasks').add(data);
+    }
     cancelForm();
-    showToast('Задача добавлена!','success');
+    showToast(existingId ? 'Задача обновлена' : 'Задача добавлена','success');
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+function editTask(taskId) {
+  var t = allTasks.find(function(t){ return t.id===taskId; });
+  if (!t) return;
+  var prev = document.getElementById('active-task-form'); if (prev) prev.remove();
+  formCol = t.status;
+
+  var assigneeOpts = '<option value="">Не назначен</option>' +
+    teamMembers.map(function(m){
+      return '<option value="'+esc(m.uid)+'"'+(m.uid===t.assigneeUid?' selected':'')+'>'+esc(m.name)+'</option>';
+    }).join('');
+
+  var form = document.createElement('div');
+  form.id = 'active-task-form';
+  form.className = 'task-form';
+  form.innerHTML =
+    '<input id="tf-title" value="'+esc(t.title||'')+'" placeholder="Название *" maxlength="120"/>' +
+    '<textarea id="tf-desc" placeholder="Описание">'+esc(t.description||'')+'</textarea>' +
+    '<select id="tf-priority"><option value="med"'+(t.priority==='med'?' selected':'')+'>🟡 Средний</option><option value="high"'+(t.priority==='high'?' selected':'')+'>🔴 Высокий</option><option value="low"'+(t.priority==='low'?' selected':'')+'>🔵 Низкий</option></select>' +
+    '<select id="tf-assignee">'+assigneeOpts+'</select>' +
+    '<label class="tf-check"><input type="checkbox" id="tf-public"'+(t.isPublic!==false?' checked':'')+'/> Публичная (видна всем)</label>' +
+    '<div class="task-form__btns">' +
+      '<button class="tf-btn tf-btn--save" onclick="saveTask(\''+taskId+'\')">Сохранить</button>' +
+      '<button class="tf-btn tf-btn--cancel" onclick="cancelForm()">Отмена</button>' +
+    '</div>';
+
+  var tc = document.getElementById('tc-'+taskId);
+  if (tc) tc.parentNode.insertBefore(form, tc);
+  else document.getElementById('col-'+t.status).insertBefore(form, document.getElementById('col-'+t.status).firstChild);
+  document.getElementById('tf-title').focus();
 }
 
 async function moveTask(taskId, newStatus) {
   if (!isOwner) return;
   try {
     await db.collection('startups').doc(startupId).collection('tasks').doc(taskId).update({
-      status: newStatus,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      status: newStatus, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
 async function deleteTask(taskId) {
-  if (!isOwner) return;
-  if (!confirm('Удалить задачу?')) return;
+  if (!isOwner || !confirm('Удалить задачу?')) return;
   try {
     await db.collection('startups').doc(startupId).collection('tasks').doc(taskId).delete();
     showToast('Задача удалена','success');
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 </body>
 </html>
