@@ -38,6 +38,7 @@
   <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
   <a href="startups.html">Стартапы</a>
   <a href="feed.html">Лента</a>
+  <a href="forum.html">Форум</a>
   <a href="members.html">Участники</a>
   <div class="nav__user">
     <a href="messages.html" style="font-size:20px;text-decoration:none">💬</a>
@@ -175,8 +176,8 @@ async function renderStartup(el, uid) {
             : (inv.message?'<div style="font-size:12px;color:var(--text3);margin-top:2px">'+esc(inv.message)+'</div>':'')
           )+'</div>' +
           '<div style="display:flex;gap:6px">' +
-            '<button class="btn btn--primary btn--sm" onclick="answer(\''+inv.id+'\',\'accepted\')">✓</button>' +
-            '<button class="btn btn--outline btn--sm" onclick="answer(\''+inv.id+'\',\'rejected\')">✕</button>' +
+            '<button class="btn btn--primary btn--sm" data-iid="'+inv.id+'" data-st="accepted" onclick="answer(this)">✓</button>' +
+            '<button class="btn btn--outline btn--sm" data-iid="'+inv.id+'" data-st="rejected" onclick="answer(this)">✕</button>' +
           '</div></div>';
       }).join('')
     : '');
@@ -248,7 +249,9 @@ async function renderAdmin(el) {
     '<div class="grid-2"><a href="admin.html" class="card card--clickable" style="text-decoration:none"><div style="font-size:32px;margin-bottom:12px">👥</div><div class="section-title" style="font-size:18px">Пользователи</div><p style="font-size:14px;color:var(--text2);margin-top:6px">Роли, блокировка, сброс паролей</p></a><a href="startups.html" class="card card--clickable" style="text-decoration:none"><div style="font-size:32px;margin-bottom:12px">🚀</div><div class="section-title" style="font-size:18px">Стартапы</div><p style="font-size:14px;color:var(--text2);margin-top:6px">Просмотр и удаление</p></a></div>';
 }
 
-async function answer(id, status) {
+async function answer(btn) {
+  var id = btn.getAttribute('data-iid');
+  var status = btn.getAttribute('data-st');
   await db.collection('invites').doc(id).update({ status: status });
   showToast(status==='accepted'?'✅ Принято':'❌ Отклонено');
   setTimeout(function(){ location.reload(); }, 800);

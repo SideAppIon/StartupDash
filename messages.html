@@ -250,7 +250,7 @@ function filterConvs(q) {
     var av    = (c.participantAvatars&&c.participantAvatars[other])||
       'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(name);
     var t = c.lastAt ? shortTime(c.lastAt) : '';
-    return '<div class="conv-item'+(activeId===c.id?' active':'')+'" onclick="openConv(\''+c.id+'\')">'+
+    return '<div class="conv-item'+(activeId===c.id?' active':'')+'" data-cid="'+c.id+'" onclick="openConvById(this)">'+
       '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
       '<div class="conv-item__info">'+
         '<div class="conv-item__name">'+esc(name)+'</div>'+
@@ -463,7 +463,7 @@ function renderUserPick(users) {
   }
   el.innerHTML=available.map(function(u){
     var av=u.avatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(u.name||'U');
-    return '<div class="user-pick-item" onclick="startConvWith(\''+u.uid+'\')">'+
+    return '<div class="user-pick-item" data-uid="'+u.uid+'" onclick="startConvByEl(this)">'+
       '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
       '<div><div class="user-pick-item__name">'+esc(u.name||'—')+'</div>'+
       '<div class="user-pick-item__role">'+(ROLE_LABELS[u.role]||u.role||'')+'</div></div>'+
@@ -481,6 +481,8 @@ async function startConvWith(otherUid) {
   } catch(e){showToast('Ошибка: '+e.message,'error');}
 }
 
+function openConvById(el) { openConv(el.getAttribute('data-cid')); }
+function startConvByEl(el) { startConvWith(el.getAttribute('data-uid')); }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 </script>
 </body>

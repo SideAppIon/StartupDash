@@ -140,7 +140,7 @@ onAuthReady(async function(user, userData) {
         '</div>'+
         '<div class="update-card__date">'+formatDate(u.createdAt)+'</div>'+
         '<div class="update-card__body">'+esc(u.body||'').substring(0,200)+(u.body&&u.body.length>200?'...':'')+'</div>'+
-        (u.imageUrl?'<img src="'+esc(u.imageUrl)+'" class="update-card__img" onerror="this.style.display=\'none\'"/>':'')+
+        (u.imageUrl?'<img src="'+esc(u.imageUrl)+'" class="update-card__img" onerror="this.style.display=&quot;none&quot;"/>':'')+
       '</div>';
     }).join('');
   }

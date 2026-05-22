@@ -291,9 +291,9 @@ function renderBoard(canEdit) {
 
       return '<div class="task-card '+pr.cls+(priv?' private-task':'')+'" id="tc-'+t.id+'">' +
         (canEdit ? '<div class="task-card__actions">'+
-          '<select class="task-btn" onchange="moveTask(\''+t.id+'\',this.value)" title="Переместить">'+moveOpts+'</select>'+
-          '<button class="task-btn" onclick="editTask(\''+t.id+\')" title="Редактировать">✏️</button>'+
-          '<button class="task-btn task-btn--danger" onclick="deleteTask(\''+t.id+\')" title="Удалить">✕</button>'+
+          '<select class="task-btn" onchange="moveTask(this)" data-id="'+esc(t.id)+'" title="Переместить">'+moveOpts+'</select>'+
+          '<button class="task-btn" data-id="'+esc(t.id)+'" onclick="editTask(this)" title="Редактировать">✏️</button>'+
+          '<button class="task-btn task-btn--danger" data-id="'+esc(t.id)+'" onclick="deleteTask(this)" title="Удалить">✕</button>'+
         '</div>' : '') +
         '<div class="task-card__title">' + esc(t.title||'') + '</div>' +
         (t.description ? '<div class="task-card__desc">' + esc(t.description) + '</div>' : '') +
@@ -354,7 +354,7 @@ function showForm(col) {
     '<select id="tf-assignee">'+assigneeOpts+'</select>' +
     '<label class="tf-check"><input type="checkbox" id="tf-public" checked/> Публичная (видна всем)</label>' +
     '<div class="task-form__btns">' +
-      '<button class="tf-btn tf-btn--save" onclick="saveTask()">Добавить</button>' +
+      '<button class="tf-btn tf-btn--save" onclick="saveTask(null)">Добавить</button>' +
       '<button class="tf-btn tf-btn--cancel" onclick="cancelForm()">Отмена</button>' +
     '</div>';
 
@@ -368,7 +368,7 @@ function cancelForm() {
   formCol = null;
 }
 
-async function saveTask(existingId) {
+async function saveTask(btn) { var existingId = btn ? btn.getAttribute("data-id") : null;
   if (!isOwner) return;
   var title = (document.getElementById('tf-title').value||'').trim();
   if (!title) { showToast('Введи название','error'); return; }
@@ -406,7 +406,7 @@ async function saveTask(existingId) {
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
-function editTask(taskId) {
+function editTask(btn) { var taskId=btn.getAttribute("data-id");
   var t = allTasks.find(function(t){ return t.id===taskId; });
   if (!t) return;
   var prev = document.getElementById('active-task-form'); if (prev) prev.remove();
@@ -427,7 +427,7 @@ function editTask(taskId) {
     '<select id="tf-assignee">'+assigneeOpts+'</select>' +
     '<label class="tf-check"><input type="checkbox" id="tf-public"'+(t.isPublic!==false?' checked':'')+'/> Публичная (видна всем)</label>' +
     '<div class="task-form__btns">' +
-      '<button class="tf-btn tf-btn--save" onclick="saveTask(\''+taskId+'\')">Сохранить</button>' +
+      '<button class="tf-btn tf-btn--save" data-id="'+taskId+'" onclick="saveTask(this)">Сохранить</button>' +
       '<button class="tf-btn tf-btn--cancel" onclick="cancelForm()">Отмена</button>' +
     '</div>';
 
@@ -437,7 +437,7 @@ function editTask(taskId) {
   document.getElementById('tf-title').focus();
 }
 
-async function moveTask(taskId, newStatus) {
+async function moveTask(sel) { var taskId=sel.getAttribute("data-id"); var newStatus=sel.value;
   if (!isOwner) return;
   try {
     await db.collection('startups').doc(startupId).collection('tasks').doc(taskId).update({
@@ -446,7 +446,7 @@ async function moveTask(taskId, newStatus) {
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
-async function deleteTask(taskId) {
+async function deleteTask(btn) { var taskId=btn.getAttribute("data-id");
   if (!isOwner || !confirm('Удалить задачу?')) return;
   try {
     await db.collection('startups').doc(startupId).collection('tasks').doc(taskId).delete();

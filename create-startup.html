@@ -246,9 +246,22 @@ function addTag(){
 }
 function removeTag(t){tags=tags.filter(function(x){return x!==t;});renderTags();}
 function renderTags(){
-  document.getElementById('tagsList').innerHTML=tags.map(function(t){
-    return '<span class="tag-item">'+esc(t)+'<button type="button" onclick="removeTag(\''+esc(t)+'\')">×</button></span>';
-  }).join('');
+  var el=document.getElementById('tagsList');
+  el.innerHTML='';
+  tags.forEach(function(t){
+    var span=document.createElement('span');
+    span.className='tag-item';
+    var txt=document.createElement('span');
+    txt.textContent=t;
+    span.appendChild(txt);
+    var btn2=document.createElement('button');
+    btn2.type='button';
+    btn2.textContent='×';
+    btn2.setAttribute('data-tag',t);
+    btn2.addEventListener('click',function(){removeTag(this.getAttribute('data-tag'));});
+    span.appendChild(btn2);
+    el.appendChild(span);
+  });
 }
 
 // Content blocks
@@ -277,35 +290,76 @@ function renderBlocks(){
     container.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px 0">Нет блоков — добавь текст или картинку</div>';
     return;
   }
-  container.innerHTML=blocks.map(function(b){
-    var inner='';
-    if (b.type==='text'){
-      inner='<textarea id="inp-'+b.id+'" class="form-textarea" style="min-height:100px" '+
-        'placeholder="Опиши идею, проблему, решение..." '+
-        'oninput="updateBlock(\''+b.id+'\',\'content\',this.value)">'+esc(b.content)+'</textarea>';
-    } else if (b.type==='image'){
-      inner='<input id="inp-'+b.id+'" type="url" class="form-input" placeholder="https://i.imgur.com/..." '+
-        'value="'+esc(b.content)+'" '+
-        'oninput="updateBlock(\''+b.id+'\',\'content\',this.value);previewBlockImg(\'prev-'+b.id+'\',this.value)"/>'+
-        '<img id="prev-'+b.id+'" class="img-preview-small'+(b.content?' show':'')+'\" src="'+esc(b.content)+'" onerror="this.className=\'img-preview-small\'" alt=""/>';
-    } else if (b.type==='video'){
-      inner='<input id="inp-'+b.id+'" type="url" class="form-input" '+
-        'placeholder="https://vk.com/video_ext.php?oid=...&id=...&hd=2" '+
-        'value="'+esc(b.content)+'" '+
-        'oninput="updateBlock(\''+b.id+'\',\'content\',this.value)"/>'+
-        '<div class="form-hint">Ссылку для встраивания: ВКонтакте → видео → Поделиться → Код для вставки → извлеки src из iframe</div>';
-    }
+  // Рендерим через DOM чтобы избежать кавычек в атрибутах
+  container.innerHTML='';
+  blocks.forEach(function(b){
+    var wrap=document.createElement('div');
+    wrap.className='content-block';
     var icons={'text':'📝','image':'🖼','video':'▶'};
     var labels={'text':'Текст','image':'Картинка','video':'Видео ВК'};
-    return '<div class="content-block">'+
-      '<div class="content-block__header">'+
-        '<span>'+icons[b.type]+'</span>'+
-        '<span class="content-block__type">'+labels[b.type]+'</span>'+
-      '</div>'+
-      '<button class="content-block__del" type="button" onclick="removeBlock(\''+b.id+'\')" title="Удалить блок">×</button>'+
-      inner+
-    '</div>';
-  }).join('');
+    var header=document.createElement('div');
+    header.className='content-block__header';
+    header.innerHTML='<span>'+icons[b.type]+'</span><span class="content-block__type">'+labels[b.type]+'</span>';
+    wrap.appendChild(header);
+
+    var del=document.createElement('button');
+    del.className='content-block__del';
+    del.type='button';
+    del.title='Удалить блок';
+    del.textContent='×';
+    del.setAttribute('data-bid', b.id);
+    del.addEventListener('click', function(){ removeBlock(this.getAttribute('data-bid')); });
+    wrap.appendChild(del);
+
+    var inp;
+    if (b.type==='text'){
+      inp=document.createElement('textarea');
+      inp.className='form-textarea';
+      inp.style.minHeight='100px';
+      inp.placeholder='Опиши идею, проблему, решение...';
+      inp.value=b.content||'';
+      inp.setAttribute('data-bid', b.id);
+      inp.addEventListener('input', function(){ updateBlock(this.getAttribute('data-bid'),'content',this.value); });
+    } else if (b.type==='image'){
+      inp=document.createElement('input');
+      inp.type='url';
+      inp.className='form-input';
+      inp.placeholder='https://i.imgur.com/...';
+      inp.value=b.content||'';
+      inp.setAttribute('data-bid', b.id);
+      var prevId='prev-'+b.id;
+      inp.addEventListener('input', function(){
+        updateBlock(this.getAttribute('data-bid'),'content',this.value);
+        previewBlockImg(prevId, this.value);
+      });
+      wrap.appendChild(inp);
+      var prev=document.createElement('img');
+      prev.id=prevId;
+      prev.className='img-preview-small'+(b.content?' show':'');
+      if(b.content) prev.src=b.content;
+      prev.onerror=function(){this.className='img-preview-small';};
+      wrap.appendChild(prev);
+      container.appendChild(wrap);
+      return;
+    } else if (b.type==='video'){
+      inp=document.createElement('input');
+      inp.type='url';
+      inp.className='form-input';
+      inp.placeholder='https://vk.com/video_ext.php?oid=...&id=...&hd=2';
+      inp.value=b.content||'';
+      inp.setAttribute('data-bid', b.id);
+      inp.addEventListener('input', function(){ updateBlock(this.getAttribute('data-bid'),'content',this.value); });
+      var hint=document.createElement('div');
+      hint.className='form-hint';
+      hint.textContent='Ссылка для встраивания: ВКонтакте → видео → Поделиться → Код для вставки → извлеки src из iframe';
+      wrap.appendChild(inp);
+      wrap.appendChild(hint);
+      container.appendChild(wrap);
+      return;
+    }
+    wrap.appendChild(inp);
+    container.appendChild(wrap);
+  });
 }
 function previewBlockImg(previewId, url){
   var img=document.getElementById(previewId);

@@ -73,6 +73,10 @@
         <option value="">Все стадии</option>
       </select>
       <span class="count-label" id="countLabel"></span>
+      <div style="display:flex;gap:6px;margin-left:auto">
+        <button class="filter-select" id="sortNew" onclick="setSort('new',this)" style="cursor:pointer;background:var(--accent-dim);border-color:var(--accent);color:var(--accent)">🕐 Новые</button>
+        <button class="filter-select" id="sortAz"  onclick="setSort('az',this)"  style="cursor:pointer">А–Я</button>
+      </div>
     </div>
   </div>
 </div>
@@ -114,7 +118,20 @@
     applyFilters();
   });
 
-  function applyFilters() {
+  var currentSort = 'new';
+
+function setSort(type, btn) {
+  currentSort = type;
+  document.querySelectorAll('#sortNew,#sortAz').forEach(function(b){
+    b.style.background=''; b.style.borderColor=''; b.style.color='';
+  });
+  btn.style.background='var(--accent-dim)';
+  btn.style.borderColor='var(--accent)';
+  btn.style.color='var(--accent)';
+  applyFilters();
+}
+
+function applyFilters() {
     const search   = document.getElementById('searchInput').value.toLowerCase();
     const category = document.getElementById('categoryFilter').value;
     const stage    = document.getElementById('stageFilter').value;
@@ -131,6 +148,13 @@
     });
 
     document.getElementById('countLabel').textContent = `${filtered.length} стартапов`;
+    if (currentSort === 'az') {
+      filtered.sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','ru'); });
+    } else {
+      filtered.sort(function(a,b){
+        return ((b.createdAt&&b.createdAt.seconds)||0) - ((a.createdAt&&a.createdAt.seconds)||0);
+      });
+    }
     renderList(filtered);
   }
 

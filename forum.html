@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Форум — LaunchPad</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .forum-layout{display:grid;grid-template-columns:1fr 260px;gap:24px}
+    @media(max-width:860px){.forum-layout{grid-template-columns:1fr}}
+    /* Категории */
+    .cat-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+    .cat-tab{padding:6px 16px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .2s}
+    .cat-tab:hover{border-color:var(--border2);color:var(--text)}
+    .cat-tab.active{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+    /* Topic list */
+    .topic-item{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:10px;display:flex;gap:16px;align-items:flex-start;transition:border-color .2s;text-decoration:none;color:inherit;cursor:pointer}
+    .topic-item:hover{border-color:var(--border2)}
+    .topic-item.pinned{border-left:3px solid var(--accent)}
+    .topic-item__icon{font-size:28px;flex-shrink:0;width:40px;text-align:center;margin-top:2px}
+    .topic-item__body{flex:1;min-width:0}
+    .topic-item__title{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:4px;line-height:1.3}
+    .topic-item__meta{font-size:12px;color:var(--text2);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .topic-item__stats{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;gap:4px}
+    .topic-item__count{font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--accent)}
+    .topic-item__count-lbl{font-size:11px;color:var(--text3)}
+    .topic-item__last{font-size:11px;color:var(--text3);text-align:right;max-width:120px}
+    .pin-badge{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-dim);padding:1px 6px;border-radius:3px;letter-spacing:.5px}
+    /* Topic page */
+    .topic-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:28px 0;margin-bottom:0}
+    .topic-cat-badge{display:inline-block;font-size:12px;font-weight:600;color:var(--text2);background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:2px 10px;margin-bottom:10px}
+    .post-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:14px;overflow:hidden}
+    .post-card.op{border-color:rgba(0,230,118,.2)}
+    .post-card__header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;background:var(--bg3)}
+    .post-card.op .post-card__header{background:var(--accent-dim)}
+    .post-card__author{font-size:14px;font-weight:600}
+    .post-card__role{font-size:11px;color:var(--text2)}
+    .post-card__date{font-size:12px;color:var(--text3);margin-left:auto}
+    .post-card__body{padding:18px 20px;font-size:14px;color:var(--text2);line-height:1.8;white-space:pre-wrap;word-break:break-word}
+    .post-card__footer{padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+    .post-num{font-size:11px;color:var(--text3);margin-right:auto}
+    .reply-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-top:8px}
+    .reply-box h3{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:14px}
+    /* New topic form */
+    .new-topic-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px;margin-bottom:20px}
+    .new-topic-box h3{font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:16px}
+    /* Sidebar */
+    .sidebar-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;margin-bottom:16px}
+    .sidebar-box h3{font-family:var(--font-head);font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;font-size:12px}
+    .sidebar-stat{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+    .sidebar-stat:last-child{border-bottom:none}
+    .sidebar-stat__num{font-weight:700;color:var(--accent)}
+    .hot-topic{padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;cursor:pointer;color:var(--text2);transition:color .2s}
+    .hot-topic:last-child{border-bottom:none}
+    .hot-topic:hover{color:var(--accent)}
+    .hot-topic__title{font-weight:500;margin-bottom:2px}
+    .hot-topic__meta{font-size:11px;color:var(--text3)}
+    /* Views */
+    #viewList{display:block}
+    #viewTopic{display:none}
+    #viewNewTopic{display:none}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="startups.html">Стартапы</a>
+  <a href="feed.html">Лента</a>
+  <a href="forum.html" class="active">Форум</a>
+  <a href="members.html">Участники</a>
+  <div class="nav__user" id="navUser">
+    <a href="login.html" class="btn btn--outline btn--sm">Войти</a>
+    <a href="register.html" class="btn btn--primary btn--sm">Регистрация</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="container">
+
+    <!-- LIST VIEW -->
+    <div id="viewList">
+      <div class="section-header" style="margin-bottom:20px">
+        <div>
+          <h1 class="page-title">Форум</h1>
+          <p class="page-subtitle">Обсуждения, вопросы, идеи</p>
+        </div>
+        <button class="btn btn--primary" id="newTopicBtn" onclick="showView('newTopic')" style="display:none">+ Новая тема</button>
+      </div>
+
+      <div class="forum-layout">
+        <div>
+          <!-- Категории -->
+          <div class="cat-tabs" id="catTabs">
+            <button class="cat-tab active" onclick="setCategory('',this)">Все темы</button>
+          </div>
+          <!-- Темы -->
+          <div id="topicList"><div class="spinner" style="margin:32px auto"></div></div>
+        </div>
+        <div>
+          <div class="sidebar-box">
+            <h3>📊 Статистика</h3>
+            <div class="sidebar-stat"><span>Тем</span><span class="sidebar-stat__num" id="statTopics">—</span></div>
+            <div class="sidebar-stat"><span>Сообщений</span><span class="sidebar-stat__num" id="statPosts">—</span></div>
+            <div class="sidebar-stat"><span>Участников</span><span class="sidebar-stat__num" id="statUsers">—</span></div>
+          </div>
+          <div class="sidebar-box">
+            <h3>🔥 Популярные темы</h3>
+            <div id="hotTopics"><div class="spinner" style="width:18px;height:18px;border-width:2px;margin:8px auto"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOPIC VIEW -->
+    <div id="viewTopic">
+      <div style="margin-bottom:16px">
+        <button class="btn btn--ghost btn--sm" onclick="showView('list')">← Назад к форуму</button>
+      </div>
+      <div class="topic-header">
+        <div class="topic-cat-badge" id="topicCat"></div>
+        <h1 class="page-title" id="topicTitle" style="margin-bottom:8px"></h1>
+        <div style="font-size:13px;color:var(--text2)" id="topicMeta"></div>
+      </div>
+      <div style="margin-top:20px" id="postList"></div>
+      <div id="replyArea"></div>
+    </div>
+
+    <!-- NEW TOPIC VIEW -->
+    <div id="viewNewTopic">
+      <div style="margin-bottom:16px">
+        <button class="btn btn--ghost btn--sm" onclick="showView('list')">← Назад к форуму</button>
+      </div>
+      <div class="new-topic-box">
+        <h3>Новая тема</h3>
+        <div class="form-group">
+          <label class="form-label">Категория</label>
+          <select class="form-select" id="newTopicCat">
+            <option value="Общее">💬 Общее</option>
+            <option value="Стартапы">🚀 Стартапы</option>
+            <option value="Поиск команды">👥 Поиск команды</option>
+            <option value="Инвестиции">💰 Инвестиции</option>
+            <option value="Технологии">🔬 Технологии</option>
+            <option value="Маркетинг">📣 Маркетинг</option>
+            <option value="Вопросы">❓ Вопросы</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Заголовок темы *</label>
+          <input type="text" class="form-input" id="newTopicTitle" placeholder="Кратко о чём тема..." maxlength="120"/>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Первое сообщение *</label>
+          <textarea class="form-textarea" id="newTopicBody" style="min-height:160px" placeholder="Расскажи подробнее..."></textarea>
+        </div>
+        <div id="newTopicErr" class="form-error" style="display:none;margin-top:10px"></div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn--primary btn--lg" onclick="createTopic()">Создать тему</button>
+          <button class="btn btn--ghost" onclick="showView('list')">Отмена</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+var currentView    = 'list';
+var currentCat     = '';
+var currentTopicId = null;
+var allTopics      = [];
+var pageUser       = null;
+var pageUserData   = null;
+
+var CAT_ICONS = {
+  'Общее':'💬','Стартапы':'🚀','Поиск команды':'👥',
+  'Инвестиции':'💰','Технологии':'🔬','Маркетинг':'📣','Вопросы':'❓'
+};
+
+onAuthReady(async function(user, userData) {
+  pageUser     = user;
+  pageUserData = userData;
+
+  var navUser = document.getElementById('navUser');
+  if (user && userData) {
+    var av = userData.avatar ||
+      'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(userData.name||'U');
+    navUser.innerHTML =
+      '<span class="nav__role nav__role--'+userData.role+'">'+(ROLE_LABELS[userData.role]||userData.role)+'</span>'+
+      '<img class="nav__avatar" src="'+esc(av)+'" onclick="window.location.href=&quot;profile.html&quot;"/>'+
+      '<a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>';
+    document.getElementById('newTopicBtn').style.display = '';
+  }
+
+  // Если открываем тему по URL
+  var topicId = getUrlParam('topic');
+  if (topicId) {
+    await loadTopic(topicId);
+    showView('topic');
+  } else {
+    await loadTopics();
+    loadStats();
+    loadHotTopics();
+  }
+});
+
+// ── VIEWS ─────────────────────────────────────────────
+function showView(view) {
+  ['list','topic','newTopic'].forEach(function(v){
+    document.getElementById('view'+v.charAt(0).toUpperCase()+v.slice(1)).style.display = v===view?'block':'none';
+  });
+  currentView = view;
+  if (view === 'list') {
+    history.replaceState({}, '', 'forum.html');
+    loadTopics();
+  }
+}
+
+// ── CATEGORIES ────────────────────────────────────────
+function buildCatTabs(topics) {
+  var cats = {};
+  topics.forEach(function(t){ cats[t.category] = (cats[t.category]||0)+1; });
+  var el = document.getElementById('catTabs');
+  el.innerHTML = '';
+  var allBtn = document.createElement('button');
+  allBtn.className = 'cat-tab'+(currentCat===''?' active':'');
+  allBtn.textContent = 'Все темы';
+  allBtn.setAttribute('data-cat','');
+  allBtn.addEventListener('click', function(){ setCatByEl(this); });
+  el.appendChild(allBtn);
+  Object.keys(CAT_ICONS).forEach(function(cat) {
+    if (!cats[cat]) return;
+    var btn = document.createElement('button');
+    btn.className = 'cat-tab'+(currentCat===cat?' active':'');
+    btn.innerHTML = CAT_ICONS[cat]+' '+esc(cat)+' <span style="opacity:.6;font-size:11px">('+cats[cat]+')</span>';
+    btn.setAttribute('data-cat', cat);
+    btn.addEventListener('click', function(){ setCatByEl(this); });
+    el.appendChild(btn);
+  });
+}
+
+function setCategory(cat) {
+  currentCat = cat;
+  document.querySelectorAll('.cat-tab').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-cat')===cat);
+  });
+  renderTopics();
+}
+
+// ── LOAD TOPICS ───────────────────────────────────────
+async function loadTopics() {
+  try {
+    var snap = await db.collection('forum_topics').orderBy('lastAt','desc').limit(50).get();
+    allTopics = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+    buildCatTabs(allTopics);
+    renderTopics();
+  } catch(e) {
+    // Нет индекса — без сортировки
+    try {
+      var snap2 = await db.collection('forum_topics').get();
+      allTopics = snap2.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+      allTopics.sort(function(a,b){ return ((b.lastAt&&b.lastAt.seconds)||0)-((a.lastAt&&a.lastAt.seconds)||0); });
+      buildCatTabs(allTopics);
+      renderTopics();
+    } catch(e2) {
+      document.getElementById('topicList').innerHTML =
+        '<div class="empty-state"><div class="empty-state__icon">⚠️</div><p>'+esc(e2.message)+'</p></div>';
+    }
+  }
+}
+
+function renderTopics() {
+  var filtered = currentCat ? allTopics.filter(function(t){ return t.category===currentCat; }) : allTopics;
+  var el = document.getElementById('topicList');
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">💬</div>'+
+      '<div class="empty-state__title">Нет тем</div>'+
+      '<p style="font-size:14px">Будь первым — создай тему!</p></div>';
+    return;
+  }
+  // Закреплённые вверху
+  var pinned = filtered.filter(function(t){ return t.pinned; });
+  var rest   = filtered.filter(function(t){ return !t.pinned; });
+  el.innerHTML = pinned.concat(rest).map(function(t) {
+    var icon = CAT_ICONS[t.category] || '💬';
+    var lastDate = t.lastAt ? shortDate(t.lastAt) : '';
+    return '<div class="topic-item'+(t.pinned?' pinned':'')+'" data-tid="'+t.id+'" onclick="openTopicEl(this)">'+
+      '<div class="topic-item__icon">'+icon+'</div>'+
+      '<div class="topic-item__body">'+
+        '<div class="topic-item__title">'+
+          (t.pinned?'<span class="pin-badge">📌 ЗАКРЕП</span> ':'')+
+          esc(t.title||'')+
+        '</div>'+
+        '<div class="topic-item__meta">'+
+          '<span class="badge badge--gray" style="font-size:11px">'+esc(t.category||'Общее')+'</span>'+
+          '<span>'+esc(t.authorName||'Аноним')+'</span>'+
+          '<span>'+formatDate(t.createdAt)+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="topic-item__stats">'+
+        '<div class="topic-item__count">'+(t.replyCount||0)+'</div>'+
+        '<div class="topic-item__count-lbl">ответов</div>'+
+        (lastDate?'<div class="topic-item__last">последний<br>'+lastDate+'</div>':'')+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function shortDate(ts) {
+  if (!ts) return '';
+  var d = ts.toDate?ts.toDate():new Date(ts);
+  var now = new Date();
+  if (d.toDateString()===now.toDateString()) return d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
+}
+
+// ── OPEN TOPIC ────────────────────────────────────────
+async function openTopic(topicId) {
+  currentTopicId = topicId;
+  history.replaceState({}, '', 'forum.html?topic='+topicId);
+  await loadTopic(topicId);
+  showView('topic');
+}
+
+async function loadTopic(topicId) {
+  currentTopicId = topicId;
+  document.getElementById('postList').innerHTML = '<div class="spinner" style="margin:32px auto"></div>';
+  document.getElementById('replyArea').innerHTML = '';
+
+  try {
+    // Загружаем тему
+    var tSnap = await db.collection('forum_topics').doc(topicId).get();
+    if (!tSnap.exists) { showView('list'); return; }
+    var t = Object.assign({id:tSnap.id}, tSnap.data());
+
+    document.getElementById('topicCat').textContent = (CAT_ICONS[t.category]||'💬')+' '+t.category;
+    document.getElementById('topicTitle').textContent = t.title||'';
+    document.getElementById('topicMeta').innerHTML =
+      'Автор: <strong>'+esc(t.authorName||'')+'</strong> · '+
+      formatDate(t.createdAt)+' · '+
+      '<span style="color:var(--text3)">'+(t.replyCount||0)+' ответов · '+(t.views||0)+' просмотров</span>';
+
+    // Увеличиваем счётчик просмотров
+    db.collection('forum_topics').doc(topicId).update({
+      views: firebase.firestore.FieldValue.increment(1)
+    }).catch(function(){});
+
+    // Загружаем посты
+    var pSnap = await db.collection('forum_topics').doc(topicId).collection('posts')
+      .orderBy('createdAt','asc').get();
+    var posts = pSnap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+
+    // Первый пост — ОП
+    if (posts.length === 0) {
+      posts = [{
+        id:'op', authorUid:t.authorUid, authorName:t.authorName, authorAvatar:t.authorAvatar,
+        authorRole:t.authorRole, body:t.body, createdAt:t.createdAt, isOp:true
+      }];
+    }
+
+    renderPosts(posts);
+
+    // Форма ответа
+    if (pageUser) {
+      document.getElementById('replyArea').innerHTML = buildReplyBox();
+    } else {
+      document.getElementById('replyArea').innerHTML =
+        '<div style="text-align:center;padding:20px;color:var(--text2);font-size:14px">'+
+        '<a href="login.html" style="color:var(--accent)">Войди</a> чтобы ответить</div>';
+    }
+  } catch(e) {
+    document.getElementById('postList').innerHTML =
+      '<div class="empty-state"><div class="empty-state__icon">⚠️</div><p>'+esc(e.message)+'</p></div>';
+  }
+}
+
+function renderPosts(posts) {
+  document.getElementById('postList').innerHTML = posts.map(function(p, i) {
+    var av = p.authorAvatar ||
+      'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(p.authorName||'U');
+    var isOp = p.isOp || i===0;
+    var canDel = pageUser && (pageUser.uid===p.authorUid || (pageUserData&&pageUserData.role==='admin'));
+    return '<div class="post-card'+(isOp?' op':'')+'">'+
+      '<div class="post-card__header">'+
+        '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
+        '<div>'+
+          '<div class="post-card__author">'+esc(p.authorName||'Аноним')+
+            (isOp?'<span style="margin-left:6px;font-size:10px;background:var(--accent);color:#000;padding:1px 5px;border-radius:3px;font-weight:700">ТС</span>':'')+
+          '</div>'+
+          '<div class="post-card__role">'+(p.authorRole?esc(ROLE_LABELS[p.authorRole]||p.authorRole):'')+'</div>'+
+        '</div>'+
+        '<div class="post-card__date">'+formatDate(p.createdAt)+'</div>'+
+      '</div>'+
+      '<div class="post-card__body">'+esc(p.body||'')+'</div>'+
+      '<div class="post-card__footer">'+
+        '<span class="post-num">#'+(i+1)+'</span>'+
+        (canDel && !isOp ? '<button class="btn btn--ghost btn--sm" data-pid="'+p.id+'" onclick="deletePost(this)">Удалить</button>' : '')+
+        '<button class="btn btn--ghost btn--sm" data-author="'+esc((p.authorName||'').replace(/"/g,''))+'" onclick="quoteByEl(this)" style="font-size:12px">💬 Цитата</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function buildReplyBox() {
+  return '<div class="reply-box">'+
+    '<h3>Ответить в теме</h3>'+
+    '<div class="form-group" style="margin-bottom:0">'+
+      '<textarea class="form-textarea" id="replyText" style="min-height:120px" placeholder="Напиши ответ..."></textarea>'+
+    '</div>'+
+    '<div id="replyErr" class="form-error" style="display:none;margin-top:8px"></div>'+
+    '<div style="margin-top:12px;display:flex;gap:10px">'+
+      '<button class="btn btn--primary" onclick="sendReply()">Отправить ответ</button>'+
+      '<span style="font-size:13px;color:var(--text3);align-self:center">Отвечает: <strong>'+esc(pageUserData?pageUserData.name:'')+'</strong></span>'+
+    '</div>'+
+  '</div>';
+}
+
+function quotePost(authorName) {
+  var ta = document.getElementById('replyText');
+  if (!ta) return;
+  ta.value = '[' + authorName + '] написал:\n> ...\n\n' + ta.value;
+  ta.focus();
+  ta.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+// ── CREATE TOPIC ──────────────────────────────────────
+async function createTopic() {
+  if (!pageUser) { showToast('Войди чтобы создать тему','warn'); return; }
+  var title = document.getElementById('newTopicTitle').value.trim();
+  var body  = document.getElementById('newTopicBody').value.trim();
+  var cat   = document.getElementById('newTopicCat').value;
+  var err   = document.getElementById('newTopicErr');
+  err.style.display = 'none';
+  if (!title) { err.textContent='Введи заголовок темы'; err.style.display='block'; return; }
+  if (body.length < 10) { err.textContent='Напиши первое сообщение (минимум 10 символов)'; err.style.display='block'; return; }
+
+  try {
+    var ref = await db.collection('forum_topics').add({
+      title,
+      body,
+      category:    cat,
+      authorUid:   pageUser.uid,
+      authorName:  pageUserData ? pageUserData.name : '',
+      authorAvatar:pageUserData ? (pageUserData.avatar||'') : '',
+      authorRole:  pageUserData ? pageUserData.role : '',
+      replyCount:  0,
+      views:       0,
+      pinned:      false,
+      createdAt:   firebase.firestore.FieldValue.serverTimestamp(),
+      lastAt:      firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('Тема создана!','success');
+    await openTopic(ref.id);
+  } catch(e) {
+    err.textContent = 'Ошибка: '+e.message;
+    err.style.display = 'block';
+  }
+}
+
+// ── SEND REPLY ────────────────────────────────────────
+async function sendReply() {
+  if (!pageUser || !currentTopicId) return;
+  var ta  = document.getElementById('replyText');
+  var err = document.getElementById('replyErr');
+  var body = ta ? ta.value.trim() : '';
+  if (!body) { err.textContent='Напиши сообщение'; err.style.display='block'; return; }
+  err.style.display = 'none';
+  try {
+    await db.collection('forum_topics').doc(currentTopicId).collection('posts').add({
+      body,
+      authorUid:   pageUser.uid,
+      authorName:  pageUserData ? pageUserData.name : '',
+      authorAvatar:pageUserData ? (pageUserData.avatar||'') : '',
+      authorRole:  pageUserData ? pageUserData.role : '',
+      createdAt:   firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await db.collection('forum_topics').doc(currentTopicId).update({
+      replyCount: firebase.firestore.FieldValue.increment(1),
+      lastAt:     firebase.firestore.FieldValue.serverTimestamp(),
+      lastAuthor: pageUserData ? pageUserData.name : ''
+    });
+    ta.value = '';
+    showToast('Ответ опубликован!','success');
+    await loadTopic(currentTopicId);
+  } catch(e) {
+    err.textContent = 'Ошибка: '+e.message;
+    err.style.display = 'block';
+  }
+}
+
+// ── DELETE POST ───────────────────────────────────────
+async function deletePost(btn) {
+  var pid = btn.getAttribute('data-pid');
+  if (!pid || !confirm('Удалить сообщение?')) return;
+  try {
+    await db.collection('forum_topics').doc(currentTopicId).collection('posts').doc(pid).delete();
+    await db.collection('forum_topics').doc(currentTopicId).update({
+      replyCount: firebase.firestore.FieldValue.increment(-1)
+    });
+    showToast('Удалено','success');
+    await loadTopic(currentTopicId);
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+// ── STATS ─────────────────────────────────────────────
+async function loadStats() {
+  try {
+    var [ts, us] = await Promise.all([
+      db.collection('forum_topics').get(),
+      db.collection('users').get()
+    ]);
+    var totalPosts = ts.docs.reduce(function(acc,d){ return acc+(d.data().replyCount||0); }, 0);
+    document.getElementById('statTopics').textContent = ts.size;
+    document.getElementById('statPosts').textContent  = totalPosts + ts.size;
+    document.getElementById('statUsers').textContent  = us.size;
+  } catch(e){}
+}
+
+async function loadHotTopics() {
+  try {
+    var snap = await db.collection('forum_topics').orderBy('replyCount','desc').limit(5).get();
+    var el = document.getElementById('hotTopics');
+    if (snap.empty) { el.innerHTML='<p style="font-size:12px;color:var(--text3)">Нет тем</p>'; return; }
+    el.innerHTML = snap.docs.map(function(d){
+      var t = d.data();
+      return '<div class="hot-topic" data-tid="'+d.id+'" onclick="openTopicEl(this)">'+
+        '<div class="hot-topic__title">'+esc(t.title||'')+'</div>'+
+        '<div class="hot-topic__meta">'+(t.replyCount||0)+' ответов · '+esc(t.category||'')+'</div>'+
+      '</div>';
+    }).join('');
+  } catch(e) {
+    // без индекса — просто берём последние
+    try {
+      var snap2 = await db.collection('forum_topics').limit(5).get();
+      document.getElementById('hotTopics').innerHTML = snap2.docs.map(function(d){
+        var t=d.data();
+        return '<div class="hot-topic" data-tid="'+d.id+'" onclick="openTopicEl(this)">'+
+          '<div class="hot-topic__title">'+esc(t.title||'')+'</div>'+
+          '<div class="hot-topic__meta">'+esc(t.category||'')+'</div></div>';
+      }).join('');
+    } catch(e2){}
+  }
+}
+
+function setCatByEl(btn) {
+  currentCat = btn.getAttribute('data-cat') || '';
+  document.querySelectorAll('.cat-tab').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  renderTopics();
+}
+function openTopicEl(el) { openTopic(el.getAttribute('data-tid')); }
+function quoteByEl(btn) { quotePost(btn.getAttribute('data-author')); }
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>

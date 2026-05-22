@@ -257,9 +257,9 @@ function renderUsers(users) {
         '<span class="badge '+(ROLE_CLASSES[u.role]||'badge--gray')+'">'+esc(ROLE_LABELS[u.role]||u.role||'')+'</span>'+
         '<div class="user-row__actions">'+
           '<a href="member.html?uid='+esc(u.uid||'')+'" class="btn btn--ghost btn--sm">👁</a>'+
-          '<button class="btn btn--outline btn--sm" onclick="openRoleModal(\''+esc(u.uid||'')+'\',\''+esc(u.name||'')+'\',\''+esc(u.role||'')+'\')">Роль</button>'+
-          '<button class="btn btn--ghost btn--sm" onclick="openPwdModal(\''+esc(u.email||'')+'\')">🔑</button>'+
-          '<button class="btn btn--danger btn--sm" onclick="delUser(\''+esc(u.uid||'')+'\',\''+esc(u.name||'')+'\')">✕</button>'+
+          '<button class="btn btn--outline btn--sm" data-action="role" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'" data-role="'+esc(u.role||'')+'">Роль</button>'+
+          '<button class="btn btn--ghost btn--sm" data-action="pwd" data-email="'+esc(u.email||'')+'">🔑</button>'+
+          '<button class="btn btn--danger btn--sm" data-action="delusr" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'">✕</button>'+
         '</div>'+
       '</div>';
     }).join('') + '</div>';
@@ -290,7 +290,7 @@ function renderStartups(list) {
         '<span class="badge badge--green">'+esc(s.stage||'Идея')+'</span>'+
         '<div class="user-row__actions">'+
           '<a href="startup.html?id='+s.id+'" class="btn btn--outline btn--sm" target="_blank">Открыть</a>'+
-          '<button class="btn btn--danger btn--sm" onclick="delStartup(\''+s.id+'\',\''+esc(s.name||'')+'\')">✕</button>'+
+          '<button class="btn btn--danger btn--sm" data-action="delst" data-sid="'+s.id+'" data-name="'+esc(s.name||'')+'">✕</button>'+
         '</div>'+
       '</div>';
     }).join('') + '</div>';
@@ -395,7 +395,8 @@ function removeStage(i) {
 // Icon picker
 function renderIconPicker() {
   document.getElementById('emojiPicker').innerHTML = ICON_OPTS.map(function(e) {
-    return '<button class="ep-btn" onclick="pickIcon(\''+e+'\')" title="'+e+'">'+e+'</button>';
+    var b=document.createElement('button'); b.className='ep-btn'; b.title=e; b.textContent=e;
+    b.setAttribute('data-emoji',e); b.addEventListener('click',function(){pickIcon(this.getAttribute('data-emoji'));}); return b.outerHTML;
   }).join('');
 }
 function openIconPicker(idx) {
@@ -462,6 +463,17 @@ async function delStartup(id, name) {
   showToast('Удалён','success');
   await loadStartupsAdmin(); await loadStats();
 }
+
+// Admin event delegation
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  var a = btn.getAttribute('data-action');
+  if (a==='role')   openRoleModal(btn.getAttribute('data-uid'), btn.getAttribute('data-name'), btn.getAttribute('data-role'));
+  if (a==='pwd')    openPwdModal(btn.getAttribute('data-email'));
+  if (a==='delusr') delUser(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));
+  if (a==='delst')  delStartup(btn.getAttribute('data-sid'), btn.getAttribute('data-name'));
+});
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
