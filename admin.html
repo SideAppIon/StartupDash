@@ -50,6 +50,7 @@
 <body>
 <nav class="nav">
   <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="forum.html">Форум</a>
   <div class="nav__user">
     <a href="dashboard.html" class="btn btn--ghost btn--sm">← Дашборд</a>
     <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=ff4757&name=A"/>
@@ -76,6 +77,7 @@
       <button class="tab-a active" onclick="showTab('users',this)">👥 Пользователи</button>
       <button class="tab-a" onclick="showTab('startups',this)">🚀 Стартапы</button>
       <button class="tab-a" onclick="showTab('settings',this)">⚙️ Настройки</button>
+      <button class="tab-a" onclick="showTab('forum',this)">💬 Форум</button>
     </div>
 
     <!-- USERS -->
@@ -88,6 +90,12 @@
     <div id="tab-startups" style="display:none">
       <input type="text" class="search-bar" id="startupSearch" placeholder="🔍 Поиск стартапов..." oninput="filterStartups()"/>
       <div id="startupsList"><div class="spinner"></div></div>
+    </div>
+
+    <!-- FORUM MOD -->
+    <div id="tab-forum" style="display:none">
+      <input type="text" class="search-bar" id="forumAdminSearch" placeholder="🔍 Поиск тем..." oninput="filterAdminTopics()"/>
+      <div id="adminTopicList"><div class="spinner"></div></div>
     </div>
 
     <!-- SETTINGS -->
@@ -425,6 +433,8 @@ function showTab(name, btn) {
   document.getElementById('tab-users').style.display    = name==='users'    ?'block':'none';
   document.getElementById('tab-startups').style.display = name==='startups' ?'block':'none';
   document.getElementById('tab-settings').style.display = name==='settings' ?'block':'none';
+  document.getElementById('tab-forum').style.display    = name==='forum'    ?'block':'none';
+  if (name==='forum') loadAdminTopics();
 }
 function openRoleModal(uid, name, role) {
   selUid = uid;
@@ -464,11 +474,84 @@ async function delStartup(id, name) {
   await loadStartupsAdmin(); await loadStats();
 }
 
-// Admin event delegation
+// ── FORUM MODERATION ─────────────────────────────────
+var allAdminTopics = [];
+
+async function loadAdminTopics() {
+  try {
+    var snap = await db.collection('forum_topics').orderBy('createdAt','desc').get();
+    allAdminTopics = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+  } catch(e) {
+    var snap2 = await db.collection('forum_topics').get();
+    allAdminTopics = snap2.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+    allAdminTopics.sort(function(a,b){ return ((b.createdAt&&b.createdAt.seconds)||0)-((a.createdAt&&a.createdAt.seconds)||0); });
+  }
+  renderAdminTopics(allAdminTopics);
+}
+
+function filterAdminTopics() {
+  var q = document.getElementById('forumAdminSearch').value.toLowerCase();
+  renderAdminTopics(q ? allAdminTopics.filter(function(t){
+    return (t.title||'').toLowerCase().includes(q)||(t.authorName||'').toLowerCase().includes(q);
+  }) : allAdminTopics);
+}
+
+function renderAdminTopics(topics) {
+  var el = document.getElementById('adminTopicList');
+  if (!topics.length) { el.innerHTML='<p style="color:var(--text2);font-size:14px">Нет тем</p>'; return; }
+  el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' +
+    topics.map(function(t) {
+      var CAT_ICONS = {'Общее':'💬','Стартапы':'🚀','Поиск команды':'👥','Инвестиции':'💰','Технологии':'🔬','Маркетинг':'📣','Вопросы':'❓'};
+      var icon = CAT_ICONS[t.category]||'💬';
+      var hidden = t.hidden ? ' style="opacity:.5"' : '';
+      return '<div class="user-row"'+hidden+'>'+
+        '<span style="font-size:20px">'+icon+'</span>'+
+        '<div class="user-row__info">'+
+          '<div class="user-row__name">'+esc(t.title||'')+(t.pinned?' 📌':'')+(t.hidden?' 🚫':'')+
+          ' <span style="font-size:12px;color:var(--text3)">('+( t.replyCount||0)+' отв.)</span></div>'+
+          '<div class="user-row__email">'+esc(t.authorName||'?')+' · '+esc(t.category||'')+' · '+formatDate(t.createdAt)+'</div>'+
+        '</div>'+
+        '<div class="user-row__actions">'+
+          '<a href="forum.html?topic='+t.id+'" class="btn btn--ghost btn--sm" target="_blank">👁</a>'+
+          '<button class="btn btn--outline btn--sm" data-action="pintopic" data-tid="'+t.id+'" data-pinned="'+(t.pinned?'1':'0')+'">'+(t.pinned?'📌 Откреп':'📌 Закреп')+'</button>'+
+          '<button class="btn btn--outline btn--sm" data-action="hidetopic" data-tid="'+t.id+'" data-hidden="'+(t.hidden?'1':'0')+'">'+(t.hidden?'👁 Показать':'🚫 Скрыть')+'</button>'+
+          '<button class="btn btn--danger btn--sm" data-action="deltopic" data-tid="'+t.id+'" data-name="'+esc(t.title||'')+'">✕ Удалить</button>'+
+        '</div>'+
+      '</div>';
+    }).join('') + '</div>';
+}
+
+function formatDate(ts) {
+  if (!ts) return '';
+  var d = ts.toDate?ts.toDate():new Date(ts);
+  return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'});
+}
+
+async function pinTopic(tid, currentlyPinned) {
+  await db.collection('forum_topics').doc(tid).update({ pinned: !currentlyPinned });
+  showToast(!currentlyPinned?'Тема закреплена':'Тема откреплена','success');
+  loadAdminTopics();
+}
+async function hideTopic(tid, currentlyHidden) {
+  await db.collection('forum_topics').doc(tid).update({ hidden: !currentlyHidden });
+  showToast(!currentlyHidden?'Тема скрыта':'Тема видна','success');
+  loadAdminTopics();
+}
+async function delTopic(tid, name) {
+  if (!confirm('Удалить тему «'+name+'»?')) return;
+  await db.collection('forum_topics').doc(tid).delete();
+  showToast('Тема удалена','success');
+  loadAdminTopics();
+}
+
+// Обновляем event delegation
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('[data-action]');
   if (!btn) return;
   var a = btn.getAttribute('data-action');
+  if (a==='pintopic')  pinTopic(btn.getAttribute('data-tid'),  btn.getAttribute('data-pinned')==='1');
+  if (a==='hidetopic') hideTopic(btn.getAttribute('data-tid'), btn.getAttribute('data-hidden')==='1');
+  if (a==='deltopic')  delTopic(btn.getAttribute('data-tid'),  btn.getAttribute('data-name'));
   if (a==='role')   openRoleModal(btn.getAttribute('data-uid'), btn.getAttribute('data-name'), btn.getAttribute('data-role'));
   if (a==='pwd')    openPwdModal(btn.getAttribute('data-email'));
   if (a==='delusr') delUser(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));

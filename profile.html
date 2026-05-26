@@ -28,10 +28,11 @@
 <body>
 <nav class="nav">
   <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="forum.html">Форум</a>
   <div class="nav__user">
     <a href="dashboard.html" class="btn btn--ghost btn--sm">← Дашборд</a>
     <span class="nav__role" id="navRole"></span>
-    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="window.location.href='profile.html'"/>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="goProfile()"/>
     <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
   </div>
 </nav>

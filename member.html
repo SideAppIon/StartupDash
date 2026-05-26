@@ -141,7 +141,7 @@ onAuthReady(async function(user, userData) {
       'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(userData.name||'U');
     navUser.innerHTML =
       '<span class="nav__role nav__role--'+userData.role+'">' + (ROLE_LABELS[userData.role]||userData.role) + '</span>' +
-      '<img class="nav__avatar" src="'+esc(av)+'" onclick="window.location.href='profile.html'"/>' +
+      '<img class="nav__avatar" src="'+esc(av)+'" onclick="goProfile()"/>' +
       '<a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>';
   }
 
@@ -246,7 +246,7 @@ function renderActions(user, userData, alreadyInvited) {
   }
   var btns = '';
   // Написать сообщение
-  btns += '<button class="btn btn--outline btn--sm" onclick="window.location.href=&quot;messages.html?to=' + profileUid + '&quot;">💬 Написать</button>';
+  btns += '<button class="btn btn--outline btn--sm" data-href="messages.html?to=' + profileUid + '" onclick="window.location.href=this.getAttribute(\"data-href\")">💬 Написать</button>';
   // Пригласить в команду (только стартаперы, и только если ещё не приглашён)
   if (userData && userData.role === 'startup') {
     if (alreadyInvited) {

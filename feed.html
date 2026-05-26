@@ -97,6 +97,7 @@
 <nav class="nav">
   <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
   <a href="startups.html">Стартапы</a>
+  <a href="forum.html">Форум</a>
   <a href="feed.html" class="active">Лента</a>
   <a href="members.html">Участники</a>
   <div class="nav__user" id="navUser">
@@ -169,7 +170,7 @@ onAuthReady(async function(user, userData) {
       'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(userData.name||'U');
     navUser.innerHTML =
       '<span class="nav__role nav__role--'+userData.role+'">' + (ROLE_LABELS[userData.role]||userData.role) + '</span>' +
-      '<img class="nav__avatar" src="'+esc(av)+'" onclick="window.location.href='profile.html'"/>' +
+      '<img class="nav__avatar" src="'+esc(av)+'" onclick="goProfile()"/>' +
       '<a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>';
   }
 

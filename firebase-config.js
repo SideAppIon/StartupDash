@@ -177,3 +177,5 @@ function fillFilterSelect(selectId, type, selectedVal) {
       }).join('');
   });
 }
+
+function goProfile() { window.location.href = 'profile.html'; }

@@ -90,6 +90,10 @@
 
       <div class="forum-layout">
         <div>
+          <!-- Поиск -->
+          <div style="display:flex;gap:10px;margin-bottom:16px">
+            <input type="text" class="search-bar" id="forumSearch" placeholder="🔍 Поиск по темам..." oninput="searchForum(this.value)" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:14px;padding:9px 14px;outline:none;flex:1;transition:border-color .2s"/>
+          </div>
           <!-- Категории -->
           <div class="cat-tabs" id="catTabs">
             <button class="cat-tab active" onclick="setCategory('',this)">Все темы</button>
@@ -192,7 +196,7 @@ onAuthReady(async function(user, userData) {
       'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(userData.name||'U');
     navUser.innerHTML =
       '<span class="nav__role nav__role--'+userData.role+'">'+(ROLE_LABELS[userData.role]||userData.role)+'</span>'+
-      '<img class="nav__avatar" src="'+esc(av)+'" onclick="window.location.href=&quot;profile.html&quot;"/>'+
+      '<img class="nav__avatar" src="'+esc(av)+'" data-href="profile.html" onclick="window.location.href=this.getAttribute(\"data-href\")"/>'+
       '<a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>';
     document.getElementById('newTopicBtn').style.display = '';
   }
@@ -257,7 +261,9 @@ async function loadTopics() {
   try {
     var snap = await db.collection('forum_topics').orderBy('lastAt','desc').limit(50).get();
     allTopics = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
-    buildCatTabs(allTopics);
+    // Строим табы только из видимых тем
+    var visibleForTabs = allTopics.filter(function(t){ return !(t.hidden) || (pageUserData && pageUserData.role==='admin'); });
+    buildCatTabs(visibleForTabs);
     renderTopics();
   } catch(e) {
     // Нет индекса — без сортировки
@@ -275,7 +281,10 @@ async function loadTopics() {
 }
 
 function renderTopics() {
-  var filtered = currentCat ? allTopics.filter(function(t){ return t.category===currentCat; }) : allTopics;
+  // Скрываем hidden темы для не-администраторов
+  var isAdmin = pageUserData && pageUserData.role === 'admin';
+  var visible = allTopics.filter(function(t){ return isAdmin || !t.hidden; });
+  var filtered = currentCat ? visible.filter(function(t){ return t.category===currentCat; }) : visible;
   var el = document.getElementById('topicList');
   if (!filtered.length) {
     el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">💬</div>'+
@@ -337,6 +346,15 @@ async function loadTopic(topicId) {
     var tSnap = await db.collection('forum_topics').doc(topicId).get();
     if (!tSnap.exists) { showView('list'); return; }
     var t = Object.assign({id:tSnap.id}, tSnap.data());
+    // Скрытая тема — только для admin
+    if (t.hidden && !(pageUserData && pageUserData.role==='admin')) {
+      document.getElementById('postList').innerHTML =
+        '<div class="empty-state"><div class="empty-state__icon">🚫</div>'+
+        '<div class="empty-state__title">Тема скрыта</div>'+
+        '<p style="font-size:14px">Эта тема недоступна</p></div>';
+      document.getElementById('replyArea').innerHTML = '';
+      return;
+    }
 
     document.getElementById('topicCat').textContent = (CAT_ICONS[t.category]||'💬')+' '+t.category;
     document.getElementById('topicTitle').textContent = t.title||'';
@@ -555,6 +573,43 @@ function setCatByEl(btn) {
 }
 function openTopicEl(el) { openTopic(el.getAttribute('data-tid')); }
 function quoteByEl(btn) { quotePost(btn.getAttribute('data-author')); }
+
+function searchForum(q) {
+  q = (q||'').toLowerCase().trim();
+  if (!q) { renderTopics(); return; }
+  var filtered = allTopics.filter(function(t){
+    return (t.title||'').toLowerCase().includes(q) ||
+           (t.body||'').toLowerCase().includes(q) ||
+           (t.authorName||'').toLowerCase().includes(q) ||
+           (t.category||'').toLowerCase().includes(q);
+  });
+  var el = document.getElementById('topicList');
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🔍</div><div class="empty-state__title">Ничего не найдено</div><p style="font-size:14px">По запросу «'+esc(q)+'» тем не найдено</p></div>';
+    return;
+  }
+  // Рендерим найденные темы
+  var saved = currentCat;
+  el.innerHTML = filtered.map(function(t) {
+    var icon = CAT_ICONS[t.category] || '💬';
+    var lastDate = t.lastAt ? shortDate(t.lastAt) : '';
+    var titleHl = (t.title||'').replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'), '<mark style="background:var(--accent-dim);color:var(--accent);border-radius:2px">$1</mark>');
+    return '<div class="topic-item" data-tid="'+t.id+'" onclick="openTopicEl(this)">'+
+      '<div class="topic-item__icon">'+icon+'</div>'+
+      '<div class="topic-item__body">'+
+        '<div class="topic-item__title">'+titleHl+'</div>'+
+        '<div class="topic-item__meta">'+
+          '<span class="badge badge--gray" style="font-size:11px">'+esc(t.category||'Общее')+'</span>'+
+          '<span>'+esc(t.authorName||'')+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="topic-item__stats">'+
+        '<div class="topic-item__count">'+(t.replyCount||0)+'</div>'+
+        '<div class="topic-item__count-lbl">ответов</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
