@@ -123,8 +123,6 @@ var editRoleCtx = null; // {startupId, uid, inviteId, currentRole}
 onAuthReady(async function(user, userData) {
   if (!user) return;
   renderNav(userData);
-
-  // Специалисты (user) не могут создавать стартапы
   if (userData && userData.role === 'user') {
     var cb = document.getElementById('createStartupBtn');
     if (cb) cb.style.display = 'none';

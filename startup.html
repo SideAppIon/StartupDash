@@ -27,6 +27,17 @@
     .vac-card__title{font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:6px}
     .vac-card__desc{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:12px;white-space:pre-wrap}
     .vac-card__footer{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .perms-panel{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+    .perms-panel__title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px}
+    .perm-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+    .perm-row:last-child{border-bottom:none}
+    .perm-row__label{font-size:13px}
+    .perm-toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+    .perm-toggle input{opacity:0;width:0;height:0}
+    .perm-toggle__slider{position:absolute;inset:0;background:var(--border2);border-radius:20px;cursor:pointer;transition:.2s}
+    .perm-toggle__slider:before{content:'';position:absolute;width:14px;height:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
+    .perm-toggle input:checked+.perm-toggle__slider{background:var(--accent)}
+    .perm-toggle input:checked+.perm-toggle__slider:before{transform:translateX(16px)}
 
 </style>
 </head>
@@ -75,7 +86,7 @@
             <button class="tab active" onclick="switchTab(0,this)">О проекте</button>
             <button class="tab" onclick="switchTab(1,this)">Обновления</button>
             <button class="tab" onclick="switchTab(2,this)">Команда</button>
-            <button class="tab" onclick="switchTab(3,this)" id="vacTab">Вакансии</button>
+            <button class="tab" onclick="switchTab(3,this)">Вакансии</button>
           </div>
 
           <!-- О проекте -->
@@ -171,7 +182,7 @@
   </div>
 </div>
 
-<!-- Vacancy Modal -->
+<!-- Vacancy Create Modal -->
 <div class="modal-overlay" id="vacModal">
   <div class="modal" style="max-width:500px">
     <div class="modal__header">
@@ -192,6 +203,29 @@
     </div>
     <div id="vacErr" class="form-error" style="display:none;margin-top:10px"></div>
     <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="saveVacancy()">Опубликовать</button>
+  </div>
+</div>
+
+<!-- Vacancy Apply Modal -->
+<div class="modal-overlay" id="vacApplyModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal__header">
+      <div class="modal__title">Отклик на вакансию</div>
+      <button class="modal__close" onclick="document.getElementById('vacApplyModal').classList.remove('open')">×</button>
+    </div>
+    <input type="hidden" id="vacApplyVid"/>
+    <div class="form-group">
+      <label class="form-label">Позиция</label>
+      <input type="text" class="form-input" id="vacApplyRole" readonly style="color:var(--accent);font-weight:600"/>
+      <div class="form-hint">Позиция заполнена автоматически из вакансии</div>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Сопроводительное письмо *</label>
+      <textarea class="form-textarea" id="vacApplyMsg" style="min-height:140px"
+        placeholder="Расскажи о себе, своём опыте и почему хочешь присоединиться к этому проекту..."></textarea>
+    </div>
+    <div id="vacApplyErr" class="form-error" style="display:none;margin-top:10px"></div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="sendVacApply()">Отправить заявку</button>
   </div>
 </div>
 
@@ -303,15 +337,29 @@ onAuthReady(async function(user, userData) {
     // Проверка приватности
     var privacy   = startupData.privacy || 'public';
     var isTeamMember = false;
+    var memberPerms  = {};  // разрешения текущего участника команды
     if (user) {
-      // Проверяем принят ли в команду
+      // Проверяем принят ли в команду (через team subcollection или accepted invite)
       try {
-        var myInvSnap = await db.collection('invites')
-          .where('fromUid','==', user.uid)
-          .where('startupId','==', startupId)
-          .where('status','==','accepted').get();
-        isTeamMember = !myInvSnap.empty;
+        var myTeamSnap = await db.collection('startups').doc(startupId)
+          .collection('team').where('uid','==',user.uid).get();
+        if (!myTeamSnap.empty) {
+          isTeamMember = true;
+          memberPerms  = myTeamSnap.docs[0].data().permissions || {};
+        }
       } catch(e) {}
+      if (!isTeamMember) {
+        try {
+          var myInvSnap = await db.collection('invites')
+            .where('fromUid','==', user.uid)
+            .where('startupId','==', startupId)
+            .where('status','==','accepted').get();
+          if (!myInvSnap.empty) {
+            isTeamMember = true;
+            memberPerms  = myInvSnap.docs[0].data().permissions || {};
+          }
+        } catch(e) {}
+      }
     }
     var isOwnerOrAdmin = user && (user.uid === startupData.ownerUid || (userData && userData.role === 'admin'));
     var hasFullAccess  = isOwnerOrAdmin || isTeamMember;
@@ -340,15 +388,15 @@ onAuthReady(async function(user, userData) {
         }
       } catch(e) { /* игнорируем */ }
     }
-    renderActions(user, userData, userInviteStatus);
+    renderActions(user, userData, userInviteStatus, isTeamMember, memberPerms);
 
     // Основатель
     await loadOwner();
 
-    // Обновления и команда
+    // Обновления, команда, вакансии
     await loadUpdates();
-    await loadTeam();
-    await loadVacancies();
+    await loadTeam(isOwnerOrAdmin, isTeamMember, memberPerms);
+    await loadVacancies(isOwnerOrAdmin, isTeamMember);
 
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('pageContent').style.display  = 'block';
@@ -363,11 +411,12 @@ onAuthReady(async function(user, userData) {
 });
 
 // ── ACTIONS ───────────────────────────────────────────
-function renderActions(user, userData, inviteStatus) {
+function renderActions(user, userData, inviteStatus, isTeamMember, memberPerms) {
   var el      = document.getElementById('actionBtns');
   var isOwner = user && startupData && user.uid === startupData.ownerUid;
   var isAdmin = userData && userData.role === 'admin';
   var role    = userData && userData.role;
+  memberPerms = memberPerms || {};
 
   if (isOwner || isAdmin) {
     el.innerHTML =
@@ -377,6 +426,16 @@ function renderActions(user, userData, inviteStatus) {
     document.getElementById('ownerUpdateBtn').style.display = 'block';
     document.getElementById('addUpdateLink').href = 'update-startup.html?id=' + startupId;
 
+  } else if (isTeamMember) {
+    // Участник команды — показываем кнопки по разрешениям
+    var btns = [];
+    // Kanban всегда доступен для чтения; редактирование — только с разрешением
+    btns.push('<a href="roadmap.html?id=' + startupId + '" class="btn btn--outline btn--sm">🗺 Roadmap</a>');
+    if (memberPerms.updates) {
+      btns.push('<a href="update-startup.html?id=' + startupId + '" class="btn btn--primary btn--sm">+ Обновление</a>');
+    }
+    el.innerHTML = btns.join('');
+
   } else if (role === 'investor') {
     el.innerHTML =
       '<a href="roadmap.html?id=' + startupId + '" class="btn btn--ghost btn--sm">🗺 Roadmap</a>' +
@@ -384,7 +443,9 @@ function renderActions(user, userData, inviteStatus) {
 
   } else if (role === 'user') {
     if (inviteStatus === 'accepted') {
-      el.innerHTML = '<span class="badge badge--green" style="padding:8px 16px;font-size:13px">✅ Ты в команде</span>';
+      el.innerHTML =
+        '<a href="roadmap.html?id=' + startupId + '" class="btn btn--outline btn--sm">🗺 Roadmap</a>' +
+        '<span class="badge badge--green" style="padding:8px 16px;font-size:13px">✅ Ты в команде</span>';
     } else if (inviteStatus === 'pending') {
       el.innerHTML = '<span class="badge badge--gray" style="padding:8px 16px;font-size:13px">⏳ Заявка на рассмотрении</span>';
     } else if (inviteStatus === 'rejected') {
@@ -452,7 +513,7 @@ async function loadUpdates() {
 }
 
 // ── TEAM ──────────────────────────────────────────────
-async function loadTeam() {
+async function loadTeam(isOwnerOrAdmin, isTeamMember, memberPerms) {
   var el = document.getElementById('teamList');
   try {
     var members = [];
@@ -467,20 +528,23 @@ async function loadTeam() {
 
     // Участники из коллекции team
     var teamSnap = await db.collection('startups').doc(startupId).collection('team').get();
+    // Собираем данные команды для панели разрешений
+    var teamDocs = {}; // uid -> docId
     var teamUids = [];
     for (var i = 0; i < teamSnap.docs.length; i++) {
       var t = teamSnap.docs[i].data();
       if (!t.uid) continue;
       teamUids.push(t.uid);
+      teamDocs[t.uid] = { docId: teamSnap.docs[i].id, permissions: t.permissions || {}, role: t.role || 'Участник', src: 'team' };
       try {
         var uSnap = await db.collection('users').doc(t.uid).get();
         if (uSnap.exists) {
-          members.push(Object.assign({ _teamRole: t.role || 'Участник' }, uSnap.data()));
+          members.push(Object.assign({ _teamRole: t.role || 'Участник', _teamDocId: teamSnap.docs[i].id, _src: 'team', _perms: t.permissions || {} }, uSnap.data()));
         }
-      } catch(e) { /* пропускаем */ }
+      } catch(e) {}
     }
 
-    // Также показываем принятые invites (accepted) если ещё не в team
+    // Участники через accepted invites
     try {
       var accSnap = await db.collection('invites')
         .where('startupId','==', startupId)
@@ -489,34 +553,41 @@ async function loadTeam() {
         var inv = accSnap.docs[j].data();
         if (!inv.fromUid || inv.fromUid === startupData.ownerUid) continue;
         if (teamUids.indexOf(inv.fromUid) !== -1) continue;
-        // Определяем роль из applications или поля role
         var invRole = 'Участник';
         if (inv.applications && inv.applications.length && inv.applications[0].role) {
           invRole = inv.applications[0].role;
-        } else if (inv.role) {
-          invRole = inv.role;
-        }
+        } else if (inv.role) { invRole = inv.role; }
+        teamDocs[inv.fromUid] = { docId: accSnap.docs[j].id, permissions: inv.permissions || {}, role: invRole, src: 'invite' };
         try {
           var iUsnap = await db.collection('users').doc(inv.fromUid).get();
           if (iUsnap.exists) {
-            members.push(Object.assign({ _teamRole: invRole }, iUsnap.data()));
+            members.push(Object.assign({ _teamRole: invRole, _teamDocId: accSnap.docs[j].id, _src: 'invite', _perms: inv.permissions || {} }, iUsnap.data()));
           }
-        } catch(e) { /* пропускаем */ }
+        } catch(e) {}
       }
-    } catch(e) { /* invites недоступны */ }
+    } catch(e) {}
 
-    el.innerHTML = '<div class="card">' +
+    // Список команды
+    var membersHtml = '<div class="card">' +
       members.map(function(m) {
         var av = m.avatar ||
           'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(m.name||'U');
-        // Используем pageUser — НЕ user из замыкания
         var isMe = pageUser && m.uid === pageUser.uid;
         var removeBtn = '';
         var editRoleBtn = '';
         if (!m._isOwner && pageUser && startupData &&
             (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'))) {
-          removeBtn = '<button class="btn btn--danger btn--sm" onclick="removeFromTeam(this)" data-uid="' + esc(m.uid||'') + '" data-name="' + esc(m.name||'') + '">✕</button>';
+          removeBtn  = '<button class="btn btn--danger btn--sm" onclick="removeFromTeam(this)" data-uid="' + esc(m.uid||'') + '" data-name="' + esc(m.name||'') + '">✕</button>';
           editRoleBtn = '<button class="btn btn--ghost btn--sm" onclick="editMemberRole(this)" data-uid="' + esc(m.uid||'') + '" data-name="' + esc(m.name||'') + '" data-role="' + esc(m._teamRole||'Участник') + '" title="Изменить должность">✏️</button>';
+        }
+        // Значки разрешений для владельца
+        var permsBadges = '';
+        if ((isOwnerOrAdmin) && !m._isOwner && m._perms) {
+          var pp = [];
+          if (m._perms.updates) pp.push('<span title="Может публиковать обновления" class="badge badge--green" style="font-size:10px;padding:2px 6px">📢</span>');
+          if (m._perms.kanban)  pp.push('<span title="Может редактировать Roadmap" class="badge badge--blue" style="font-size:10px;padding:2px 6px">🗺</span>');
+          if (m._perms.team)    pp.push('<span title="Может управлять командой" class="badge badge--purple" style="font-size:10px;padding:2px 6px">👥</span>');
+          if (pp.length) permsBadges = '<div style="display:flex;gap:3px;margin-top:3px">' + pp.join('') + '</div>';
         }
         return '<div class="team-member">' +
           '<a href="member.html?uid=' + esc(m.uid||'') + '" style="display:contents">' +
@@ -525,11 +596,45 @@ async function loadTeam() {
           '<div style="flex:1">' +
             '<div style="font-size:14px;font-weight:500">' + esc(m.name||'—') + (isMe?' <span style="font-size:11px;color:var(--text3)">(вы)</span>':'') + '</div>' +
             '<div style="font-size:12px;color:var(--text2)">' + esc(m._teamRole||'') + '</div>' +
+            permsBadges +
           '</div>' +
-          (m._isOwner ? '<span style="font-size:16px">👑</span>' : '<div style="display:flex;gap:4px">'+editRoleBtn+removeBtn+'</div>') +
+          (m._isOwner ? '<span style="font-size:16px">👑</span>' : '<div style="display:flex;gap:4px">' + editRoleBtn + removeBtn + '</div>') +
         '</div>';
       }).join('') +
     '</div>';
+
+    // Панель управления разрешениями — только для владельца/админа
+    var permsHtml = '';
+    if (isOwnerOrAdmin && members.length > 1) {
+      var nonOwners = members.filter(function(m){ return !m._isOwner; });
+      permsHtml = '<div class="perms-panel" style="margin-top:20px">' +
+        '<div class="perms-panel__title">🔑 Разрешения участников</div>' +
+        nonOwners.map(function(m) {
+          var td = teamDocs[m.uid] || {};
+          var p  = td.permissions || {};
+          var mid = esc(m.uid||'');
+          var msrc = esc(td.src||'invite');
+          var mdid = esc(td.docId||'');
+          return '<div style="margin-bottom:12px;padding:12px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">' +
+            '<div style="font-size:13px;font-weight:600;margin-bottom:8px">' + esc(m.name||'—') + ' <span style="color:var(--text3);font-weight:400">· ' + esc(m._teamRole||'') + '</span></div>' +
+            '<div class="perm-row">' +
+              '<span class="perm-row__label">📢 Публикация обновлений</span>' +
+              '<label class="perm-toggle"><input type="checkbox" ' + (p.updates?'checked':'') + ' onchange="savePerm(\''+mid+'\',\''+msrc+'\',\''+mdid+'\',\'updates\',this.checked)"><span class="perm-toggle__slider"></span></label>' +
+            '</div>' +
+            '<div class="perm-row">' +
+              '<span class="perm-row__label">🗺 Редактирование Roadmap</span>' +
+              '<label class="perm-toggle"><input type="checkbox" ' + (p.kanban?'checked':'') + ' onchange="savePerm(\''+mid+'\',\''+msrc+'\',\''+mdid+'\',\'kanban\',this.checked)"><span class="perm-toggle__slider"></span></label>' +
+            '</div>' +
+            '<div class="perm-row">' +
+              '<span class="perm-row__label">👥 Управление командой</span>' +
+              '<label class="perm-toggle"><input type="checkbox" ' + (p.team?'checked':'') + ' onchange="savePerm(\''+mid+'\',\''+msrc+'\',\''+mdid+'\',\'team\',this.checked)"><span class="perm-toggle__slider"></span></label>' +
+            '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }
+
+    el.innerHTML = membersHtml + permsHtml;
 
   } catch(e) {
     el.innerHTML = '<p style="color:var(--text3);font-size:14px;padding:20px 0">' + esc(e.message) + '</p>';
@@ -698,7 +803,8 @@ async function editMemberRole(btn) {
       }
     }
     showToast('Должность обновлена: ' + newRole, 'success');
-    await loadTeam(); // перезагружаем команду
+    var _isOA = pageUser && startupData && (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'));
+    await loadTeam(_isOA, false, {});
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }
 
@@ -723,22 +829,33 @@ async function removeFromTeam(btn) {
       await invSnap.docs[j].ref.update({ status: 'removed' });
     }
     showToast(name + ' удалён из команды', 'success');
-    await loadTeam();
+    var _isOA = pageUser && startupData && (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'));
+    await loadTeam(_isOA, false, {});
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
+}
+
+// ── SAVE PERMISSION ──────────────────────────────────
+async function savePerm(uid, src, docId, permKey, value) {
+  try {
+    var update = {};
+    update['permissions.' + permKey] = value;
+    if (src === 'team') {
+      await db.collection('startups').doc(startupId).collection('team').doc(docId).update(update);
+    } else {
+      await db.collection('invites').doc(docId).update(update);
+    }
+    showToast('Разрешение обновлено', 'success');
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }
 
 // ── VACANCIES ─────────────────────────────────────────
-async function loadVacancies() {
-  var el = document.getElementById('vacList');
+async function loadVacancies(isOwnerOrAdmin, isTeamMember) {
+  var el    = document.getElementById('vacList');
   var actEl = document.getElementById('vacOwnerActions');
-  var isOwnerOrAdmin2 = pageUser && (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'));
-
-  // Кнопка добавить вакансию — только владелец/админ
-  if (isOwnerOrAdmin2) {
+  if (isOwnerOrAdmin) {
     actEl.style.display = '';
     actEl.innerHTML = '<button class="btn btn--primary btn--sm" onclick="openVacModal()">+ Добавить вакансию</button>';
   }
-
   try {
     var snap = await db.collection('startups').doc(startupId).collection('vacancies')
       .orderBy('createdAt','desc').get();
@@ -748,39 +865,42 @@ async function loadVacancies() {
         '<p style="font-size:14px;color:var(--text2)">Основатель ещё не опубликовал открытые позиции</p></div>';
       return;
     }
-
     el.innerHTML = snap.docs.map(function(d) {
       var v = d.data();
-      var isOwner2 = pageUser && (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'));
-      // Проверяем подавал ли текущий пользователь заявку
       var hasApplied = pageUser && safeArray(v.applicants).indexOf(pageUser.uid) !== -1;
-
       var applyBtn = '';
-      if (pageUser && !isOwner2) {
+      if (pageUser && !isOwnerOrAdmin) {
         if (hasApplied) {
           applyBtn = '<span class="badge badge--green">✓ Заявка подана</span>';
         } else if (pageUserData && pageUserData.role === 'user') {
-          applyBtn = '<button class="btn btn--primary btn--sm" data-vid="'+d.id+'" onclick="applyVacancy(this)">Откликнуться</button>';
+          applyBtn = '<button class="btn btn--primary btn--sm" data-vid="'+d.id+'" data-vtitle="'+esc(v.title||'')+'" onclick="openVacApplyModal(this)">Откликнуться</button>';
         }
       }
-      var delBtn = isOwner2 ? '<button class="btn btn--danger btn--sm" data-vid="'+d.id+'" onclick="deleteVacancy(this)">Удалить</button>' : '';
-      var appCount = isOwner2 ? '<a href="members.html" class="badge badge--gray" style="cursor:pointer">👥 Откликнулись: '+safeArray(v.applicants).length+'</a>' : '';
-
+      var appCount = isOwnerOrAdmin
+        ? '<span class="badge badge--gray" style="cursor:default">👥 Откликнулись: ' + safeArray(v.applicants).length + '</span>'
+        : '';
+      var delBtn = isOwnerOrAdmin
+        ? '<button class="btn btn--danger btn--sm" data-vid="'+d.id+'" onclick="deleteVacancy(this)">Удалить</button>'
+        : '';
       return '<div class="vac-card">' +
-        '<div class="vac-card__title">'+esc(v.title||'')+'</div>' +
-        (v.tags ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+
-          safeArray(v.tags).map(function(t){return '<span class="badge badge--gray">'+esc(t)+'</span>';}).join('')+
+        '<div class="vac-card__title">' + esc(v.title||'') + '</div>' +
+        (safeArray(v.tags).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">' +
+          safeArray(v.tags).map(function(t){return '<span class="badge badge--gray">'+esc(t)+'</span>';}).join('') +
         '</div>' : '') +
-        '<div class="vac-card__desc">'+esc(v.description||'')+'</div>' +
-        '<div class="vac-card__footer">'+applyBtn+appCount+delBtn+'</div>' +
+        '<div class="vac-card__desc">' + esc(v.description||'') + '</div>' +
+        '<div class="vac-card__footer">' + applyBtn + appCount + delBtn + '</div>' +
       '</div>';
     }).join('');
   } catch(e) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div><p>'+esc(e.message)+'</p></div>';
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div><p>' + esc(e.message) + '</p></div>';
   }
 }
 
 function openVacModal() {
+  document.getElementById('vacTitle').value = '';
+  document.getElementById('vacDesc').value  = '';
+  document.getElementById('vacTags').value  = '';
+  document.getElementById('vacErr').style.display = 'none';
   document.getElementById('vacModal').classList.add('open');
 }
 
@@ -795,33 +915,75 @@ async function saveVacancy() {
   var tags = tagsVal ? tagsVal.split(',').map(function(t){return t.trim();}).filter(Boolean) : [];
   try {
     await db.collection('startups').doc(startupId).collection('vacancies').add({
-      title: title,
-      description: desc,
-      tags: tags,
-      applicants: [],
-      authorUid: pageUser.uid,
+      title: title, description: desc, tags: tags,
+      applicants: [], authorUid: pageUser.uid,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     document.getElementById('vacModal').classList.remove('open');
-    document.getElementById('vacTitle').value = '';
-    document.getElementById('vacDesc').value  = '';
-    document.getElementById('vacTags').value  = '';
-    showToast('Вакансия добавлена!','success');
-    await loadVacancies();
+    showToast('Вакансия добавлена!', 'success');
+    await loadVacancies(true, false);
   } catch(e) { err.textContent='Ошибка: '+e.message; err.style.display='block'; }
 }
 
-async function applyVacancy(btn) {
-  if (!pageUser) { showToast('Войди чтобы откликнуться','warn'); return; }
-  var vid = btn.getAttribute('data-vid');
-  btn.disabled = true; btn.textContent = 'Отправка...';
+// Отклик на вакансию — открываем модал с письмом
+function openVacApplyModal(btn) {
+  if (!pageUser) { window.location.href = 'login.html'; return; }
+  var vid    = btn.getAttribute('data-vid');
+  var vtitle = btn.getAttribute('data-vtitle');
+  document.getElementById('vacApplyVid').value   = vid;
+  document.getElementById('vacApplyRole').value  = vtitle; // позиция уже заполнена
+  document.getElementById('vacApplyMsg').value   = '';
+  document.getElementById('vacApplyErr').style.display = 'none';
+  document.getElementById('vacApplyModal').classList.add('open');
+}
+
+async function sendVacApply() {
+  var vid   = document.getElementById('vacApplyVid').value;
+  var role  = document.getElementById('vacApplyRole').value.trim();
+  var msg   = document.getElementById('vacApplyMsg').value.trim();
+  var err   = document.getElementById('vacApplyErr');
+  err.style.display = 'none';
+  if (!msg) { err.textContent='Напиши сопроводительное письмо'; err.style.display='block'; return; }
+
+  // Проверяем дубль заявки
   try {
+    var existing = await db.collection('invites')
+      .where('fromUid','==', pageUser.uid)
+      .where('startupId','==', startupId).get();
+    var alreadyApplied = existing.docs.some(function(d){
+      var s = d.data().status; return s === 'pending' || s === 'accepted';
+    });
+    if (alreadyApplied) {
+      showToast('Ты уже подавал заявку в этот стартап', 'warn');
+      document.getElementById('vacApplyModal').classList.remove('open'); return;
+    }
+  } catch(e) {}
+
+  try {
+    // Добавляем uid в список откликнувшихся на вакансию
     await db.collection('startups').doc(startupId).collection('vacancies').doc(vid).update({
       applicants: firebase.firestore.FieldValue.arrayUnion(pageUser.uid)
     });
-    showToast('Заявка отправлена! Основатель увидит твой профиль.','success');
-    await loadVacancies();
-  } catch(e) { showToast('Ошибка: '+e.message,'error'); btn.disabled=false; btn.textContent='Откликнуться'; }
+    // Создаём invite с указанием роли (вакансии)
+    await db.collection('invites').add({
+      fromUid:      pageUser.uid,
+      fromName:     pageUserData ? pageUserData.name : '',
+      fromAvatar:   pageUserData ? (pageUserData.avatar||'') : '',
+      fromSkills:   pageUserData ? safeArray(pageUserData.skills) : [],
+      startupId:    startupId,
+      startupName:  startupData.name,
+      startupOwner: startupData.ownerUid,
+      applications: [{ type: 'specialist', role: role, message: msg }],
+      role:         role,
+      message:      msg,
+      status:       'pending',
+      vacancyId:    vid,
+      createdAt:    firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('vacApplyModal').classList.remove('open');
+    showToast('✅ Заявка отправлена!', 'success');
+    await loadVacancies(false, false);
+  } catch(e) { err.textContent='Ошибка: '+e.message; err.style.display='block'; }
 }
 
 async function deleteVacancy(btn) {
@@ -829,9 +991,9 @@ async function deleteVacancy(btn) {
   var vid = btn.getAttribute('data-vid');
   try {
     await db.collection('startups').doc(startupId).collection('vacancies').doc(vid).delete();
-    showToast('Вакансия удалена','success');
-    await loadVacancies();
-  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+    showToast('Вакансия удалена', 'success');
+    await loadVacancies(true, false);
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }
 
 function esc(s) {

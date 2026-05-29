@@ -83,16 +83,6 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label">Роль на платформе</label>
-              <select class="form-select" id="editRole">
-                <option value="user">👤 Специалист — ищу проект в команду</option>
-                <option value="startup">🚀 Стартапер — развиваю свой проект</option>
-                <option value="investor">💼 Инвестор — ищу проекты для инвестиций</option>
-              </select>
-              <div class="form-hint">Смена роли влияет на доступные функции</div>
-            </div>
-
-            <div class="form-group">
               <label class="form-label">О себе</label>
               <textarea class="form-textarea" id="editBio" placeholder="Опыт, цели, чем занимаешься..."></textarea>
             </div>
@@ -277,7 +267,6 @@ function toggleEdit() {
     document.getElementById('editBtn').textContent    = '✏️ Редактировать';
   } else {
     document.getElementById('editName').value      = uData.name      || '';
-    document.getElementById('editRole').value      = uData.role      || 'user';
     document.getElementById('editBio').value       = uData.bio       || '';
     document.getElementById('editContacts').value  = uData.contacts  || '';
     document.getElementById('editPortfolio').value = uData.portfolio || '';
@@ -306,7 +295,7 @@ function renderEditSkills() {
 async function saveProfile() {
   var name = document.getElementById('editName').value.trim();
   if (!name) { showToast('Введи имя','error'); return; }
-  var newRole = document.getElementById('editRole').value;
+  var newRole = uData.role || 'user';
   var upd = {
     name, role:newRole,
     bio:       document.getElementById('editBio').value.trim(),
