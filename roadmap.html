@@ -26,6 +26,13 @@
     .col--todo    .col__head{border-top:3px solid var(--info)}
     .col--doing   .col__head{border-top:3px solid var(--warn)}
     .col--done    .col__head{border-top:3px solid var(--accent)}
+    .col--archive .col__head{border-top:3px solid var(--text3);opacity:.7}
+    .deadline-badge{font-size:11px;padding:2px 8px;border-radius:12px}
+    .deadline-ok   {background:rgba(0,230,118,.1);color:var(--accent)}
+    .deadline-soon {background:rgba(255,165,0,.15);color:var(--warn)}
+    .deadline-over {background:rgba(255,71,87,.15);color:var(--danger)}
+    .archive-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2);padding:10px 0;border-top:1px solid var(--border);margin-top:8px;user-select:none}
+    .archive-toggle:hover{color:var(--text)}
     .col__title{font-family:var(--font-head);font-size:13px;font-weight:700;flex:1}
     .col__count{font-size:12px;color:var(--text3);background:var(--bg3);border-radius:10px;padding:1px 7px}
     .col__toggle{font-size:12px;color:var(--text3);transition:transform .2s}
@@ -150,6 +157,12 @@
           <div class="col__add visible" id="add-done" onclick="showForm('done')">+ Добавить</div>
         </div>
       </div>
+      <!-- Archive toggle -->
+      <div class="archive-toggle" onclick="toggleArchive()" id="archiveToggle" style="display:none">
+        <span id="archiveArrow">▸</span>
+        <span>📦 Архив (<span id="archiveCount">0</span>)</span>
+      </div>
+      <div id="archiveList" style="display:none;margin-top:8px"></div>
     </div>
   </div>
 </div>
@@ -167,8 +180,10 @@ var startupData = null;
 var pageUser    = null;
 var pageUserData= null;
 var isOwner     = false;
-var isMember    = false; // участник команды
+var isMember    = false;
+var memberPerms = {}; // {kanban, updates, team}
 var allTasks    = [];
+var showArchive = false;
 var teamMembers = []; // [{uid, name}]
 var colCollapsed = { backlog:false, todo:false, doing:false, done:false };
 var formCol     = null;
@@ -195,14 +210,26 @@ onAuthReady(async function(user, userData) {
     document.getElementById('backBtn').href        = 'startup.html?id=' + startupId;
     document.title = startupData.name + ' — Roadmap';
 
-    // Проверяем участие
+    // Проверяем участие и permissions
     try {
       var invCheck = await db.collection('invites')
         .where('fromUid','==',user.uid).where('startupId','==',startupId).where('status','==','accepted').get();
-      isMember = !invCheck.empty;
+      if (!invCheck.empty) {
+        isMember = true;
+        var inv = invCheck.docs[0].data();
+        memberPerms = inv.permissions || {};
+      }
+    } catch(e) {}
+    // Также проверяем team subcollection
+    try {
+      var teamCheck = await db.collection('startups').doc(startupId).collection('team').where('uid','==',user.uid).get();
+      if (!teamCheck.empty) {
+        isMember = true;
+        memberPerms = teamCheck.docs[0].data().permissions || {};
+      }
     } catch(e) {}
 
-    var canEdit = isOwner;
+    var canEdit = isOwner || memberPerms.kanban === true;
 
     // Кнопки добавления — только владельцу
     if (!canEdit) {
@@ -217,9 +244,15 @@ onAuthReady(async function(user, userData) {
       .orderBy('createdAt','asc')
       .onSnapshot(function(snap) {
         allTasks = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
-        // Фильтрация: не-участники видят только публичные
         if (!isOwner && !isMember) {
           allTasks = allTasks.filter(function(t){ return t.isPublic !== false; });
+        }
+        // Показываем кнопку архива
+        var archivedCount = allTasks.filter(function(t){return t.archived;}).length;
+        var archBtn = document.getElementById('archiveToggle');
+        if (archBtn) {
+          archBtn.style.display = archivedCount > 0 ? 'flex' : 'none';
+          document.getElementById('archiveCount').textContent = archivedCount;
         }
         renderBoard(canEdit);
       }, function() {
@@ -262,7 +295,7 @@ async function loadTeamMembers() {
 // ── BOARD RENDER ──────────────────────────────────────
 function renderBoard(canEdit) {
   var byCol = { backlog:[], todo:[], doing:[], done:[] };
-  allTasks.forEach(function(t){ if (byCol[t.status]) byCol[t.status].push(t); });
+  allTasks.forEach(function(t){ if (!t.archived && byCol[t.status]) byCol[t.status].push(t); });
 
   Object.keys(byCol).forEach(function(col) {
     var tasks = byCol[col];
@@ -301,7 +334,8 @@ function renderBoard(canEdit) {
         '<div class="task-card__meta">' +
           '<span class="badge '+pr.badge+'" style="font-size:11px">'+pr.label+'</span>' +
           (asgn ? '<span class="task-card__assignee">👤 '+esc(asgn.name)+'</span>' : '') +
-          (priv ? '<span class="badge badge--gray" style="font-size:10px">🔒 Приватная</span>' : '') +
+          (t.deadline ? deadlineBadge(t.deadline) : '') +
+          (priv ? '<span class="badge badge--gray" style="font-size:10px">🔒</span>' : '') +
         '</div>' +
       '</div>';
     }).join('');
@@ -353,6 +387,10 @@ function showForm(col) {
     '<textarea id="tf-desc" placeholder="Описание (необязательно)"></textarea>' +
     '<select id="tf-priority"><option value="med">🟡 Приоритет: Средний</option><option value="high">🔴 Высокий</option><option value="low">🔵 Низкий</option></select>' +
     '<select id="tf-assignee">'+assigneeOpts+'</select>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      '<div><label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Дедлайн</label><input type="date" id="tf-deadline" style="width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;padding:6px 9px;outline:none"/></div>' +
+      '<div style="display:flex;align-items:flex-end;padding-bottom:2px"><label class="tf-check" style="margin:0"><input type="checkbox" id="tf-archive"/> В архив</label></div>' +
+    '</div>' +
     '<label class="tf-check"><input type="checkbox" id="tf-public" checked/> Публичная (видна всем)</label>' +
     '<div class="task-form__btns">' +
       '<button class="tf-btn tf-btn--save" onclick="saveTask(null)">Добавить</button>' +
@@ -453,6 +491,51 @@ async function deleteTask(btn) { var taskId=btn.getAttribute("data-id");
     await db.collection('startups').doc(startupId).collection('tasks').doc(taskId).delete();
     showToast('Задача удалена','success');
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+function deadlineBadge(dateStr) {
+  if (!dateStr) return '';
+  var d    = new Date(dateStr);
+  var now  = new Date();
+  now.setHours(0,0,0,0);
+  var diff = Math.ceil((d-now)/(1000*60*60*24));
+  var cls  = diff < 0 ? 'deadline-over' : diff <= 3 ? 'deadline-soon' : 'deadline-ok';
+  var lbl  = diff < 0 ? '⚠ Просрочено' : diff === 0 ? '⚡ Сегодня' : diff <= 3 ? '⏰ '+diff+'д' : '📅 '+dateStr;
+  return '<span class="deadline-badge '+cls+'">'+lbl+'</span>';
+}
+
+function toggleArchive() {
+  showArchive = !showArchive;
+  document.getElementById('archiveArrow').textContent = showArchive ? '▾' : '▸';
+  document.getElementById('archiveList').style.display = showArchive ? 'block' : 'none';
+  if (showArchive) renderArchive();
+}
+
+function renderArchive() {
+  var archived = allTasks.filter(function(t){ return t.archived; });
+  var el = document.getElementById('archiveList');
+  if (!archived.length) { el.innerHTML='<p style="font-size:13px;color:var(--text3);padding:8px 0">Архив пуст</p>'; return; }
+  el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' +
+    archived.map(function(t) {
+      var asgn = t.assigneeUid ? teamMembers.find(function(m){return m.uid===t.assigneeUid;}) : null;
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)">' +
+        '<span style="color:var(--accent)">✓</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:13px;text-decoration:line-through;color:var(--text2)">'+esc(t.title||'')+'</div>' +
+          (asgn?'<div style="font-size:11px;color:var(--text3)">👤 '+esc(asgn.name)+'</div>':'') +
+        '</div>' +
+        (t.deadline?'<span style="font-size:11px;color:var(--text3)">📅 '+t.deadline+'</span>':'')+
+        (isOwner?'<button class="btn btn--ghost btn--sm" style="font-size:11px" data-id="'+t.id+'" onclick="unarchiveTask(this)">↩ Вернуть</button>':'') +
+      '</div>';
+    }).join('') + '</div>';
+}
+
+async function unarchiveTask(btn) {
+  var id = btn.getAttribute('data-id');
+  await db.collection('startups').doc(startupId).collection('tasks').doc(id).update({
+    archived: false, status: 'todo', updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  showToast('Задача возвращена','success');
 }
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

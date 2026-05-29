@@ -386,9 +386,32 @@ async function openInviteModal() {
   var myStartups = await db.collection('startups').where('ownerUid','==',pageViewer.uid).get();
   if (myStartups.empty) { showToast('У тебя нет стартапов','warn'); return; }
 
-  document.getElementById('invStartup').innerHTML = myStartups.docs.map(function(d) {
-    return '<option value="' + d.id + '">' + esc(d.data().name||'') + '</option>';
+  // Находим стартапы куда человек уже приглашён (любой статус кроме rejected/removed)
+  var existingInvites = await db.collection('invites')
+    .where('toUid','==',profileUid).get();
+  var alreadyIn = {};
+  existingInvites.docs.forEach(function(d) {
+    var st = d.data().status;
+    if (st !== 'rejected' && st !== 'removed') alreadyIn[d.data().startupId] = st;
+  });
+  // Также проверяем заявки ОТ пользователя (он сам подавал)
+  var selfInvites = await db.collection('invites')
+    .where('fromUid','==',profileUid).get();
+  selfInvites.docs.forEach(function(d) {
+    var st = d.data().status;
+    if (st === 'accepted') alreadyIn[d.data().startupId] = st;
+  });
+
+  var opts = myStartups.docs.map(function(d) {
+    var sid = d.id; var sname = d.data().name||'';
+    var status = alreadyIn[sid];
+    var label = sname;
+    if (status === 'accepted') label += ' ✅ (уже в команде)';
+    else if (status === 'pending') label += ' ⏳ (заявка отправлена)';
+    return '<option value="'+esc(sid)+'"'+(status==='accepted'?' disabled':'')+'>'+esc(label)+'</option>';
   }).join('');
+
+  document.getElementById('invStartup').innerHTML = opts;
   document.getElementById('invRole').value = '';
   document.getElementById('inviteModal').classList.add('open');
 }

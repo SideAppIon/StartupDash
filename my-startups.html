@@ -61,6 +61,22 @@
   </div>
 </div>
 
+<!-- Accept invite modal -->
+<div class="modal-overlay" id="acceptModal">
+  <div class="modal">
+    <div class="modal__header">
+      <div class="modal__title" id="acceptModalName">Принять в команду</div>
+      <button class="modal__close" onclick="document.getElementById('acceptModal').classList.remove('open')">×</button>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Роль в команде *</label>
+      <input type="text" class="form-input" id="acceptRoleInput" placeholder="Разработчик, Дизайнер, CTO..."/>
+      <div class="form-hint">Укажите должность участника в проекте</div>
+    </div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="confirmAccept()">✅ Принять</button>
+  </div>
+</div>
+
 <!-- Edit role modal -->
 <div class="modal-overlay" id="editRoleModal">
   <div class="modal">
@@ -69,9 +85,26 @@
       <button class="modal__close" onclick="document.getElementById('editRoleModal').classList.remove('open')">×</button>
     </div>
     <p id="editRoleName" style="color:var(--text2);font-size:14px;margin-bottom:16px"></p>
-    <div class="form-group" style="margin-bottom:0">
+    <div class="form-group">
       <label class="form-label">Роль / должность</label>
       <input type="text" class="form-input" id="editRoleInput" placeholder="Дизайнер, Разработчик, CTO..."/>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Доступ к функциям</label>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
+          <input type="checkbox" id="permKanban" style="accent-color:var(--accent);width:16px;height:16px"/>
+          🗺 Доступ к Kanban / Roadmap
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
+          <input type="checkbox" id="permUpdates" style="accent-color:var(--accent);width:16px;height:16px"/>
+          📢 Публикация обновлений
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">
+          <input type="checkbox" id="permTeam" style="accent-color:var(--accent);width:16px;height:16px"/>
+          👥 Управление командой
+        </label>
+      </div>
     </div>
     <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="saveEditRole()">Сохранить</button>
   </div>
@@ -93,20 +126,68 @@ onAuthReady(async function(user, userData) {
 
   var el = document.getElementById('content');
   try {
+    // Мои стартапы (владелец)
     var snap = await db.collection('startups').where('ownerUid','==',user.uid).get();
-    var startups = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
-    startups.sort(function(a,b){
+    var myStartups = snap.docs.map(function(d){ return Object.assign({id:d.id, _isOwner:true}, d.data()); });
+    myStartups.sort(function(a,b){
       return ((b.createdAt&&b.createdAt.seconds)||0) - ((a.createdAt&&a.createdAt.seconds)||0);
     });
 
-    if (!startups.length) {
-      el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🚀</div><div class="empty-state__title">Нет стартапов</div><p style="font-size:14px;margin-bottom:24px">Создай первый проект</p><a href="create-startup.html" class="btn btn--primary btn--lg">Создать стартап</a></div>';
+    // Стартапы где участвую (accepted invites)
+    var participatingStartups = [];
+    try {
+      var invSnap = await db.collection('invites')
+        .where('fromUid','==',user.uid).where('status','==','accepted').get();
+      for (var ii = 0; ii < invSnap.docs.length; ii++) {
+        var inv = invSnap.docs[ii].data();
+        if (!inv.startupId) continue;
+        // Не дублируем свои стартапы
+        if (myStartups.find(function(s){ return s.id===inv.startupId; })) continue;
+        try {
+          var sSnap = await db.collection('startups').doc(inv.startupId).get();
+          if (sSnap.exists) {
+            var role = 'Участник';
+            if (inv.applications&&inv.applications.length&&inv.applications[0].role) role=inv.applications[0].role;
+            else if (inv.role&&inv.role!=='Специалист') role=inv.role;
+            participatingStartups.push(Object.assign({id:sSnap.id,_isOwner:false,_myRole:role}, sSnap.data()));
+          }
+        } catch(e3){}
+      }
+    } catch(e2){ console.warn('invites:', e2.message); }
+
+    var allVisible = myStartups.concat(participatingStartups);
+
+    if (!allVisible.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🚀</div><div class="empty-state__title">Нет стартапов</div><p style="font-size:14px;margin-bottom:24px">Создай первый проект или подай заявку</p><a href="create-startup.html" class="btn btn--primary btn--lg">Создать стартап</a></div>';
       return;
     }
 
     var html = '';
-    for (var i = 0; i < startups.length; i++) {
-      html += await buildStartupCard(startups[i], user.uid);
+    // Мои стартапы — полная карточка
+    for (var i = 0; i < myStartups.length; i++) {
+      html += await buildStartupCard(myStartups[i], user.uid);
+    }
+    // Участие — компактная карточка
+    if (participatingStartups.length) {
+      html += '<h3 class="section-title" style="margin:24px 0 14px">Участвую в проектах</h3>';
+      participatingStartups.forEach(function(s) {
+        var logo = s.iconImage
+          ? '<img src="'+esc(s.iconImage)+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.style.display=&quot;none&quot;"/>'
+          : esc(s.emoji||'🚀');
+        html += '<div class="s-row" style="display:flex;gap:16px;align-items:center">'+
+          '<div class="s-logo">'+logo+'</div>'+
+          '<div style="flex:1">'+
+            '<div class="s-name">'+esc(s.name||'')+'</div>'+
+            '<div style="font-size:13px;color:var(--accent);font-weight:500">'+esc(s._myRole)+'</div>'+
+            '<div style="display:flex;gap:8px;margin-top:6px">'+
+              '<span class="badge badge--green">'+esc(s.stage||'Идея')+'</span>'+
+            '</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:8px">'+
+            '<a href="startup.html?id='+s.id+'" class="btn btn--outline btn--sm">👁 Открыть</a>'+
+          '</div>'+
+        '</div>';
+      });
     }
     el.innerHTML = html;
   } catch(e) {
@@ -249,25 +330,47 @@ function toggleSection(header) {
 }
 
 // ── ANSWER INVITE ─────────────────────────────────────
-async function answerInvite(inviteId, status, startupId) {
+// Контекст для модального принятия
+var acceptCtx = null;
+
+function openAcceptModal(inviteId, startupId, fromName, suggestedRole) {
+  acceptCtx = { inviteId, startupId };
+  document.getElementById('acceptModalName').textContent = 'Принять ' + fromName + ' в команду';
+  document.getElementById('acceptRoleInput').value = suggestedRole || '';
+  document.getElementById('acceptModal').classList.add('open');
+}
+
+async function confirmAccept() {
+  if (!acceptCtx) return;
+  var role = document.getElementById('acceptRoleInput').value.trim() || 'Участник';
   try {
-    var updates = { status: status };
-    // Если принимаем — добавляем в team subcollection
-    if (status === 'accepted') {
-      var invSnap = await db.collection('invites').doc(inviteId).get();
-      var inv = invSnap.data();
-      var role = 'Участник';
-      if (inv.applications&&inv.applications.length&&inv.applications[0].role) role=inv.applications[0].role;
-      else if (inv.role&&inv.role!=='Специалист') role=inv.role;
-      await db.collection('startups').doc(startupId).collection('team').add({
-        uid:  inv.fromUid,
-        name: inv.fromName||'',
-        role: role,
-        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    }
-    await db.collection('invites').doc(inviteId).update(updates);
-    showToast(status==='accepted'?'✅ Принят в команду':'❌ Отклонено','success');
+    var invSnap = await db.collection('invites').doc(acceptCtx.inviteId).get();
+    var inv = invSnap.data();
+    await db.collection('startups').doc(acceptCtx.startupId).collection('team').add({
+      uid:  inv.fromUid, name: inv.fromName||'', role: role,
+      joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await db.collection('invites').doc(acceptCtx.inviteId).update({ status:'accepted', role: role });
+    document.getElementById('acceptModal').classList.remove('open');
+    showToast('✅ '+inv.fromName+' принят как «'+role+'»','success');
+    setTimeout(function(){ location.reload(); }, 700);
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+async function answerInvite(inviteId, status, startupId) {
+  if (status === 'accepted') {
+    // Показываем модал для указания роли
+    var invSnap = await db.collection('invites').doc(inviteId).get();
+    var inv = invSnap.data();
+    var suggestedRole = '';
+    if (inv.applications&&inv.applications.length&&inv.applications[0].role) suggestedRole=inv.applications[0].role;
+    else if (inv.role&&inv.role!=='Специалист') suggestedRole=inv.role;
+    openAcceptModal(inviteId, startupId, inv.fromName||'участника', suggestedRole);
+    return;
+  }
+  try {
+    await db.collection('invites').doc(inviteId).update({ status: status });
+    showToast('❌ Отклонено','success');
     setTimeout(function(){ location.reload(); }, 700);
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
@@ -277,17 +380,37 @@ function openEditRole(startupId, uid, name, role, src, docId) {
   editRoleCtx = { startupId, uid, name, role, src, docId };
   document.getElementById('editRoleName').textContent = 'Участник: ' + name;
   document.getElementById('editRoleInput').value = role;
+  // Загружаем текущие разрешения
+  loadMemberPerms(src, docId);
   document.getElementById('editRoleModal').classList.add('open');
+}
+
+async function loadMemberPerms(src, docId) {
+  var perms = {};
+  try {
+    var snap = src === 'team'
+      ? await db.collection('startups').doc(editRoleCtx.startupId).collection('team').doc(docId).get()
+      : await db.collection('invites').doc(docId).get();
+    if (snap.exists) perms = snap.data().permissions || {};
+  } catch(e) {}
+  document.getElementById('permKanban').checked  = !!perms.kanban;
+  document.getElementById('permUpdates').checked = !!perms.updates;
+  document.getElementById('permTeam').checked    = !!perms.team;
 }
 async function saveEditRole() {
   if (!editRoleCtx) return;
   var newRole = document.getElementById('editRoleInput').value.trim();
   if (!newRole) { showToast('Введи роль','error'); return; }
+  var permissions = {
+    kanban:  document.getElementById('permKanban').checked,
+    updates: document.getElementById('permUpdates').checked,
+    team:    document.getElementById('permTeam').checked
+  };
   try {
     if (editRoleCtx.src === 'team') {
-      await db.collection('startups').doc(editRoleCtx.startupId).collection('team').doc(editRoleCtx.docId).update({ role: newRole });
+      await db.collection('startups').doc(editRoleCtx.startupId).collection('team').doc(editRoleCtx.docId).update({ role: newRole, permissions: permissions });
     } else {
-      var upd = { role: newRole };
+      var upd = { role: newRole, permissions: permissions };
       var invSnap = await db.collection('invites').doc(editRoleCtx.docId).get();
       if (invSnap.exists && invSnap.data().applications) {
         var apps = invSnap.data().applications.slice();
@@ -297,7 +420,7 @@ async function saveEditRole() {
       await db.collection('invites').doc(editRoleCtx.docId).update(upd);
     }
     document.getElementById('editRoleModal').classList.remove('open');
-    showToast('Роль обновлена: '+newRole,'success');
+    showToast('Роль и права обновлены','success');
     setTimeout(function(){ location.reload(); }, 700);
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }

@@ -120,8 +120,21 @@ onAuthReady(async function(user, userData) {
   if (!snap.exists){window.location.href='dashboard.html';return;}
   startupData = Object.assign({id:snap.id}, snap.data());
 
-  if (startupData.ownerUid!==user.uid&&userData.role!=='admin'){
-    window.location.href='dashboard.html';return;
+  var isOwner = startupData.ownerUid===user.uid || (userData&&userData.role==='admin');
+  var hasUpdatesPermission = false;
+  if (!isOwner) {
+    // Проверяем permission updates через team или invite
+    try {
+      var teamSnap = await db.collection('startups').doc(startupId).collection('team').where('uid','==',user.uid).get();
+      if (!teamSnap.empty && teamSnap.docs[0].data().permissions && teamSnap.docs[0].data().permissions.updates) hasUpdatesPermission = true;
+    } catch(e){}
+    try {
+      var invSnap2 = await db.collection('invites').where('fromUid','==',user.uid).where('startupId','==',startupId).where('status','==','accepted').get();
+      if (!invSnap2.empty && invSnap2.docs[0].data().permissions && invSnap2.docs[0].data().permissions.updates) hasUpdatesPermission = true;
+    } catch(e){}
+  }
+  if (!isOwner && !hasUpdatesPermission){
+    window.location.href='startup.html?id='+startupId; return;
   }
   document.getElementById('startupNameLabel').textContent = startupData.name;
 

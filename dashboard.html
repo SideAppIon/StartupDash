@@ -205,6 +205,13 @@ async function renderInvestor(el) {
 }
 
 async function renderUser(el, uid) {
+  // Входящие приглашения от стартапов (type=from_startup, status=pending, toUid=uid)
+  var incomingInvites = [];
+  try {
+    var inSnap = await db.collection('invites')
+      .where('toUid','==',uid).where('status','==','pending').get();
+    incomingInvites = inSnap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+  } catch(e) {}
   var snap = await db.collection('startups').orderBy('createdAt','desc').limit(6).get();
   var list = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); })
     .filter(function(s){ return s.privacy !== 'closed'; }).slice(0,4);
@@ -232,6 +239,27 @@ async function renderUser(el, uid) {
       '<div id="myInvitesList">'+invRows+'</div>';
   }
 
+  var incomingHtml = '';
+  if (incomingInvites.length) {
+    incomingHtml = '<hr class="divider">' +
+      '<div class="section-header" style="margin-bottom:14px">' +
+        '<div class="section-title" style="color:var(--accent)">📩 Вас приглашают в команду ('+incomingInvites.length+')</div>' +
+      '</div>' +
+      incomingInvites.map(function(inv){
+        return '<div class="inv-card" style="border-left:3px solid var(--accent)">' +
+          '<div style="font-size:22px">🚀</div>' +
+          '<div class="inv-card__info">' +
+            '<div class="inv-card__name">'+esc(inv.startupName||'Стартап')+'</div>' +
+            '<div class="inv-card__sub">Роль: <strong>'+esc(inv.role||'Участник')+'</strong></div>' +
+          '</div>' +
+          '<div style="display:flex;gap:6px">' +
+            '<button class="btn btn--primary btn--sm" data-iid="'+inv.id+'" data-st="accepted" onclick="answerFromStartup(this)">✓ Принять</button>' +
+            '<button class="btn btn--outline btn--sm" data-iid="'+inv.id+'" data-st="rejected" onclick="answerFromStartup(this)">✕</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+  }
+
   el.innerHTML =
     '<div class="section-header" style="margin-bottom:16px"><div class="section-title">Стартапы</div>'+
     '<div style="display:flex;gap:8px"><a href="create-startup.html" class="btn btn--primary btn--sm">+ Создать</a><a href="startups.html" class="btn btn--outline btn--sm">Все</a></div></div>' +
@@ -239,7 +267,7 @@ async function renderUser(el, uid) {
       return '<a class="s-card" href="startup.html?id='+s.id+'" style="display:flex">'+
         '<div class="s-card__logo">'+(s.iconImage?'<img src="'+s.iconImage+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.style.display=&quot;none&quot;"/>':'')+(s.iconImage?'':(s.emoji||'🚀'))+'</div>'+
         '<div><div class="s-card__name">'+esc(s.name||'')+'</div><div class="s-card__tagline">'+esc(s.tagline||'')+'</div></div></a>';
-    }).join('') + invitesHtml;
+    }).join('') + invitesHtml + incomingHtml;
 }
 
 async function renderAdmin(el) {
@@ -255,6 +283,26 @@ async function answer(btn) {
   await db.collection('invites').doc(id).update({ status: status });
   showToast(status==='accepted'?'✅ Принято':'❌ Отклонено');
   setTimeout(function(){ location.reload(); }, 800);
+}
+
+async function answerFromStartup(btn) {
+  var iid    = btn.getAttribute('data-iid');
+  var status = btn.getAttribute('data-st');
+  try {
+    if (status === 'accepted') {
+      var invSnap = await db.collection('invites').doc(iid).get();
+      var inv = invSnap.data();
+      var role = inv.role || 'Участник';
+      // Добавляем в team subcollection
+      await db.collection('startups').doc(inv.startupId).collection('team').add({
+        uid: currentUser.uid, name: currentUserData.name||'', role: role,
+        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    await db.collection('invites').doc(iid).update({ status: status });
+    showToast(status==='accepted'?'✅ Вы приняты в команду!':'Отклонено');
+    setTimeout(function(){ location.reload(); }, 800);
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
 function toggleMyInvites(header) {
