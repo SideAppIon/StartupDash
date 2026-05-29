@@ -2,78 +2,133 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Пользователи
-    match /users/{uid} {
-      allow read:   if true;
-      allow create: if request.auth != null && request.auth.uid == uid;
-      allow update: if request.auth != null && request.auth.uid == uid;
+    function isAuth() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function isStartupOwner(startupId) {
+      return isAuth() &&
+        get(/databases/$(database)/documents/startups/$(startupId)).data.ownerUid == request.auth.uid;
     }
 
-    // Стартапы
+    // ── Пользователи ──────────────────────────────────────
+    match /users/{uid} {
+      allow read: if true;
+      allow create: if isAuth() && request.auth.uid == uid;
+      allow update: if isAuth() && request.auth.uid == uid;
+    }
+
+    // ── Стартапы ─────────────────────────────────────────
     match /startups/{startupId} {
-      allow read:          if true;
-      allow create:        if request.auth != null;
-      allow update, delete: if request.auth != null && (
-        resource.data.ownerUid == request.auth.uid ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      allow read: if true;
+      allow create: if isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['startup', 'expert', 'admin'];
+      allow update, delete: if isAuth() && (
+        isStartupOwner(startupId) || isAdmin()
       );
 
+      // Обновления проекта
       match /updates/{updateId} {
         allow read: if true;
-        allow write: if request.auth != null && (
-          get(/databases/$(database)/documents/startups/$(startupId)).data.ownerUid == request.auth.uid ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        allow write: if isAuth() && (
+          isStartupOwner(startupId) || isAdmin() ||
+          exists(/databases/$(database)/documents/startups/$(startupId)/team/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/startups/$(startupId)/team/$(request.auth.uid)).data.permissions.updates == true
         );
       }
 
+      // Команда
       match /team/{memberId} {
         allow read: if true;
-        allow write: if request.auth != null && (
-          get(/databases/$(database)/documents/startups/$(startupId)).data.ownerUid == request.auth.uid ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        allow write: if isAuth() && (
+          isStartupOwner(startupId) || isAdmin()
+        );
+      }
+
+      // Задачи Roadmap (kanban)
+      match /tasks/{taskId} {
+        allow read: if true;
+        allow write: if isAuth() && (
+          isStartupOwner(startupId) || isAdmin() ||
+          exists(/databases/$(database)/documents/startups/$(startupId)/team/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/startups/$(startupId)/team/$(request.auth.uid)).data.permissions.kanban == true
+        );
+      }
+
+      // Вакансии
+      match /vacancies/{vacancyId} {
+        allow read: if true;
+        allow create, delete: if isAuth() && (
+          isStartupOwner(startupId) || isAdmin()
+        );
+        allow update: if isAuth() && (
+          isStartupOwner(startupId) || isAdmin() ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicants'])
         );
       }
     }
 
-    // Приглашения
+    // ── Форум ────────────────────────────────────────────
+    match /forum_topics/{topicId} {
+      allow read: if true;
+      allow create: if isAuth();
+      allow update: if isAuth() && (
+        resource.data.authorUid == request.auth.uid ||
+        isAdmin() ||
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['replyCount', 'lastAt', 'lastAuthor', 'views'])
+      );
+      allow delete: if isAdmin();
+
+      match /posts/{postId} {
+        allow read: if true;
+        allow create: if isAuth();
+        allow delete: if isAuth() && (
+          resource.data.authorUid == request.auth.uid || isAdmin()
+        );
+      }
+    }
+
+    // ── Приглашения ──────────────────────────────────────
     match /invites/{inviteId} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && (
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth() && (
         resource.data.startupOwner == request.auth.uid ||
-        resource.data.fromUid == request.auth.uid
+        resource.data.fromUid == request.auth.uid ||
+        resource.data.toUid == request.auth.uid
       );
     }
 
-    // Диалоги — ИСПРАВЛЕНО: разделены read/create/update
+    // ── Диалоги ──────────────────────────────────────────
     match /conversations/{convId} {
-      allow read:   if request.auth != null &&
-                       request.auth.uid in resource.data.participants;
-      allow create: if request.auth != null &&
-                       request.auth.uid in request.resource.data.participants;
-      allow update: if request.auth != null &&
-                       request.auth.uid in resource.data.participants;
+      allow read: if isAuth() &&
+        request.auth.uid in resource.data.participants;
+      allow create: if isAuth() &&
+        request.auth.uid in request.resource.data.participants;
+      allow update: if isAuth() &&
+        request.auth.uid in resource.data.participants;
 
       match /messages/{msgId} {
-        allow read: if request.auth != null &&
+        allow read: if isAuth() &&
           request.auth.uid in
           get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
-        allow create: if request.auth != null;
+        allow create: if isAuth();
       }
     }
 
+    // ── Настройки платформы ──────────────────────────────
+    match /_config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
 
-      // Настройки платформы
-      match /_config/{docId} {
-        allow read: if true;
-        allow write: if request.auth != null &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-      }
-
-    // Админ — полный доступ
+    // ── Админ — полный доступ ────────────────────────────
     match /{document=**} {
-      allow read, write: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow read, write: if isAdmin();
     }
   }
 }

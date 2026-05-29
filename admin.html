@@ -69,7 +69,7 @@
     <div class="stat-cards">
       <div class="stat-card"><div class="stat-card__num" id="statUsers">—</div><div class="stat-card__label">Пользователей</div></div>
       <div class="stat-card"><div class="stat-card__num" id="statStartups">—</div><div class="stat-card__label">Стартапов</div></div>
-      <div class="stat-card"><div class="stat-card__num" id="statInvestors">—</div><div class="stat-card__label">Инвесторов</div></div>
+      <div class="stat-card"><div class="stat-card__num" id="statExperts">—</div><div class="stat-card__label">Экспертов</div></div>
       <div class="stat-card"><div class="stat-card__num" id="statPublic">—</div><div class="stat-card__label">Публичных</div></div>
     </div>
 
@@ -171,7 +171,7 @@
       <select class="form-select" id="newRoleSelect">
         <option value="user">Специалист</option>
         <option value="startup">Стартапер</option>
-        <option value="investor">Инвестор</option>
+        <option value="expert">Эксперт</option>
         <option value="admin">Администратор</option>
       </select>
     </div>
@@ -199,7 +199,7 @@
 <script>
 requireAuth('login.html');
 
-var ROLE_CLASSES = {startup:'badge--green',investor:'badge--purple',user:'badge--blue',admin:'badge--red'};
+var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',user:'badge--blue',admin:'badge--red'};
 
 // Дефолтные категории и стадии (используются если в Firestore ещё нет)
 var DEFAULT_CATS   = ['FinTech','EdTech','HealthTech','E-commerce','SaaS','AI / ML','Gaming','GreenTech','Marketplace','Другое'];
@@ -236,7 +236,7 @@ async function loadStats() {
   ]);
   document.getElementById('statUsers').textContent    = u.size;
   document.getElementById('statStartups').textContent = s.size;
-  document.getElementById('statInvestors').textContent= u.docs.filter(function(d){return d.data().role==='investor';}).length;
+  document.getElementById('statExperts').textContent= u.docs.filter(function(d){return d.data().role==='expert';}).length;
   document.getElementById('statPublic').textContent   = s.docs.filter(function(d){return !d.data().privacy||d.data().privacy==='public';}).length;
 }
 

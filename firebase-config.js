@@ -86,7 +86,7 @@ function showToast(message, type) {
 
 var ROLE_LABELS = {
   startup:  'Стартапер',
-  investor: 'Инвестор',
+  expert: 'Эксперт',
   user:     'Специалист',
   admin:    'Администратор'
 };

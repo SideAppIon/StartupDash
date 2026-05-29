@@ -82,7 +82,7 @@ requireAuth('login.html');
 
 var NAV = {
   startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
-  investor: [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
+  expert:   [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}]
 };
@@ -122,7 +122,7 @@ onAuthReady(async function(user, userData) {
   var main = document.getElementById('main');
   try {
     if (role==='startup')  await renderStartup(main, user.uid);
-    else if (role==='investor') await renderInvestor(main);
+    else if (role==='expert') await renderExpert(main, user.uid);
     else if (role==='admin')    await renderAdmin(main);
     else                         await renderUser(main, user.uid);
   } catch(e) {
@@ -191,11 +191,26 @@ async function renderStartup(el, uid) {
   if (tt) tt.textContent = total;
 }
 
-async function renderInvestor(el) {
+async function renderExpert(el, uid) {
+  var mySnap = await db.collection('startups').where('ownerUid','==',uid).get();
+  var myStartups = mySnap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+
   var snap = await db.collection('startups').orderBy('createdAt','desc').limit(10).get();
   var list = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); })
-    .filter(function(s){ return s.privacy !== 'closed'; }); // закрытые не показываем
-  el.innerHTML = '<div class="section-header" style="margin-bottom:16px"><div class="section-title">Свежие стартапы</div><a href="startups.html" class="btn btn--outline btn--sm">Все</a></div>' +
+    .filter(function(s){ return s.privacy !== 'closed'; });
+
+  var myStartupsHtml = '';
+  if (myStartups.length) {
+    myStartupsHtml = '<div class="section-header" style="margin-bottom:16px"><div class="section-title">Мои стартапы</div><a href="create-startup.html" class="btn btn--primary btn--sm">+ Создать</a></div>' +
+      myStartups.map(function(s){
+        return '<a class="s-card" href="startup.html?id='+s.id+'" style="display:flex">' +
+          '<div class="s-card__logo">'+(s.iconImage?'<img src="'+s.iconImage+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.style.display=&quot;none&quot;"/>':'')+(s.iconImage?'':(s.emoji||'🚀'))+'</div>' +
+          '<div><div class="s-card__name">'+esc(s.name||'')+'</div><div class="s-card__tagline">'+esc(s.tagline||'')+'</div></div></a>';
+      }).join('') + '<hr class="divider">';
+  }
+
+  el.innerHTML = myStartupsHtml +
+    '<div class="section-header" style="margin-bottom:16px"><div class="section-title">Свежие стартапы</div><a href="startups.html" class="btn btn--outline btn--sm">Все</a></div>' +
     list.slice(0,8).map(function(s){
       var privBadge = s.privacy==='private'?'<span class="badge badge--gray" style="font-size:11px">🔒</span>':'';
       return '<a class="s-card" href="startup.html?id='+s.id+'" style="display:flex">' +
@@ -273,7 +288,7 @@ async function renderUser(el, uid) {
 async function renderAdmin(el) {
   var u = await db.collection('users').get();
   var s = await db.collection('startups').get();
-  el.innerHTML = '<div class="stat-row"><div class="stat-box"><div class="stat-box__num">'+u.size+'</div><div class="stat-box__lbl">Пользователей</div></div><div class="stat-box"><div class="stat-box__num">'+s.size+'</div><div class="stat-box__lbl">Стартапов</div></div><div class="stat-box"><div class="stat-box__num">'+(u.docs.filter(function(d){return d.data().role==='investor';}).length)+'</div><div class="stat-box__lbl">Инвесторов</div></div></div>' +
+  el.innerHTML = '<div class="stat-row"><div class="stat-box"><div class="stat-box__num">'+u.size+'</div><div class="stat-box__lbl">Пользователей</div></div><div class="stat-box"><div class="stat-box__num">'+s.size+'</div><div class="stat-box__lbl">Стартапов</div></div><div class="stat-box"><div class="stat-box__num">'+(u.docs.filter(function(d){return d.data().role==='expert';}).length)+'</div><div class="stat-box__lbl">Экспертов</div></div></div>' +
     '<div class="grid-2"><a href="admin.html" class="card card--clickable" style="text-decoration:none"><div style="font-size:32px;margin-bottom:12px">👥</div><div class="section-title" style="font-size:18px">Пользователи</div><p style="font-size:14px;color:var(--text2);margin-top:6px">Роли, блокировка, сброс паролей</p></a><a href="startups.html" class="card card--clickable" style="text-decoration:none"><div style="font-size:32px;margin-bottom:12px">🚀</div><div class="section-title" style="font-size:18px">Стартапы</div><p style="font-size:14px;color:var(--text2);margin-top:6px">Просмотр и удаление</p></a></div>';
 }
 

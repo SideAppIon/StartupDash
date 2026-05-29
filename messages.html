@@ -152,16 +152,21 @@ onAuthReady(async function(user, userData) {
   myRole = userData ? userData.role : 'user';
   renderNav(userData);
 
-  // Для специалистов — вычисляем с кем можно общаться
+  // Права на новые диалоги по роли
   if (myRole === 'user') {
+    // Специалист: другие специалисты + команда
     await computeAllowedUids();
-    // Кнопка "Новый диалог" скрыта — они могут писать только разрешённым
-    // но показываем если есть хоть кто-то
+    if (allowedUids.size > 0) {
+      document.getElementById('newConvBtn').classList.remove('hidden');
+    }
+  } else if (myRole === 'expert') {
+    // Эксперт: только стартаперы
+    await computeExpertAllowedUids();
     if (allowedUids.size > 0) {
       document.getElementById('newConvBtn').classList.remove('hidden');
     }
   } else {
-    // Стартаперы, инвесторы, админы — могут писать всем
+    // Стартапер, админ — могут писать всем (но фильтруем по роли ниже)
     document.getElementById('newConvBtn').classList.remove('hidden');
   }
 
@@ -181,23 +186,21 @@ onAuthReady(async function(user, userData) {
   loadUsersForPicker();
 });
 
-// ── ПРАВА СПЕЦИАЛИСТА ─────────────────────────────────
+// ── ПРАВА НА ПЕРЕПИСКУ ────────────────────────────────
 async function computeAllowedUids() {
+  // Специалист: другие специалисты + члены команды
   allowedUids = new Set();
   try {
-    // 1. Другие специалисты
     var usersSnap = await db.collection('users').where('role','==','user').get();
     usersSnap.docs.forEach(function(d) {
       if (d.data().uid && d.data().uid !== myUid) allowedUids.add(d.data().uid);
     });
-    // 2. Владельцы стартапов где он принят в команду (accepted invite)
     var invSnap = await db.collection('invites')
       .where('fromUid','==', myUid)
       .where('status','==','accepted').get();
     for (var i = 0; i < invSnap.docs.length; i++) {
       var inv = invSnap.docs[i].data();
       if (inv.startupOwner) allowedUids.add(inv.startupOwner);
-      // 3. Другие участники той же команды
       var teamSnap = await db.collection('startups').doc(inv.startupId).collection('team').get();
       teamSnap.docs.forEach(function(d) {
         if (d.data().uid && d.data().uid !== myUid) allowedUids.add(d.data().uid);
@@ -206,10 +209,35 @@ async function computeAllowedUids() {
   } catch(e) { console.warn('computeAllowedUids:', e.message); }
 }
 
+async function computeExpertAllowedUids() {
+  // Эксперт: только стартаперы
+  allowedUids = new Set();
+  try {
+    var snap = await db.collection('users').where('role','==','startup').get();
+    snap.docs.forEach(function(d) {
+      if (d.data().uid && d.data().uid !== myUid) allowedUids.add(d.data().uid);
+    });
+  } catch(e) { console.warn('computeExpertAllowedUids:', e.message); }
+}
+
+function getUserRole(uid) {
+  var u = allUsers.find(function(u){ return u.uid === uid; });
+  return u ? u.role : null;
+}
+
 function canMessageUser(uid) {
   if (!uid || uid === myUid) return false;
-  if (myRole === 'startup' || myRole === 'investor' || myRole === 'admin') return true;
-  // Специалист — проверяем allowedUids
+  if (myRole === 'admin') return true;
+  if (myRole === 'startup') {
+    // Стартапер: пишет специалистам и экспертам
+    var role = getUserRole(uid);
+    return role === 'user' || role === 'expert';
+  }
+  if (myRole === 'expert') {
+    // Эксперт: пишет только стартаперам
+    return allowedUids.has(uid);
+  }
+  // Специалист: проверяем allowedUids
   return allowedUids.has(uid);
 }
 
@@ -438,11 +466,16 @@ function openNewConvModal() {
   document.getElementById('userPickSearch').value='';
   document.getElementById('newConvModal').classList.add('open');
 
-  // Показываем пояснение для специалистов
   var note=document.getElementById('msgRestrictionNote');
   if (myRole==='user') {
     note.style.display='block';
     note.textContent='Вы можете писать другим специалистам и участникам ваших команд';
+  } else if (myRole==='expert') {
+    note.style.display='block';
+    note.textContent='Эксперты могут писать стартаперам';
+  } else if (myRole==='startup') {
+    note.style.display='block';
+    note.textContent='Вы можете писать специалистам и экспертам';
   } else {
     note.style.display='none';
   }

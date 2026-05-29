@@ -28,6 +28,7 @@
 <nav class="nav">
   <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
   <a href="startups.html">Стартапы</a>
+  <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
   <a href="members.html" class="active">Участники</a>
   <div class="nav__user" id="navUser">
@@ -49,7 +50,7 @@
         <option value="user" selected>Специалисты</option>
         <option value="">Все роли</option>
         <option value="startup">Стартаперы</option>
-        <option value="investor">Инвесторы</option>
+        <option value="expert">Эксперты</option>
       </select>
     </div>
 
@@ -65,7 +66,7 @@
 
 <script src="firebase-config.js"></script>
 <script>
-  var ROLE_CLASSES = {startup:'badge--green',investor:'badge--purple',user:'badge--blue',admin:'badge--red'};
+  var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',user:'badge--blue',admin:'badge--red'};
   let allMembers = [];
 
   onAuthReady(async (user, userData) => {

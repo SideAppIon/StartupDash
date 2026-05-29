@@ -46,7 +46,9 @@
 <nav class="nav">
   <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
   <a href="startups.html">Стартапы</a>
+  <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
+  <a href="members.html">Участники</a>
   <div class="nav__user" id="navUser">
     <a href="login.html" class="btn btn--outline btn--sm">Войти</a>
     <a href="register.html" class="btn btn--primary btn--sm">Регистрация</a>
@@ -179,6 +181,27 @@
 
     <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="sendAllInvites()">Отправить заявку</button>
     <div id="inviteError" class="form-error" style="display:none;margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- Expert Apply Modal -->
+<div class="modal-overlay" id="expertModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal__header">
+      <div class="modal__title">🎓 Подать заявку как эксперт</div>
+      <button class="modal__close" onclick="document.getElementById('expertModal').classList.remove('open')">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Область экспертизы *</label>
+      <input type="text" class="form-input" id="expertArea" placeholder="Например: юридические вопросы, маркетинг, финансы..."/>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Сообщение / предложение *</label>
+      <textarea class="form-textarea" id="expertMsg" style="min-height:110px"
+        placeholder="Расскажи о своём опыте и чем можешь помочь проекту..."></textarea>
+    </div>
+    <button class="btn btn--expert" style="width:100%;justify-content:center;margin-top:16px" onclick="sendExpertApplication()">Отправить заявку</button>
+    <div id="expertError" class="form-error" style="display:none;margin-top:10px"></div>
   </div>
 </div>
 
@@ -436,10 +459,26 @@ function renderActions(user, userData, inviteStatus, isTeamMember, memberPerms) 
     }
     el.innerHTML = btns.join('');
 
-  } else if (role === 'investor') {
-    el.innerHTML =
-      '<a href="roadmap.html?id=' + startupId + '" class="btn btn--ghost btn--sm">🗺 Roadmap</a>' +
-      '<button class="btn btn--investor" onclick="writeToFounder()">💬 Написать основателю</button>';
+  } else if (role === 'expert') {
+    if (inviteStatus === 'accepted') {
+      el.innerHTML =
+        '<a href="roadmap.html?id=' + startupId + '" class="btn btn--outline btn--sm">🗺 Roadmap</a>' +
+        '<span class="badge badge--purple" style="padding:8px 16px;font-size:13px">✅ Ты эксперт проекта</span>' +
+        '<button class="btn btn--expert" onclick="writeToFounder()">💬 Написать основателю</button>';
+    } else if (inviteStatus === 'pending') {
+      el.innerHTML =
+        '<span class="badge badge--gray" style="padding:8px 16px;font-size:13px">⏳ Заявка на рассмотрении</span>' +
+        '<button class="btn btn--expert" onclick="writeToFounder()">💬 Написать основателю</button>';
+    } else if (inviteStatus === 'rejected') {
+      el.innerHTML =
+        '<span class="badge badge--red" style="padding:8px 16px;font-size:13px">❌ Заявка отклонена</span>' +
+        '<button class="btn btn--expert" onclick="writeToFounder()">💬 Написать основателю</button>';
+    } else {
+      el.innerHTML =
+        '<a href="roadmap.html?id=' + startupId + '" class="btn btn--ghost btn--sm">🗺 Roadmap</a>' +
+        '<button class="btn btn--expert" onclick="openExpertModal()">🎓 Подать заявку как эксперт</button>' +
+        '<button class="btn btn--outline btn--sm" onclick="writeToFounder()">💬 Написать основателю</button>';
+    }
 
   } else if (role === 'user') {
     if (inviteStatus === 'accepted') {
@@ -764,10 +803,66 @@ async function sendAllInvites() {
   }
 }
 
-// ── INVESTOR: написать основателю ─────────────────────
+// ── EXPERT: написать основателю ──────────────────────
 async function writeToFounder() {
   if (!pageUser) { window.location.href = 'login.html'; return; }
   window.location.href = 'messages.html?to=' + startupData.ownerUid;
+}
+
+function openExpertModal() {
+  if (!pageUser) { window.location.href = 'login.html'; return; }
+  document.getElementById('expertArea').value = '';
+  document.getElementById('expertMsg').value = '';
+  document.getElementById('expertError').style.display = 'none';
+  document.getElementById('expertModal').classList.add('open');
+}
+
+async function sendExpertApplication() {
+  var area = document.getElementById('expertArea').value.trim();
+  var msg  = document.getElementById('expertMsg').value.trim();
+  var errEl = document.getElementById('expertError');
+  errEl.style.display = 'none';
+  if (!area) { errEl.textContent = 'Укажи область экспертизы'; errEl.style.display = 'block'; return; }
+  if (!msg)  { errEl.textContent = 'Напиши сообщение'; errEl.style.display = 'block'; return; }
+
+  try {
+    var existing = await db.collection('invites')
+      .where('fromUid','==', pageUser.uid)
+      .where('startupId','==', startupId).get();
+    var alreadyApplied = existing.docs.some(function(d){
+      var s = d.data().status;
+      return s === 'pending' || s === 'accepted';
+    });
+    if (alreadyApplied) {
+      var isAccepted = existing.docs.some(function(d){ return d.data().status === 'accepted'; });
+      showToast(isAccepted ? '✅ Ты уже эксперт этого проекта' : '⏳ Заявка уже отправлена', 'warn');
+      document.getElementById('expertModal').classList.remove('open');
+      return;
+    }
+
+    await db.collection('invites').add({
+      fromUid:      pageUser.uid,
+      fromName:     pageUserData ? pageUserData.name : '',
+      fromAvatar:   pageUserData ? (pageUserData.avatar||'') : '',
+      fromSkills:   pageUserData ? safeArray(pageUserData.skills) : [],
+      startupId:    startupId,
+      startupName:  startupData.name,
+      startupOwner: startupData.ownerUid,
+      type:         'expert',
+      role:         'Эксперт',
+      expertArea:   area,
+      message:      msg,
+      status:       'pending',
+      createdAt:    firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    document.getElementById('expertModal').classList.remove('open');
+    showToast('✅ Заявка эксперта отправлена!', 'success');
+    renderActions(pageUser, pageUserData, 'pending', false, {});
+  } catch(e) {
+    errEl.textContent = 'Ошибка: ' + e.message;
+    errEl.style.display = 'block';
+  }
 }
 
 // ── HELPERS ───────────────────────────────────────────

@@ -20,8 +20,8 @@
   --danger:   #ff4757;
   --warn:     #ffa502;
   --info:     #3d8ef5;
-  --investor: #b48bff;
-  --investor-dim: rgba(180,139,255,0.12);
+  --expert: #b48bff;
+  --expert-dim: rgba(180,139,255,0.12);
   --radius:   10px;
   --radius-lg:16px;
   --shadow:   0 4px 24px rgba(0,0,0,0.4);
@@ -86,7 +86,7 @@ body {
   text-transform: uppercase; padding: 2px 8px; border-radius: 20px;
 }
 .nav__role--startup  { background: var(--accent-dim);   color: var(--accent); }
-.nav__role--investor { background: var(--investor-dim); color: var(--investor); }
+.nav__role--expert { background: var(--expert-dim); color: var(--expert); }
 .nav__role--user     { background: rgba(61,142,245,.12); color: var(--info); }
 .nav__role--admin    { background: rgba(255,71,87,.12);  color: var(--danger); }
 
@@ -131,8 +131,8 @@ body {
 .btn--ghost:hover { color: var(--text); background: var(--bg3); }
 .btn--danger { background: var(--danger); color: #fff; }
 .btn--danger:hover { background: #e8303d; }
-.btn--investor { background: var(--investor); color: #000; }
-.btn--investor:hover { background: #9b6fe8; }
+.btn--expert { background: var(--expert); color: #000; }
+.btn--expert:hover { background: #9b6fe8; }
 .btn--sm { padding: 6px 14px; font-size: 13px; }
 .btn--lg { padding: 14px 28px; font-size: 16px; }
 .btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
@@ -168,7 +168,7 @@ body {
   padding: 3px 10px; border-radius: 20px;
 }
 .badge--green  { background: var(--accent-dim); color: var(--accent); }
-.badge--purple { background: var(--investor-dim); color: var(--investor); }
+.badge--purple { background: var(--expert-dim); color: var(--expert); }
 .badge--blue   { background: rgba(61,142,245,.12); color: var(--info); }
 .badge--red    { background: rgba(255,71,87,.12); color: var(--danger); }
 .badge--gray   { background: var(--bg3); color: var(--text2); }
