@@ -83,7 +83,7 @@ requireAuth('login.html');
 var NAV = {
   startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   investor: [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
-  user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
+  user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}]
 };
 
@@ -262,7 +262,7 @@ async function renderUser(el, uid) {
 
   el.innerHTML =
     '<div class="section-header" style="margin-bottom:16px"><div class="section-title">Стартапы</div>'+
-    '<div style="display:flex;gap:8px"><a href="create-startup.html" class="btn btn--primary btn--sm">+ Создать</a><a href="startups.html" class="btn btn--outline btn--sm">Все</a></div></div>' +
+    '<div style="display:flex;gap:8px"><a href="startups.html" class="btn btn--outline btn--sm">Все стартапы</a></div></div>' +
     list.map(function(s){
       return '<a class="s-card" href="startup.html?id='+s.id+'" style="display:flex">'+
         '<div class="s-card__logo">'+(s.iconImage?'<img src="'+s.iconImage+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.style.display=&quot;none&quot;"/>':'')+(s.iconImage?'':(s.emoji||'🚀'))+'</div>'+

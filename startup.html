@@ -23,6 +23,11 @@
     .update-card__body{font-size:14px;color:var(--text2);line-height:1.75;white-space:pre-wrap}
       .privacy-opt{border:2px solid var(--border2);border-radius:var(--radius);background:var(--bg3);transition:all .2s}
     .privacy-opt.selected{border-color:var(--accent);background:var(--accent-dim)}
+    .vac-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px}
+    .vac-card__title{font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:6px}
+    .vac-card__desc{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:12px;white-space:pre-wrap}
+    .vac-card__footer{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
 </style>
 </head>
 <body>
@@ -70,6 +75,7 @@
             <button class="tab active" onclick="switchTab(0,this)">О проекте</button>
             <button class="tab" onclick="switchTab(1,this)">Обновления</button>
             <button class="tab" onclick="switchTab(2,this)">Команда</button>
+            <button class="tab" onclick="switchTab(3,this)" id="vacTab">Вакансии</button>
           </div>
 
           <!-- О проекте -->
@@ -96,6 +102,12 @@
           <!-- Команда -->
           <div class="tab-panel" id="panel2">
             <div id="teamList"><div class="spinner" style="margin:32px auto"></div></div>
+          </div>
+
+          <!-- Вакансии -->
+          <div class="tab-panel" id="panel3">
+            <div id="vacOwnerActions" style="display:none;margin-bottom:14px"></div>
+            <div id="vacList"><div class="spinner" style="margin:32px auto"></div></div>
           </div>
         </div>
 
@@ -156,6 +168,30 @@
 
     <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="sendAllInvites()">Отправить заявку</button>
     <div id="inviteError" class="form-error" style="display:none;margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- Vacancy Modal -->
+<div class="modal-overlay" id="vacModal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal__header">
+      <div class="modal__title">Новая вакансия</div>
+      <button class="modal__close" onclick="document.getElementById('vacModal').classList.remove('open')">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Название вакансии *</label>
+      <input type="text" class="form-input" id="vacTitle" placeholder="Frontend-разработчик, UX-дизайнер..."/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Описание *</label>
+      <textarea class="form-textarea" id="vacDesc" style="min-height:120px" placeholder="Что нужно делать, какой опыт нужен, условия..."></textarea>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Теги / навыки <span style="color:var(--text3);font-weight:400">(через запятую)</span></label>
+      <input type="text" class="form-input" id="vacTags" placeholder="React, Python, Figma..."/>
+    </div>
+    <div id="vacErr" class="form-error" style="display:none;margin-top:10px"></div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="saveVacancy()">Опубликовать</button>
   </div>
 </div>
 
@@ -312,6 +348,7 @@ onAuthReady(async function(user, userData) {
     // Обновления и команда
     await loadUpdates();
     await loadTeam();
+    await loadVacancies();
 
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('pageContent').style.display  = 'block';
@@ -688,6 +725,113 @@ async function removeFromTeam(btn) {
     showToast(name + ' удалён из команды', 'success');
     await loadTeam();
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
+}
+
+// ── VACANCIES ─────────────────────────────────────────
+async function loadVacancies() {
+  var el = document.getElementById('vacList');
+  var actEl = document.getElementById('vacOwnerActions');
+  var isOwnerOrAdmin2 = pageUser && (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'));
+
+  // Кнопка добавить вакансию — только владелец/админ
+  if (isOwnerOrAdmin2) {
+    actEl.style.display = '';
+    actEl.innerHTML = '<button class="btn btn--primary btn--sm" onclick="openVacModal()">+ Добавить вакансию</button>';
+  }
+
+  try {
+    var snap = await db.collection('startups').doc(startupId).collection('vacancies')
+      .orderBy('createdAt','desc').get();
+    if (snap.empty) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">📋</div>' +
+        '<div class="empty-state__title">Вакансий пока нет</div>' +
+        '<p style="font-size:14px;color:var(--text2)">Основатель ещё не опубликовал открытые позиции</p></div>';
+      return;
+    }
+
+    el.innerHTML = snap.docs.map(function(d) {
+      var v = d.data();
+      var isOwner2 = pageUser && (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'));
+      // Проверяем подавал ли текущий пользователь заявку
+      var hasApplied = pageUser && safeArray(v.applicants).indexOf(pageUser.uid) !== -1;
+
+      var applyBtn = '';
+      if (pageUser && !isOwner2) {
+        if (hasApplied) {
+          applyBtn = '<span class="badge badge--green">✓ Заявка подана</span>';
+        } else if (pageUserData && pageUserData.role === 'user') {
+          applyBtn = '<button class="btn btn--primary btn--sm" data-vid="'+d.id+'" onclick="applyVacancy(this)">Откликнуться</button>';
+        }
+      }
+      var delBtn = isOwner2 ? '<button class="btn btn--danger btn--sm" data-vid="'+d.id+'" onclick="deleteVacancy(this)">Удалить</button>' : '';
+      var appCount = isOwner2 ? '<a href="members.html" class="badge badge--gray" style="cursor:pointer">👥 Откликнулись: '+safeArray(v.applicants).length+'</a>' : '';
+
+      return '<div class="vac-card">' +
+        '<div class="vac-card__title">'+esc(v.title||'')+'</div>' +
+        (v.tags ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+
+          safeArray(v.tags).map(function(t){return '<span class="badge badge--gray">'+esc(t)+'</span>';}).join('')+
+        '</div>' : '') +
+        '<div class="vac-card__desc">'+esc(v.description||'')+'</div>' +
+        '<div class="vac-card__footer">'+applyBtn+appCount+delBtn+'</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div><p>'+esc(e.message)+'</p></div>';
+  }
+}
+
+function openVacModal() {
+  document.getElementById('vacModal').classList.add('open');
+}
+
+async function saveVacancy() {
+  var title = document.getElementById('vacTitle').value.trim();
+  var desc  = document.getElementById('vacDesc').value.trim();
+  var tagsVal = document.getElementById('vacTags').value.trim();
+  var err   = document.getElementById('vacErr');
+  err.style.display = 'none';
+  if (!title) { err.textContent='Введи название вакансии'; err.style.display='block'; return; }
+  if (!desc)  { err.textContent='Напиши описание'; err.style.display='block'; return; }
+  var tags = tagsVal ? tagsVal.split(',').map(function(t){return t.trim();}).filter(Boolean) : [];
+  try {
+    await db.collection('startups').doc(startupId).collection('vacancies').add({
+      title: title,
+      description: desc,
+      tags: tags,
+      applicants: [],
+      authorUid: pageUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('vacModal').classList.remove('open');
+    document.getElementById('vacTitle').value = '';
+    document.getElementById('vacDesc').value  = '';
+    document.getElementById('vacTags').value  = '';
+    showToast('Вакансия добавлена!','success');
+    await loadVacancies();
+  } catch(e) { err.textContent='Ошибка: '+e.message; err.style.display='block'; }
+}
+
+async function applyVacancy(btn) {
+  if (!pageUser) { showToast('Войди чтобы откликнуться','warn'); return; }
+  var vid = btn.getAttribute('data-vid');
+  btn.disabled = true; btn.textContent = 'Отправка...';
+  try {
+    await db.collection('startups').doc(startupId).collection('vacancies').doc(vid).update({
+      applicants: firebase.firestore.FieldValue.arrayUnion(pageUser.uid)
+    });
+    showToast('Заявка отправлена! Основатель увидит твой профиль.','success');
+    await loadVacancies();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); btn.disabled=false; btn.textContent='Откликнуться'; }
+}
+
+async function deleteVacancy(btn) {
+  if (!confirm('Удалить вакансию?')) return;
+  var vid = btn.getAttribute('data-vid');
+  try {
+    await db.collection('startups').doc(startupId).collection('vacancies').doc(vid).delete();
+    showToast('Вакансия удалена','success');
+    await loadVacancies();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
 function esc(s) {
