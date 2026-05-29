@@ -177,7 +177,11 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script>
-redirectIfAuth('dashboard.html');
+// Редирект только если уже авторизован при загрузке страницы (не во время регистрации)
+var registering = false;
+auth.onAuthStateChanged(function(user) {
+  if (user && !registering) window.location.href = 'dashboard.html';
+});
 
 // Загружаем ссылку политики из настроек
 firebase.firestore().collection('_config').doc('platform').get().then(function(snap) {
@@ -267,6 +271,7 @@ async function doRegister() {
 
   var btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = 'Регистрация...';
+  registering = true;
 
   var email     = document.getElementById('emailInput').value.trim();
   var pass      = document.getElementById('passInput').value;

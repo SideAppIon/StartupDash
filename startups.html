@@ -171,6 +171,15 @@ window.addEventListener('DOMContentLoaded', function() {
   }, 100);
 });
 
+function getStartupDesc(s) {
+    if (s.description) return s.description;
+    if (s.contentBlocks && s.contentBlocks.length) {
+      var block = s.contentBlocks.find(function(b){ return b.type === 'text' && b.content; });
+      if (block) return block.content;
+    }
+    return '';
+  }
+
 function renderList(items) {
     const el = document.getElementById('startupsList');
     if (items.length === 0) {
@@ -183,22 +192,27 @@ function renderList(items) {
       return;
     }
 
-    el.innerHTML = `<div class="startups-grid">` + items.map(s => `
-      <a class="startup-tile" href="startup.html?id=${s.id}">
+    el.innerHTML = `<div class="startups-grid">` + items.map(s => {
+      var desc = esc(getStartupDesc(s));
+      var logoHtml = s.iconImage
+        ? `<img src="${esc(s.iconImage)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.style.display='none'">`
+        : (s.emoji || '🚀');
+      return `<a class="startup-tile" href="startup.html?id=${s.id}">
         <div class="startup-tile__header">
-          <div class="startup-tile__logo">${s.emoji||'🚀'}</div>
+          <div class="startup-tile__logo">${logoHtml}</div>
           <div>
-            <div class="startup-tile__name">${s.name}</div>
-            <div class="startup-tile__tagline">${s.tagline||''}</div>
+            <div class="startup-tile__name">${esc(s.name||'')}</div>
+            <div class="startup-tile__tagline">${esc(s.tagline||'')}</div>
           </div>
         </div>
-        <div class="startup-tile__desc">${s.description||''}</div>
+        ${desc ? `<div class="startup-tile__desc">${desc}</div>` : ''}
         <div class="startup-tile__footer">
-          <span class="badge badge--green">${s.stage||'Идея'}</span>
-          <span class="badge badge--gray">${s.category||''}</span>
-          ${safeArray(s.tags).slice(0,2).map(t=>`<span class="badge badge--gray">${t}</span>`).join('')}
+          <span class="badge badge--green">${esc(s.stage||'Идея')}</span>
+          ${s.category ? `<span class="badge badge--gray">${esc(s.category)}</span>` : ''}
+          ${safeArray(s.tags).slice(0,2).map(t=>`<span class="badge badge--gray">${esc(t)}</span>`).join('')}
         </div>
-      </a>`).join('') + '</div>';
+      </a>`;
+    }).join('') + '</div>';
   }
 </script>
 </body>
