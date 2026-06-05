@@ -69,13 +69,14 @@
       await auth.signInWithEmailAndPassword(email, pass);
       window.location.href = 'dashboard.html';
     } catch(e) {
+      // Поддержка как Firebase кодов, так и текстовых ошибок нового API
       const map = {
-        'auth/user-not-found': 'Пользователь не найден',
-        'auth/wrong-password': 'Неверный пароль',
-        'auth/invalid-email': 'Неверный email',
-        'auth/invalid-credential': 'Неверный email или пароль'
+        'auth/user-not-found':    'Пользователь не найден',
+        'auth/wrong-password':    'Неверный пароль',
+        'auth/invalid-email':     'Неверный email',
+        'auth/invalid-credential':'Неверный email или пароль',
       };
-      showErr(map[e.code] || 'Ошибка входа');
+      showErr(map[e.code] || e.message || 'Неверный email или пароль');
       btn.disabled = false; btn.textContent = 'Войти';
     }
   }
