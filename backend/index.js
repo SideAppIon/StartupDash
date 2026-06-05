@@ -69,10 +69,21 @@ module.exports.handler = async (event, context) => {
 
     // Тело запроса
     let bodyBuffer = Buffer.alloc(0);
-    if (event.body) {
+    let bodyRaw = event.body || '';
+    if (bodyRaw) {
+      // Yandex Cloud иногда присылает уже распарсенный объект
+      if (typeof bodyRaw === 'object') {
+        bodyRaw = JSON.stringify(bodyRaw);
+      }
       bodyBuffer = event.isBase64Encoded
-        ? Buffer.from(event.body, 'base64')
-        : Buffer.from(event.body, 'utf8');
+        ? Buffer.from(bodyRaw, 'base64')
+        : Buffer.from(bodyRaw, 'utf8');
+    }
+
+    // Предварительно парсим JSON — express.json() не всегда читает из нашего Readable
+    let parsedBody = {};
+    if (bodyBuffer.length > 0) {
+      try { parsedBody = JSON.parse(bodyBuffer.toString('utf8')); } catch(e) {}
     }
 
     // Строка запроса
@@ -95,6 +106,9 @@ module.exports.handler = async (event, context) => {
         'content-length': String(bodyBuffer.length),
         ...headers,
       },
+      // Предустанавливаем body — говорим express.json() что тело уже распарсено
+      body:  parsedBody,
+      _body: true,
       connection: { remoteAddress: '127.0.0.1' },
       socket:     { remoteAddress: '127.0.0.1' },
     });
