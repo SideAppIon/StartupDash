@@ -172,10 +172,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script>
+<script src="api-config.js"></script>
 <script>
 // Редирект только если уже авторизован при загрузке страницы (не во время регистрации)
 var registering = false;
@@ -282,24 +279,20 @@ async function doRegister() {
   var roleToSave = selectedRole; // явная копия
 
   try {
-    var cred = await auth.createUserWithEmailAndPassword(email, pass);
-    await db.collection('users').doc(cred.user.uid).set({
-      uid:       cred.user.uid,
+    await auth.createUserWithEmailAndPassword(email, pass, {
       name:      name,
-      email:     email,
       role:      roleToSave,
       bio:       bio,
       skills:    skills.slice(),
       contacts:  contacts,
-      portfolio: portfolio,
-      avatar:    '',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      portfolio: portfolio
     });
     window.location.href = 'dashboard.html';
   } catch(e) {
     var map = {
-      'auth/email-already-in-use': 'Этот email уже используется',
-      'auth/invalid-email':        'Неверный формат email',
+      'Этот email уже используется': 'Этот email уже используется',
+      'auth/email-already-in-use':   'Этот email уже используется',
+      'auth/invalid-email':          'Неверный формат email',
       'auth/weak-password':        'Пароль слишком простой'
     };
     showErr(2, map[e.code] || 'Ошибка: ' + e.message);

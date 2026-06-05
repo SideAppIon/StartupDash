@@ -10,6 +10,7 @@ paths:
         type: cloud_functions
         function_id: d4et8dfjkpiutsev09c0
         service_account_id: aje2ennnoh2h0247ev78
+        payload_format_version: "1.0"
       parameters:
         - name: path
           in: path

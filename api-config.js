@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────
 
 // URL бэкенда: замени на свой URL Yandex Cloud Functions / API Gateway
-const API_URL = 'https://YOUR_FUNCTION_ID.apigw.yandexcloud.net';
+const API_URL = 'https://d5d0pq825bknmdlu2u40.6brbn2wz.apigw.yandexcloud.net';
 // Для локальной разработки: const API_URL = 'http://localhost:3000';
 
 // ─────────────────────────────────────────────────────────
