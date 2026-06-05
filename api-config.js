@@ -155,7 +155,9 @@ class _FieldValueSentinel {
 
 function _firestoreCompat() { return db; }
 _firestoreCompat.FieldValue = {
-  serverTimestamp: () => new Date().toISOString(),
+  // Возвращаем sentinel — _cleanData его уберёт.
+  // Timestamps ставит сам бэкенд через NOW() в SQL.
+  serverTimestamp: () => new _FieldValueSentinel('serverTimestamp', null),
   increment:       (n) => new _FieldValueSentinel('increment', n),
   arrayUnion:      (...items) => new _FieldValueSentinel('arrayUnion', items),
   arrayRemove:     (...items) => new _FieldValueSentinel('arrayRemove', items),
