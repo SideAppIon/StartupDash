@@ -21,8 +21,13 @@
   <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
   <a href="forum.html">Форум</a>
   <div class="nav__user">
-    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
-    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
+    <span class="nav__role" id="navRole"></span>
+    <img class="nav__avatar" id="navAvatar"
+      src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"
+      onclick="goProfile()"/>
+    <a href="dashboard.html" class="btn btn--ghost btn--sm">← Дашборд</a>
+    <button class="btn btn--ghost btn--sm"
+      onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
   </div>
 </nav>
 
@@ -37,13 +42,14 @@
     <div class="card">
       <div class="form-group">
         <label class="form-label">Заголовок *</label>
-        <input type="text" class="form-input" id="titleInput" placeholder="MVP готов! Первые 100 пользователей" maxlength="120"/>
+        <input type="text" class="form-input" id="titleInput"
+          placeholder="MVP готов! Первые 100 пользователей" maxlength="120"/>
       </div>
 
       <div class="form-group">
         <label class="form-label">Тип обновления</label>
         <select class="form-select" id="typeSelect">
-          <option value="">Общее</option>
+          <option value="Общее">📋 Общее</option>
           <option value="Milestone">🏆 Milestone</option>
           <option value="MVP">⚡ MVP</option>
           <option value="Партнёрство">🤝 Партнёрство</option>
@@ -61,7 +67,7 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Фото (ссылка на изображение)</label>
+        <label class="form-label">Фото <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
         <input type="url" class="form-input" id="imageInput"
           placeholder="https://i.imgur.com/..."
           oninput="previewImage(this.value)"/>
@@ -91,17 +97,17 @@ requireAuth('login.html');
 
 var startupId   = getUrlParam('id');
 var startupData = null;
-if (!startupId) window.location.href='dashboard.html';
+if (!startupId) window.location.href = 'dashboard.html';
 
-document.getElementById('backLink').href   = 'startup.html?id='+startupId;
-document.getElementById('cancelLink').href = 'startup.html?id='+startupId;
+document.getElementById('backLink').href   = 'startup.html?id=' + startupId;
+document.getElementById('cancelLink').href = 'startup.html?id=' + startupId;
 
 function previewImage(url) {
   var img = document.getElementById('imgPreview');
   if (url && url.startsWith('http')) {
     img.src = url;
     img.className = 'img-preview show';
-    img.onerror = function(){ img.className='img-preview'; };
+    img.onerror = function(){ img.className = 'img-preview'; };
   } else {
     img.className = 'img-preview';
   }
@@ -109,53 +115,85 @@ function previewImage(url) {
 
 onAuthReady(async function(user, userData) {
   if (!user) return;
-  // Владелец любой роли может постить обновления
-  var av = userData&&userData.avatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U';
-  document.getElementById('navAvatar').src = av;
+  renderNav(userData);
 
+  // Загружаем стартап
   var snap = await db.collection('startups').doc(startupId).get();
-  if (!snap.exists){window.location.href='dashboard.html';return;}
-  startupData = Object.assign({id:snap.id}, snap.data());
+  if (!snap.exists) { window.location.href = 'dashboard.html'; return; }
+  startupData = Object.assign({ id: snap.id }, snap.data());
 
-  var isOwner = startupData.ownerUid===user.uid || (userData&&userData.role==='admin');
+  var isOwner = startupData.ownerUid === user.uid || (userData && userData.role === 'admin');
   var hasUpdatesPermission = false;
-  if (!isOwner) {
-    // Проверяем permission updates через team или invite
-    try {
-      var teamSnap = await db.collection('startups').doc(startupId).collection('team').where('uid','==',user.uid).get();
-      if (!teamSnap.empty && teamSnap.docs[0].data().permissions && teamSnap.docs[0].data().permissions.updates) hasUpdatesPermission = true;
-    } catch(e){}
-    try {
-      var invSnap2 = await db.collection('invites').where('fromUid','==',user.uid).where('startupId','==',startupId).where('status','==','accepted').get();
-      if (!invSnap2.empty && invSnap2.docs[0].data().permissions && invSnap2.docs[0].data().permissions.updates) hasUpdatesPermission = true;
-    } catch(e){}
-  }
-  if (!isOwner && !hasUpdatesPermission){
-    window.location.href='startup.html?id='+startupId; return;
-  }
-  document.getElementById('startupNameLabel').textContent = startupData.name;
 
-  // Предыдущие обновления
-  var updSnap = await db.collection('startups').doc(startupId)
-    .collection('updates').orderBy('createdAt','desc').limit(5).get();
+  if (!isOwner) {
+    try {
+      var teamSnap = await db.collection('startups').doc(startupId)
+        .collection('team').where('userUid', '==', user.uid).get();
+      if (!teamSnap.empty) {
+        var perms = teamSnap.docs[0].data().permissions || {};
+        if (perms.updates) hasUpdatesPermission = true;
+      }
+    } catch(e) {}
+    try {
+      var invSnap = await db.collection('invites')
+        .where('fromUid', '==', user.uid)
+        .where('startupId', '==', startupId)
+        .where('status', '==', 'accepted').get();
+      if (!invSnap.empty) {
+        var perms2 = invSnap.docs[0].data().permissions || {};
+        if (perms2.updates) hasUpdatesPermission = true;
+      }
+    } catch(e) {}
+  }
+
+  if (!isOwner && !hasUpdatesPermission) {
+    window.location.href = 'startup.html?id=' + startupId;
+    return;
+  }
+
+  document.getElementById('startupNameLabel').textContent = startupData.name || '';
+
+  // Загружаем предыдущие обновления
+  loadPrevUpdates();
+});
+
+async function loadPrevUpdates() {
   var prevEl = document.getElementById('prevUpdates');
-  if (updSnap.empty) {
-    prevEl.innerHTML='<div class="empty-state" style="padding:32px"><div class="empty-state__icon">📋</div><div class="empty-state__title">Нет обновлений</div></div>';
-  } else {
-    prevEl.innerHTML = updSnap.docs.map(function(d){
-      var u=d.data();
-      return '<div class="update-card">'+
-        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">'+
-          '<div class="update-card__title">'+esc(u.title||'')+'</div>'+
-          (u.type?'<span class="badge badge--green">'+esc(u.type)+'</span>':'')+
-        '</div>'+
-        '<div class="update-card__date">'+formatDate(u.createdAt)+'</div>'+
-        '<div class="update-card__body">'+esc(u.body||'').substring(0,200)+(u.body&&u.body.length>200?'...':'')+'</div>'+
-        (u.imageUrl?'<img src="'+esc(u.imageUrl)+'" class="update-card__img" onerror="this.style.display=&quot;none&quot;"/>':'')+
+  try {
+    var data = await api.get('/startups/' + startupId + '/updates');
+    var updates = data.updates || [];
+    if (!updates.length) {
+      prevEl.innerHTML = '<div class="empty-state" style="padding:32px">' +
+        '<div class="empty-state__icon">📋</div>' +
+        '<div class="empty-state__title">Нет обновлений</div></div>';
+      return;
+    }
+    prevEl.innerHTML = updates.slice(0, 5).map(function(u) {
+      // Текст: бэкенд возвращает поле content, также есть body-алиас
+      var text = u.content || u.body || '';
+      // Дата
+      var dateStr = formatDate(u.createdAt || u.created_at);
+      // Тип — не показываем "text" и "Общее" как бейдж
+      var typeBadge = (u.type && u.type !== 'text' && u.type !== 'Общее')
+        ? '<span class="badge badge--green" style="white-space:nowrap">' + esc(u.type) + '</span>'
+        : '';
+      return '<div class="update-card">' +
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">' +
+          '<div class="update-card__title">' + esc(u.title || '') + '</div>' +
+          typeBadge +
+        '</div>' +
+        '<div class="update-card__date">' + dateStr + '</div>' +
+        '<div class="update-card__body">' + esc(text).substring(0, 200) +
+          (text.length > 200 ? '...' : '') + '</div>' +
+        (u.imageUrl || u.image_url
+          ? '<img src="' + esc(u.imageUrl || u.image_url) + '" class="update-card__img" onerror="this.style.display=\'none\'"/>'
+          : '') +
       '</div>';
     }).join('');
+  } catch(e) {
+    prevEl.innerHTML = '<p style="color:var(--text2);font-size:14px">Не удалось загрузить</p>';
   }
-});
+}
 
 async function postUpdate() {
   var title = document.getElementById('titleInput').value.trim();
@@ -163,37 +201,42 @@ async function postUpdate() {
   var image = document.getElementById('imageInput').value.trim();
   var type  = document.getElementById('typeSelect').value;
   var btn   = document.getElementById('submitBtn');
-  var err   = document.getElementById('formError');
-  err.style.display='none';
-  if (!title){showFormErr('Введи заголовок');return;}
-  if (!body) {showFormErr('Напиши содержание');return;}
-  btn.disabled=true; btn.textContent='Публикация...';
-  try {
-    var data = {
-      title, body, type,
-      authorUid:  currentUser.uid,
-      authorName: currentUserData.name,
-      createdAt:  firebase.firestore.FieldValue.serverTimestamp()
-    };
-    if (image&&image.startsWith('http')) data.imageUrl = image;
 
-    await db.collection('startups').doc(startupId).collection('updates').add(data);
-    await db.collection('startups').doc(startupId).update({
-      lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    showToast('Обновление опубликовано!','success');
-    setTimeout(function(){window.location.href='startup.html?id='+startupId;},800);
-  } catch(e){
-    showFormErr('Ошибка: '+e.message);
-    btn.disabled=false; btn.textContent='📢 Опубликовать';
+  document.getElementById('formError').style.display = 'none';
+  if (!title) { showFormErr('Введи заголовок'); return; }
+  if (!body)  { showFormErr('Напиши содержание'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Публикация...';
+
+  try {
+    var payload = {
+      title:      title,
+      content:    body,   // бэкенд ждёт 'content'
+      type:       type,
+      authorUid:  currentUser.uid,
+      authorName: currentUserData ? currentUserData.name : '',
+    };
+    if (image && image.startsWith('http')) payload.imageUrl = image;
+
+    await api.post('/startups/' + startupId + '/updates', payload);
+
+    showToast('✅ Обновление опубликовано!', 'success');
+    setTimeout(function() {
+      window.location.href = 'startup.html?id=' + startupId;
+    }, 800);
+  } catch(e) {
+    showFormErr('Ошибка: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '📢 Опубликовать';
   }
 }
 
-function showFormErr(msg){
-  var el=document.getElementById('formError');
-  el.textContent=msg; el.style.display='block';
+function showFormErr(msg) {
+  var el = document.getElementById('formError');
+  el.textContent = msg;
+  el.style.display = 'block';
 }
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 </script>
 </body>
 </html>
