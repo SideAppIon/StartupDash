@@ -59,8 +59,10 @@ module.exports.handler = async (event, context) => {
       const real = pp['path+'] || pp['path'] || '';
       path = real ? '/' + real : '/';
     }
-    const method  = (event.httpMethod || 'GET').toUpperCase();
-    const headers = event.headers || {};
+    const method = (event.httpMethod || 'GET').toUpperCase();
+    // Приводим заголовки к нижнему регистру — Yandex Cloud присылает их в разном регистре
+    const headers = {};
+    Object.entries(event.headers || {}).forEach(([k, v]) => { headers[k.toLowerCase()] = v; });
     const qs      = event.queryStringParameters || {};
 
     // Тело запроса

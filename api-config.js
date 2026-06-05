@@ -139,9 +139,13 @@ function requireAuth(redirectTo) {
   if (_authResolved) {
     if (!_currentUser) window.location.href = redirectTo || 'login.html';
   } else {
+    // Ждём завершения initAuth, затем проверяем
     const unsub = auth.onAuthStateChanged(() => {
       unsub();
-      if (!_currentUser) window.location.href = redirectTo || 'login.html';
+      // Небольшая задержка чтобы _currentUser успел установиться
+      setTimeout(() => {
+        if (!_currentUser) window.location.href = redirectTo || 'login.html';
+      }, 50);
     });
   }
 }
