@@ -399,7 +399,7 @@ async function sendInviteFromStartup() {
       type:          'from_startup',
       to_uid:        toInviteUid,
       startup_id:    startupId,
-      startup_name:  sSnap.data().name || sSnap.data().Name || '',
+      startup_name:  sSnap.data().name || '',
       startup_owner: pageViewer.uid,
       role:          role,
       message:       'Приглашение в команду'
@@ -407,6 +407,9 @@ async function sendInviteFromStartup() {
 
     document.getElementById('inviteModal').classList.remove('open');
     showToast('✅ Приглашение отправлено!', 'success');
+
+    // Обновляем кнопку — показываем что уже приглашён
+    renderActions(pageViewer, pageViewerData, true);
   } catch(e) {
     showToast('Ошибка: ' + e.message, 'error');
   }

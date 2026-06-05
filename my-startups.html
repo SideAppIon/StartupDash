@@ -55,7 +55,7 @@
         <h1 class="page-title">Мои стартапы</h1>
         <p class="page-subtitle">Управляй проектами и командой</p>
       </div>
-      <a href="create-startup.html" class="btn btn--primary" id="createStartupBtn">+ Создать стартап</a>
+      <a href="create-startup.html" class="btn btn--primary" id="createStartupBtn" style="display:none">+ Создать стартап</a>
     </div>
     <div id="content"><div class="spinner"></div></div>
   </div>
@@ -120,9 +120,10 @@ var editRoleCtx = null; // {startupId, uid, inviteId, currentRole}
 onAuthReady(async function(user, userData) {
   if (!user) return;
   renderNav(userData);
-  if (userData && userData.role === 'user') {
-    var cb = document.getElementById('createStartupBtn');
-    if (cb) cb.style.display = 'none';
+  // Кнопка "Создать" — только для стартапера и эксперта
+  var cb = document.getElementById('createStartupBtn');
+  if (cb && (userData.role === 'startup' || userData.role === 'expert' || userData.role === 'admin')) {
+    cb.style.display = '';
   }
 
   var el = document.getElementById('content');

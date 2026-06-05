@@ -5,28 +5,50 @@ const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /invites — получить приглашения текущего пользователя
+// GET /invites — получить приглашения с поддержкой любых фильтров
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const { direction } = req.query; // 'sent' | 'received' | all
+    const q = req.query;
     let sql = 'SELECT * FROM invites WHERE 1=1';
     const params = [];
 
-    if (direction === 'sent') {
-      params.push(req.user.uid);
-      sql += ` AND from_uid = $${params.length}`;
-    } else if (direction === 'received') {
-      params.push(req.user.uid);
-      sql += ` AND startup_owner = $${params.length}`;
-    } else {
-      params.push(req.user.uid);
-      sql += ` AND (from_uid = $${params.length} OR startup_owner = $${params.length} OR to_uid = $${params.length})`;
+    // Фильтры по конкретным полям (приоритет)
+    if (q.to_uid) {
+      params.push(q.to_uid); sql += ` AND to_uid = $${params.length}`;
+    }
+    if (q.from_uid) {
+      params.push(q.from_uid); sql += ` AND from_uid = $${params.length}`;
+    }
+    if (q.startup_id) {
+      params.push(q.startup_id); sql += ` AND startup_id = $${params.length}`;
+    }
+    if (q.startup_owner) {
+      params.push(q.startup_owner); sql += ` AND startup_owner = $${params.length}`;
+    }
+    if (q.status) {
+      params.push(q.status); sql += ` AND status = $${params.length}`;
+    }
+    if (q.type) {
+      params.push(q.type); sql += ` AND type = $${params.length}`;
+    }
+
+    // Если ни одного фильтра нет — показываем связанные с текущим пользователем
+    if (!q.to_uid && !q.from_uid && !q.startup_id && !q.startup_owner) {
+      if (q.direction === 'sent') {
+        params.push(req.user.uid); sql += ` AND from_uid = $${params.length}`;
+      } else if (q.direction === 'received') {
+        params.push(req.user.uid); sql += ` AND startup_owner = $${params.length}`;
+      } else {
+        params.push(req.user.uid);
+        sql += ` AND (from_uid = $${params.length} OR startup_owner = $${params.length} OR to_uid = $${params.length})`;
+      }
     }
 
     sql += ' ORDER BY created_at DESC';
     const invites = await queryAll(sql, params);
     res.json({ invites: invites.map(parseInvite) });
   } catch (e) {
+    console.error('GET /invites error:', e.message);
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
