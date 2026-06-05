@@ -357,13 +357,7 @@ async function confirmAccept() {
   if (!acceptCtx) return;
   var role = document.getElementById('acceptRoleInput').value.trim() || 'Участник';
   try {
-    // Добавляем в команду через API
-    await api.post('/startups/' + acceptCtx.startupId + '/team', {
-      user_uid: acceptCtx.fromUid,
-      role:     role,
-      permissions: {}
-    });
-    // Обновляем статус заявки
+    // PATCH /invites/:id с status=accepted автоматически добавляет человека в команду
     await api.patch('/invites/' + acceptCtx.inviteId, { status: 'accepted', role: role });
     document.getElementById('acceptModal').classList.remove('open');
     showToast('✅ ' + acceptCtx.fromName + ' принят как «' + role + '»', 'success');
