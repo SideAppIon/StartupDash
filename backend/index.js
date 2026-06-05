@@ -20,7 +20,29 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-app.use(express.json({ limit: '2mb' }));
+// Собственный парсер тела — express.json() ненадёжно работает с нашим фейковым Readable
+// Если тело уже предпарсено в handler'е (req._yc_body), используем его.
+// Иначе читаем из потока (для локальной разработки).
+app.use((req, res, next) => {
+  // Тело уже предпарсено Yandex Cloud handler'ом
+  if (req._yc_body !== undefined) {
+    req.body = req._yc_body;
+    return next();
+  }
+  // Локальная разработка — читаем из потока
+  const ct = (req.headers['content-type'] || '').toLowerCase();
+  if (!ct.includes('application/json')) {
+    req.body = {};
+    return next();
+  }
+  let raw = '';
+  req.on('data', chunk => { raw += chunk.toString('utf8'); });
+  req.on('end', () => {
+    try { req.body = raw ? JSON.parse(raw) : {}; } catch(e) { req.body = {}; }
+    next();
+  });
+  req.on('error', () => { req.body = {}; next(); });
+});
 
 // ── Healthcheck ───────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
@@ -80,11 +102,17 @@ module.exports.handler = async (event, context) => {
         : Buffer.from(bodyRaw, 'utf8');
     }
 
-    // Предварительно парсим JSON — express.json() не всегда читает из нашего Readable
+    // Предварительно парсим JSON
     let parsedBody = {};
     if (bodyBuffer.length > 0) {
-      try { parsedBody = JSON.parse(bodyBuffer.toString('utf8')); } catch(e) {}
+      try {
+        parsedBody = JSON.parse(bodyBuffer.toString('utf8'));
+      } catch(e) {
+        console.error('[body-parse-error]', e.message, 'raw:', bodyBuffer.toString('utf8').substring(0, 200));
+      }
     }
+    // Логируем входящий запрос для отладки
+    console.log(`[${method}] ${path} body_len=${bodyBuffer.length} keys=${Object.keys(parsedBody).join(',')}`);
 
     // Строка запроса
     const qstr = Object.keys(qs).length
@@ -106,9 +134,8 @@ module.exports.handler = async (event, context) => {
         'content-length': String(bodyBuffer.length),
         ...headers,
       },
-      // Предустанавливаем body — говорим express.json() что тело уже распарсено
-      body:  parsedBody,
-      _body: true,
+      // Передаём предпарсенное тело через _yc_body — наш middleware его подхватит
+      _yc_body: parsedBody,
       connection: { remoteAddress: '127.0.0.1' },
       socket:     { remoteAddress: '127.0.0.1' },
     });
