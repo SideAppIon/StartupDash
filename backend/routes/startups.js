@@ -74,8 +74,20 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Только стартапер или эксперт могут создавать проекты' });
     }
 
-    const { name, tagline, stage, category, website, looking_for, cover_image,
-            emoji, icon_image, tags, privacy, content_blocks } = req.body;
+    const b = req.body;
+    // Принимаем и snake_case и camelCase
+    const name           = b.name;
+    const tagline        = b.tagline;
+    const stage          = b.stage;
+    const category       = b.category;
+    const website        = b.website;
+    const looking_for    = b.looking_for    || b.lookingFor    || '';
+    const cover_image    = b.cover_image    || b.coverImage    || '';
+    const emoji          = b.emoji          || '🚀';
+    const icon_image     = b.icon_image     || b.iconImage     || '';
+    const tags           = b.tags;
+    const privacy        = b.privacy;
+    const content_blocks = b.content_blocks || b.contentBlocks || [];
 
     if (!name || !tagline) return res.status(400).json({ error: 'name и tagline обязательны' });
 
@@ -112,16 +124,33 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Нет доступа' });
 
+    // Нормализуем тело — camelCase → snake_case
+    const b2 = req.body;
+    const normalized = {
+      name:           b2.name,
+      tagline:        b2.tagline,
+      stage:          b2.stage,
+      category:       b2.category,
+      website:        b2.website,
+      emoji:          b2.emoji,
+      privacy:        b2.privacy,
+      looking_for:    b2.looking_for    ?? b2.lookingFor,
+      cover_image:    b2.cover_image    ?? b2.coverImage,
+      icon_image:     b2.icon_image     ?? b2.iconImage,
+      tags:           b2.tags,
+      content_blocks: b2.content_blocks ?? b2.contentBlocks,
+    };
+
     const allowed = ['name', 'tagline', 'stage', 'category', 'website', 'looking_for',
                      'cover_image', 'emoji', 'icon_image', 'tags', 'privacy', 'content_blocks'];
     const updates = [];
     const values  = [];
 
     allowed.forEach(field => {
-      if (req.body[field] !== undefined) {
+      if (normalized[field] !== undefined && normalized[field] !== null) {
         const val = ['tags', 'content_blocks'].includes(field)
-          ? JSON.stringify(req.body[field])
-          : req.body[field];
+          ? JSON.stringify(normalized[field])
+          : normalized[field];
         values.push(val);
         updates.push(`${field} = $${values.length}`);
       }
