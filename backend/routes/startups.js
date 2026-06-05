@@ -219,7 +219,7 @@ router.get('/:id/updates', async (req, res) => {
        ORDER BY u.created_at DESC`,
       [req.params.id]
     );
-    res.json({ updates });
+    res.json({ updates: updates.map(_parseUpdate) });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
@@ -237,16 +237,21 @@ router.post('/:id/updates', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Нет доступа' });
     }
 
-    const { title, content, type } = req.body;
-    if (!content) return res.status(400).json({ error: 'content обязателен' });
+    // Принимаем 'body' как алиас для 'content' (совместимость с фронтендом)
+    const content = req.body.content || req.body.body || '';
+    const title   = req.body.title   || '';
+    const type    = req.body.type    || 'text';
+    const imageUrl = req.body.imageUrl || req.body.image_url || '';
+
+    if (!content) return res.status(400).json({ error: 'Напиши содержание обновления' });
 
     const id = uuidv4();
     const update = await queryOne(
-      `INSERT INTO startup_updates (id, startup_id, author_uid, title, content, type, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,NOW()) RETURNING *`,
-      [id, req.params.id, req.user.uid, title || '', content, type || 'text']
+      `INSERT INTO startup_updates (id, startup_id, author_uid, title, content, type, image_url, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *`,
+      [id, req.params.id, req.user.uid, title, content, type, imageUrl]
     );
-    res.status(201).json({ update });
+    res.status(201).json({ update: _parseUpdate(update) });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
@@ -417,6 +422,19 @@ function tryParse(val, fallback) {
   if (!val) return fallback;
   if (typeof val !== 'string') return val;
   try { return JSON.parse(val); } catch(e) { return fallback; }
+}
+
+// Нормализация обновления — добавляем алиасы для совместимости с фронтендом
+function _parseUpdate(u) {
+  if (!u) return u;
+  return {
+    ...u,
+    body:       u.content || u.body || '',   // фронтенд читает .body
+    imageUrl:   u.image_url || '',
+    authorUid:  u.author_uid,
+    authorName: u.author_name,
+    createdAt:  u.created_at,
+  };
 }
 
 module.exports = router;
