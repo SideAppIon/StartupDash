@@ -51,8 +51,14 @@ if (require.main === module) {
 // Ручной адаптер — serverless-http не поддерживает формат Yandex Cloud
 module.exports.handler = async (event, context) => {
   return new Promise((resolve) => {
-    // Достаём путь и метод из события
-    const path    = event.path || '/';
+    // Достаём путь — API Gateway может передавать шаблон /{path+}
+    // поэтому берём реальный путь из pathParameters
+    let path = event.path || '/';
+    if (path.includes('{') || path === '/{path+}') {
+      const pp = event.pathParameters || {};
+      const real = pp['path+'] || pp['path'] || '';
+      path = real ? '/' + real : '/';
+    }
     const method  = (event.httpMethod || 'GET').toUpperCase();
     const headers = event.headers || {};
     const qs      = event.queryStringParameters || {};
