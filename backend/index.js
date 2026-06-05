@@ -20,6 +20,16 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
+// Yandex Cloud API Gateway обрезает тело PATCH/DELETE запросов.
+// Фронтенд отправляет POST ?_method=PATCH — здесь подменяем метод.
+app.use((req, res, next) => {
+  const override = req.query && req.query._method;
+  if (req.method === 'POST' && (override === 'PATCH' || override === 'DELETE')) {
+    req.method = override;
+  }
+  next();
+});
+
 // Собственный парсер тела — express.json() ненадёжно работает с нашим фейковым Readable
 // Если тело уже предпарсено в handler'е (req._yc_body), используем его.
 // Иначе читаем из потока (для локальной разработки).
