@@ -533,14 +533,25 @@ async function loadUpdates() {
 
     el.innerHTML = snap.docs.map(function(d) {
       var u = d.data();
+      // Текст: бэкенд хранит в content, фронтенд исторически читал body
+      var text = u.content || u.body || '';
+      // Дата: camelCase или snake_case
+      var dateStr = formatDate(u.createdAt || u.created_at);
+      // Тип: не показываем технические значения 'text' и 'Общее'
+      var skipTypes = ['text', 'Общее', ''];
+      var typeBadge = (u.type && skipTypes.indexOf(u.type) === -1)
+        ? '<span class="badge badge--green" style="flex-shrink:0;white-space:nowrap">' + esc(u.type) + '</span>'
+        : '';
+      // Картинка
+      var imgUrl = u.imageUrl || u.image_url || '';
       return '<div class="update-card">' +
         '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">' +
           '<div class="update-card__title">' + esc(u.title||'') + '</div>' +
-          (u.type ? '<span class="badge badge--green" style="flex-shrink:0">' + esc(u.type) + '</span>' : '') +
+          typeBadge +
         '</div>' +
-        '<div class="update-card__date">' + formatDate(u.createdAt) + '</div>' +
-        '<div class="update-card__body">' + esc(u.body||'') + '</div>' +
-        (u.imageUrl ? '<img src="' + esc(u.imageUrl) + '" style="width:100%;max-height:300px;object-fit:cover;border-radius:var(--radius);margin-top:12px;display:block" onerror="this.style.display=&quot;none&quot;"/>' : '') +
+        '<div class="update-card__date">' + dateStr + '</div>' +
+        '<div class="update-card__body">' + esc(text) + '</div>' +
+        (imgUrl ? '<img src="' + esc(imgUrl) + '" style="width:100%;max-height:300px;object-fit:cover;border-radius:var(--radius);margin-top:12px;display:block" onerror="this.style.display=&quot;none&quot;"/>' : '') +
       '</div>';
     }).join('');
   } catch(e) {
