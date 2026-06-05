@@ -1,99 +1,63 @@
 // ─────────────────────────────────────────────────────────
-// API CONFIG — замена firebase-config.js
-// Подключи этот файл вместо firebase-config.js во всех .html
+// api-config.js — полная замена firebase-config.js
+// Совместимый слой: все вызовы db.collection(...) и auth.*
+// работают через REST API бэкенда на Yandex Cloud
 // ─────────────────────────────────────────────────────────
 
-// URL бэкенда: замени на свой URL Yandex Cloud Functions / API Gateway
 const API_URL = 'https://d5d0pq825bknmdlu2u40.6brbn2wz.apigw.yandexcloud.net';
-// Для локальной разработки: const API_URL = 'http://localhost:3000';
 
 // ─────────────────────────────────────────────────────────
-// СОСТОЯНИЕ
+// ТОКЕН
+// ─────────────────────────────────────────────────────────
+function getToken()    { return localStorage.getItem('auth_token'); }
+function setToken(t)   { localStorage.setItem('auth_token', t); }
+function removeToken() { localStorage.removeItem('auth_token'); }
+
+// ─────────────────────────────────────────────────────────
+// HTTP
+// ─────────────────────────────────────────────────────────
+async function apiRequest(method, path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = getToken();
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const opts = { method, headers };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch(API_URL + path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || 'Ошибка запроса');
+    err.code  = res.status;
+    throw err;
+  }
+  return data;
+}
+const api = {
+  get:    (path)       => apiRequest('GET',    path),
+  post:   (path, body) => apiRequest('POST',   path, body),
+  patch:  (path, body) => apiRequest('PATCH',  path, body),
+  delete: (path)       => apiRequest('DELETE', path),
+};
+
+// ─────────────────────────────────────────────────────────
+// СОСТОЯНИЕ AUTH
 // ─────────────────────────────────────────────────────────
 let _currentUser     = null;
 let _currentUserData = null;
 let _authCallbacks   = [];
 let _authResolved    = false;
 
-// ─────────────────────────────────────────────────────────
-// ТОКЕН
-// ─────────────────────────────────────────────────────────
-function getToken()          { return localStorage.getItem('auth_token'); }
-function setToken(t)         { localStorage.setItem('auth_token', t); }
-function removeToken()       { localStorage.removeItem('auth_token'); }
+// Публичные алиасы (используются напрямую в HTML файлах)
+var currentUser     = null;
+var currentUserData = null;
 
-// ─────────────────────────────────────────────────────────
-// HTTP ХЕЛПЕРЫ
-// ─────────────────────────────────────────────────────────
-async function apiRequest(method, path, body) {
-  const headers = { 'Content-Type': 'application/json' };
-  const token = getToken();
-  if (token) headers['Authorization'] = 'Bearer ' + token;
-
-  const opts = { method, headers };
-  if (body !== undefined) opts.body = JSON.stringify(body);
-
-  const res = await fetch(API_URL + path, opts);
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const err = new Error(data.error || 'Ошибка запроса');
-    err.code = res.status;
-    throw err;
-  }
-  return data;
+function _syncPublic() {
+  currentUser     = _currentUser;
+  currentUserData = _currentUserData;
 }
-
-const api = {
-  get:    (path)        => apiRequest('GET',    path),
-  post:   (path, body)  => apiRequest('POST',   path, body),
-  patch:  (path, body)  => apiRequest('PATCH',  path, body),
-  delete: (path)        => apiRequest('DELETE', path),
-};
-
-// ─────────────────────────────────────────────────────────
-// AUTH
-// ─────────────────────────────────────────────────────────
-const auth = {
-  // Регистрация
-  async createUserWithEmailAndPassword(email, password, extraData) {
-    const data = await api.post('/auth/register', { email, password, ...extraData });
-    setToken(data.token);
-    _currentUser     = { uid: data.user.uid, email: data.user.email };
-    _currentUserData = data.user;
-    return { user: _currentUser };
-  },
-
-  // Вход
-  async signInWithEmailAndPassword(email, password) {
-    const data = await api.post('/auth/login', { email, password });
-    setToken(data.token);
-    _currentUser     = { uid: data.user.uid, email: data.user.email };
-    _currentUserData = data.user;
-    _notifyCallbacks();
-    return { user: _currentUser };
-  },
-
-  // Выход
-  async signOut() {
-    removeToken();
-    _currentUser     = null;
-    _currentUserData = null;
-    _notifyCallbacks();
-  },
-
-  // Сброс пароля
-  async sendPasswordResetEmail(email) {
-    await api.post('/auth/reset-password', { email });
-  },
-
-  // Слушатель смены состояния (совместимость с firebase)
-  onAuthStateChanged(callback) {
-    _authCallbacks.push(callback);
-    if (_authResolved) callback(_currentUser);
-    return () => { _authCallbacks = _authCallbacks.filter(cb => cb !== callback); };
-  },
-};
+function _notifyCallbacks() {
+  _syncPublic();
+  _authCallbacks.forEach(cb => cb(_currentUser));
+}
 
 // Восстанавливаем сессию при загрузке страницы
 (async function initAuth() {
@@ -104,53 +68,63 @@ const auth = {
       _currentUser     = { uid: data.user.uid, email: data.user.email };
       _currentUserData = data.user;
     } catch (e) {
-      // Токен протух — удаляем
       removeToken();
-      _currentUser     = null;
-      _currentUserData = null;
+      _currentUser = _currentUserData = null;
     }
   }
   _authResolved = true;
   _notifyCallbacks();
 })();
 
-function _notifyCallbacks() {
-  _authCallbacks.forEach(cb => cb(_currentUser));
-}
+// ─────────────────────────────────────────────────────────
+// AUTH API
+// ─────────────────────────────────────────────────────────
+const auth = {
+  async createUserWithEmailAndPassword(email, password, extra) {
+    const data = await api.post('/auth/register', { email, password, ...(extra||{}) });
+    setToken(data.token);
+    _currentUser     = { uid: data.user.uid, email: data.user.email };
+    _currentUserData = data.user;
+    _syncPublic();
+    return { user: _currentUser };
+  },
+  async signInWithEmailAndPassword(email, password) {
+    const data = await api.post('/auth/login', { email, password });
+    setToken(data.token);
+    _currentUser     = { uid: data.user.uid, email: data.user.email };
+    _currentUserData = data.user;
+    _notifyCallbacks();
+    return { user: _currentUser };
+  },
+  async signOut() {
+    removeToken();
+    _currentUser = _currentUserData = null;
+    _notifyCallbacks();
+  },
+  async sendPasswordResetEmail(email) {
+    await api.post('/auth/reset-password', { email });
+  },
+  onAuthStateChanged(cb) {
+    _authCallbacks.push(cb);
+    if (_authResolved) cb(_currentUser);
+    return () => { _authCallbacks = _authCallbacks.filter(x => x !== cb); };
+  },
+  get currentUser() { return _currentUser; },
+};
 
 // ─────────────────────────────────────────────────────────
-// СОВМЕСТИМОСТЬ С FIREBASE API (используется в HTML файлах)
+// HELPERS: совместимость с Firebase Auth callbacks
 // ─────────────────────────────────────────────────────────
-
-// onAuthReady(callback(user, userData)) — аналог firebase onAuthReady
-function onAuthReady(callback) {
-  if (_authResolved) {
-    callback(_currentUser, _currentUserData);
-  } else {
-    const unsub = auth.onAuthStateChanged(() => {
-      unsub();
-      callback(_currentUser, _currentUserData);
-    });
-  }
-}
-
-// requireAuth(redirectTo) — редирект если не авторизован
 function requireAuth(redirectTo) {
   if (_authResolved) {
     if (!_currentUser) window.location.href = redirectTo || 'login.html';
   } else {
-    // Ждём завершения initAuth, затем проверяем
     const unsub = auth.onAuthStateChanged(() => {
       unsub();
-      // Небольшая задержка чтобы _currentUser успел установиться
-      setTimeout(() => {
-        if (!_currentUser) window.location.href = redirectTo || 'login.html';
-      }, 50);
+      setTimeout(() => { if (!_currentUser) window.location.href = redirectTo || 'login.html'; }, 50);
     });
   }
 }
-
-// redirectIfAuth(redirectTo) — редирект если уже авторизован
 function redirectIfAuth(redirectTo) {
   if (_authResolved) {
     if (_currentUser) window.location.href = redirectTo || 'dashboard.html';
@@ -161,146 +135,315 @@ function redirectIfAuth(redirectTo) {
     });
   }
 }
-
-// ─────────────────────────────────────────────────────────
-// FIRESTORE-ПОДОБНЫЙ API (db.collection)
-// Обёртка для постепенной миграции — имитирует Firestore API
-// через HTTP запросы к бэкенду
-// ─────────────────────────────────────────────────────────
-const db = {
-  collection(name) {
-    return new CollectionRef(name);
-  }
-};
-
-class CollectionRef {
-  constructor(name, _filters = [], _order = null, _limit = null) {
-    this._name    = name;
-    this._filters = _filters;
-    this._order   = _order;
-    this._limit   = _limit;
-  }
-
-  doc(id) { return new DocRef(this._name, id); }
-
-  where(field, op, value) {
-    return new CollectionRef(this._name, [...this._filters, { field, op, value }], this._order, this._limit);
-  }
-
-  orderBy(field, dir) {
-    return new CollectionRef(this._name, this._filters, { field, dir: dir || 'asc' }, this._limit);
-  }
-
-  limit(n) {
-    return new CollectionRef(this._name, this._filters, this._order, n);
-  }
-
-  async get() {
-    const params = new URLSearchParams();
-    this._filters.forEach(f => {
-      if (f.op === '==' || f.op === '===') params.set(f.field, f.value);
-      else if (f.op === 'array-contains') params.set('participants_contains', f.value);
-    });
-    if (this._limit) params.set('_limit', this._limit);
-
-    const path = `/${this._name}?${params.toString()}`;
-    const data = await api.get(path);
-
-    // Нормализуем ответ в формат {docs: [{id, data()}]}
-    const key  = Object.keys(data).find(k => Array.isArray(data[k]));
-    const rows = key ? data[key] : [];
-    return {
-      docs: rows.map(row => ({
-        id: row.id,
-        data: () => row,
-        exists: true,
-      })),
-      size: rows.length,
-      empty: rows.length === 0,
-    };
-  }
-
-  // onSnapshot — для обратной совместимости делаем polling каждые 5 секунд
-  onSnapshot(onNext, onError) {
-    let active = true;
-    const poll = async () => {
-      if (!active) return;
-      try {
-        const snap = await this.get();
-        onNext(snap);
-      } catch (e) {
-        if (onError) onError(e);
-      }
-      if (active) setTimeout(poll, 5000);
-    };
-    poll();
-    return () => { active = false; }; // unsubscribe
+function onAuthReady(cb) {
+  if (_authResolved) {
+    cb(_currentUser, _currentUserData);
+  } else {
+    const unsub = auth.onAuthStateChanged(() => { unsub(); cb(_currentUser, _currentUserData); });
   }
 }
 
-class DocRef {
-  constructor(collection, id) {
-    this._col = collection;
-    this._id  = id;
+// ─────────────────────────────────────────────────────────
+// FIREBASE.FIRESTORE SENTINEL VALUES
+// ─────────────────────────────────────────────────────────
+class _FieldValueSentinel {
+  constructor(type, value) { this._type = type; this._value = value; }
+}
+
+function _firestoreCompat() { return db; }
+_firestoreCompat.FieldValue = {
+  serverTimestamp: () => new Date().toISOString(),
+  increment:       (n) => new _FieldValueSentinel('increment', n),
+  arrayUnion:      (...items) => new _FieldValueSentinel('arrayUnion', items),
+  arrayRemove:     (...items) => new _FieldValueSentinel('arrayRemove', items),
+};
+
+const firebase = {
+  firestore: _firestoreCompat,
+  auth:      () => auth,
+};
+
+// ─────────────────────────────────────────────────────────
+// МАППИНГ: Firestore collection → API endpoint
+// ─────────────────────────────────────────────────────────
+const _COL_MAP = {
+  users:         '/users',
+  startups:      '/startups',
+  invites:       '/invites',
+  conversations: '/messages/conversations',
+  forum_topics:  '/forum',
+  _config:       '/platform-config',
+};
+
+// Вложенные коллекции: "parentCol/parentId/subCol" → "/endpoint/{id}/sub"
+function _subPath(parts) {
+  // parts = ['startups', id, 'team'] или ['forum_topics', id, 'posts'] и т.д.
+  const [col, id, sub] = parts;
+  const subMap = {
+    'startups/team':          `/startups/${id}/team`,
+    'startups/updates':       `/startups/${id}/updates`,
+    'startups/tasks':         `/startups/${id}/tasks`,
+    'startups/vacancies':     `/startups/${id}/vacancies`,
+    'conversations/messages': `/messages/conversations/${id}/messages`,
+    'forum_topics/posts':     `/forum/${id}/posts`,
+  };
+  return subMap[`${col}/${sub}`] || `/${col}/${id}/${sub}`;
+}
+
+// Firestore field name → API query param
+const _FIELD_MAP = {
+  ownerUid:     'owner_uid',
+  fromUid:      'from_uid',
+  toUid:        'to_uid',
+  startupId:    'startup_id',
+  startupOwner: 'startup_owner',
+  authorUid:    'author_uid',
+  createdAt:    'created_at',
+  updatedAt:    'updated_at',
+};
+
+// snake_case → camelCase (рекурсивно, сохраняет оба ключа)
+function _toCamel(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(_toCamel);
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    out[k] = _toCamel(v); // сохраняем snake_case
+    const camel = k.replace(/_([a-z])/g, (_, l) => l.toUpperCase());
+    if (camel !== k) out[camel] = _toCamel(v); // добавляем camelCase
+  }
+  return out;
+}
+
+// Из ответа API вытащить массив документов
+function _extractDocs(data, colName) {
+  // API возвращает { users:[...] } или { startups:[...] } и т.д.
+  const keys = ['users','startups','invites','conversations','topics',
+                'team','updates','tasks','vacancies','messages','posts',
+                'config','platform'];
+  for (const k of keys) {
+    if (Array.isArray(data[k])) return data[k];
+  }
+  // fallback: первый массивный ключ
+  for (const v of Object.values(data)) {
+    if (Array.isArray(v)) return v;
+  }
+  return [];
+}
+
+// Обернуть массив объектов в формат Firestore snapshot
+function _makeSnap(rows, basePath) {
+  const docs = rows.map(row => _makeDoc(row, basePath));
+  return {
+    docs,
+    size:  docs.length,
+    empty: docs.length === 0,
+    forEach: (cb) => docs.forEach(cb),
+  };
+}
+
+function _makeDoc(row, basePath) {
+  const camel = _toCamel(row);
+  const docId = camel.id || camel.uid || String(Math.random());
+  const path  = basePath ? `${basePath}/${docId}` : docId;
+  return {
+    id:     docId,
+    exists: true,
+    data:   () => camel,
+    ref:    new _DocRef(path),
+  };
+}
+
+// ─────────────────────────────────────────────────────────
+// COLLECTION REF
+// ─────────────────────────────────────────────────────────
+class _CollectionRef {
+  constructor(path, filters = [], orders = [], lim = null) {
+    this._path    = path;   // e.g. 'startups' or 'startups/id/team'
+    this._filters = filters;
+    this._orders  = orders;
+    this._lim     = lim;
   }
 
-  get path() { return `/${this._col}/${this._id}`; }
+  _apiPath() {
+    const parts = this._path.split('/');
+    if (parts.length === 1) {
+      return _COL_MAP[parts[0]] || `/${parts[0]}`;
+    }
+    if (parts.length === 3) {
+      return _subPath(parts);
+    }
+    return '/' + this._path;
+  }
+
+  doc(id) { return new _DocRef(`${this._path}/${id}`); }
+
+  where(field, op, value) {
+    return new _CollectionRef(this._path, [...this._filters, { field, op, value }], this._orders, this._lim);
+  }
+  orderBy(field, dir) {
+    return new _CollectionRef(this._path, this._filters, [...this._orders, { field, dir }], this._lim);
+  }
+  limit(n) {
+    return new _CollectionRef(this._path, this._filters, this._orders, n);
+  }
 
   async get() {
-    try {
-      const data = await api.get(this.path);
-      const key  = Object.keys(data).find(k => data[k] && typeof data[k] === 'object' && !Array.isArray(data[k]));
-      const doc  = key ? data[key] : data;
-      return { id: this._id, data: () => doc, exists: true };
-    } catch (e) {
-      if (e.code === 404) return { id: this._id, data: () => null, exists: false };
-      throw e;
+    const base = this._apiPath();
+    const qs   = new URLSearchParams();
+
+    for (const f of this._filters) {
+      if (f.op === '==' || f.op === '===') {
+        const key = _FIELD_MAP[f.field] || f.field;
+        qs.set(key, f.value);
+      }
+      // array-contains → handled by auth on server
     }
-  }
-
-  async set(docData) {
-    // Попытка PATCH, если 404 — POST
-    try {
-      await api.patch(this.path, docData);
-    } catch (e) {
-      if (e.code === 404) await api.post(`/${this._col}`, { id: this._id, ...docData });
-      else throw e;
+    if (this._lim)    qs.set('_limit',    this._lim);
+    if (this._orders.length) {
+      qs.set('_orderBy', this._orders.map(o => o.field + ':' + (o.dir||'asc')).join(','));
     }
+
+    const url  = base + (qs.toString() ? '?' + qs.toString() : '');
+    const data = await api.get(url);
+    const rows = _extractDocs(data, this._path);
+    return _makeSnap(rows, this._apiPath());
   }
 
-  async update(docData) {
-    await api.patch(this.path, docData);
+  async add(docData) {
+    // Очищаем FieldValue sentinels перед отправкой
+    const clean = _cleanData(docData);
+    const base  = this._apiPath();
+    const data  = await api.post(base, clean);
+    // API возвращает созданный объект — вытаскиваем id
+    const obj   = data[Object.keys(data)[0]] || data;
+    const id    = obj.id || obj.uid || '';
+    return { id, ...obj };
   }
 
-  async delete() {
-    await api.delete(this.path);
-  }
-
-  collection(sub) {
-    return new CollectionRef(`${this._col}/${this._id}/${sub}`);
-  }
-
-  // onSnapshot — polling
   onSnapshot(onNext, onError) {
     let active = true;
     const poll = async () => {
       if (!active) return;
       try { onNext(await this.get()); } catch(e) { if (onError) onError(e); }
-      if (active) setTimeout(poll, 5000);
+      if (active) setTimeout(poll, 4000);
     };
     poll();
     return () => { active = false; };
   }
 }
 
-// Совместимость с Firebase API
-// firebase.firestore() вызывается в некоторых старых местах — делаем его функцией
-function _firestoreCompat() { return db; }
-_firestoreCompat.FieldValue = { serverTimestamp: () => new Date().toISOString() };
+// ─────────────────────────────────────────────────────────
+// DOCUMENT REF
+// ─────────────────────────────────────────────────────────
+class _DocRef {
+  constructor(path) {
+    this._path = path; // e.g. 'users/uid' or 'startups/id/team/uid'
+  }
 
-const firebase = {
-  firestore: _firestoreCompat,
-  auth:      () => auth,
+  _apiPath() {
+    const parts = this._path.split('/');
+    // Длина 2: 'collection/id'
+    if (parts.length === 2) {
+      const base = _COL_MAP[parts[0]] || `/${parts[0]}`;
+      return `${base}/${parts[1]}`;
+    }
+    // Длина 4: 'collection/id/sub/subId' e.g. 'startups/id/team/uid'
+    if (parts.length === 4) {
+      const sub = _subPath([parts[0], parts[1], parts[2]]);
+      return `${sub}/${parts[3]}`;
+    }
+    return '/' + this._path;
+  }
+
+  collection(sub) {
+    const parts = this._path.split('/');
+    return new _CollectionRef(`${parts[0]}/${parts[1]}/${sub}`);
+  }
+
+  async get() {
+    try {
+      const data  = await api.get(this._apiPath());
+      const obj   = _firstObj(data);
+      if (!obj) return { id: this._path.split('/').pop(), exists: false, data: () => null };
+      const camel = _toCamel(obj);
+      return { id: camel.id || camel.uid, exists: true, data: () => camel, ref: this };
+    } catch(e) {
+      if (e.code === 404) return { id: this._path.split('/').pop(), exists: false, data: () => null };
+      throw e;
+    }
+  }
+
+  async set(docData) {
+    const clean = _cleanData(docData);
+    try {
+      await api.patch(this._apiPath(), clean);
+    } catch(e) {
+      if (e.code === 404) await api.post(this._apiPath().split('/').slice(0,-1).join('/'), { ...clean, id: this._path.split('/').pop() });
+      else throw e;
+    }
+  }
+
+  async update(docData) {
+    const clean = _cleanData(docData);
+    if (Object.keys(clean).length === 0) return; // только sentinels — ничего не делаем
+    try {
+      await api.patch(this._apiPath(), clean);
+    } catch(e) {
+      if (e.code === 404) return;
+      throw e;
+    }
+  }
+
+  async delete() {
+    try { await api.delete(this._apiPath()); } catch(e) { if (e.code !== 404) throw e; }
+  }
+
+  onSnapshot(onNext, onError) {
+    let active = true;
+    const poll = async () => {
+      if (!active) return;
+      try { onNext(await this.get()); } catch(e) { if (onError) onError(e); }
+      if (active) setTimeout(poll, 4000);
+    };
+    poll();
+    return () => { active = false; };
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// УТИЛИТЫ
+// ─────────────────────────────────────────────────────────
+// Убрать FieldValue sentinels из объекта перед отправкой
+function _cleanData(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v instanceof _FieldValueSentinel) {
+      // arrayUnion на applicants → отдельный API call (обрабатывается в startup.html через /apply)
+      // increment/decrement → обрабатывается на сервере автоматически
+      continue; // пропускаем sentinels
+    }
+    if (v !== undefined && v !== null) {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+// Вытащить первый объект из ответа API
+function _firstObj(data) {
+  for (const v of Object.values(data)) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) return v;
+  }
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────
+// ГЛАВНЫЙ ОБЪЕКТ db
+// ─────────────────────────────────────────────────────────
+const db = {
+  collection: (name) => new _CollectionRef(name),
 };
 
 // ─────────────────────────────────────────────────────────
@@ -336,18 +479,18 @@ function getUrlParam(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
-function formatDate(timestamp) {
-  if (!timestamp) return '';
-  const d = new Date(timestamp);
-  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+function formatDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' });
 }
 
-function showToast(message, type) {
-  const toast = document.getElementById('toast');
-  if (!toast) return;
-  toast.textContent = message;
-  toast.className   = 'toast toast--' + (type || 'success') + ' toast--show';
-  setTimeout(() => { toast.className = 'toast'; }, 3000);
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className   = 'toast toast--' + (type || 'success') + ' toast--show';
+  setTimeout(() => { t.className = 'toast'; }, 3000);
 }
 
 function safeArray(val) {
@@ -361,21 +504,21 @@ function safeArray(val) {
 function goProfile() { window.location.href = 'profile.html'; }
 
 // ─────────────────────────────────────────────────────────
-// PLATFORM CONFIG (категории, стадии)
+// PLATFORM CONFIG
 // ─────────────────────────────────────────────────────────
 var DEFAULT_CATEGORIES = ['FinTech','EdTech','HealthTech','E-commerce','SaaS','AI / ML','Gaming','GreenTech','Marketplace','Другое'];
 var DEFAULT_STAGES = [
   {name:'Идея',icon:'💡'},{name:'MVP',icon:'⚡'},{name:'Бета',icon:'🔬'},
   {name:'Запущен',icon:'🚀'},{name:'Масштабирование',icon:'📈'},
 ];
-
 var _platformConfig = null;
 
 async function loadPlatformConfig() {
   if (_platformConfig) return _platformConfig;
   try {
     const data = await api.get('/platform-config');
-    _platformConfig = data;
+    _platformConfig = data.config || data;
+    if (!_platformConfig.categories) _platformConfig = { categories: DEFAULT_CATEGORIES, stages: DEFAULT_STAGES, feedLimit: 25 };
   } catch(e) {
     _platformConfig = { categories: DEFAULT_CATEGORIES, stages: DEFAULT_STAGES, feedLimit: 25 };
   }
@@ -387,8 +530,8 @@ function fillCategorySelect(selectId, selectedVal) {
     const el = document.getElementById(selectId);
     if (!el) return;
     const cur = selectedVal || el.value;
-    el.innerHTML = cfg.categories.map(cat =>
-      `<option value="${esc(cat)}"${cat===cur?' selected':''}>${esc(cat)}</option>`
+    el.innerHTML = cfg.categories.map(c =>
+      `<option value="${esc(c)}"${c===cur?' selected':''}>${esc(c)}</option>`
     ).join('');
   });
 }
@@ -398,8 +541,8 @@ function fillStageSelect(selectId, selectedVal) {
     const el = document.getElementById(selectId);
     if (!el) return;
     const cur = selectedVal || el.value;
-    el.innerHTML = cfg.stages.map(st =>
-      `<option value="${esc(st.name)}"${st.name===cur?' selected':''}>${esc(st.icon)} ${esc(st.name)}</option>`
+    el.innerHTML = cfg.stages.map(s =>
+      `<option value="${esc(s.name)}"${s.name===cur?' selected':''}>${esc(s.icon)} ${esc(s.name)}</option>`
     ).join('');
   });
 }
@@ -409,10 +552,8 @@ function fillFilterSelect(selectId, type, selectedVal) {
     const el = document.getElementById(selectId);
     if (!el) return;
     const items = type === 'category' ? cfg.categories : cfg.stages.map(s => s.name);
-    const cur = selectedVal || '';
+    const cur   = selectedVal || '';
     el.innerHTML = `<option value="">Все ${type==='category'?'категории':'стадии'}</option>` +
-      items.map(item =>
-        `<option value="${esc(item)}"${item===cur?' selected':''}>${esc(item)}</option>`
-      ).join('');
+      items.map(i => `<option value="${esc(i)}"${i===cur?' selected':''}>${esc(i)}</option>`).join('');
   });
 }

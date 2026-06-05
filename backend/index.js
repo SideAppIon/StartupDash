@@ -9,6 +9,7 @@ const startupsRoutes = require('./routes/startups');
 const invitesRoutes  = require('./routes/invites');
 const messagesRoutes = require('./routes/messages');
 const forumRoutes    = require('./routes/forum');
+const configRoutes   = require('./routes/config');
 
 const app = express();
 
@@ -25,12 +26,13 @@ app.use(express.json({ limit: '2mb' }));
 app.get('/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
 // ── Роуты ─────────────────────────────────────────────────
-app.use('/auth',     authRoutes);
-app.use('/users',    usersRoutes);
-app.use('/startups', startupsRoutes);
-app.use('/invites',  invitesRoutes);
-app.use('/messages', messagesRoutes);
-app.use('/forum',    forumRoutes);
+app.use('/auth',            authRoutes);
+app.use('/users',           usersRoutes);
+app.use('/startups',        startupsRoutes);
+app.use('/invites',         invitesRoutes);
+app.use('/messages',        messagesRoutes);
+app.use('/forum',           forumRoutes);
+app.use('/platform-config', configRoutes);
 
 // ── 404 ───────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ error: `Маршрут ${req.method} ${req.path} не найден` }));
