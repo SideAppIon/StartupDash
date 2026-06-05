@@ -301,20 +301,11 @@ async function answerFromStartup(btn) {
   var iid    = btn.getAttribute('data-iid');
   var status = btn.getAttribute('data-st');
   try {
-    if (status === 'accepted') {
-      var invSnap = await db.collection('invites').doc(iid).get();
-      var inv = invSnap.data();
-      var role = inv.role || 'Участник';
-      // Добавляем в team subcollection
-      await db.collection('startups').doc(inv.startupId).collection('team').add({
-        uid: currentUser.uid, name: currentUserData.name||'', role: role,
-        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    }
-    await db.collection('invites').doc(iid).update({ status: status });
-    showToast(status==='accepted'?'✅ Вы приняты в команду!':'Отклонено');
+    // PATCH /invites/:id автоматически добавляет в команду при accepted
+    await api.patch('/invites/' + iid, { status: status });
+    showToast(status === 'accepted' ? '✅ Вы приняты в команду!' : 'Отклонено');
     setTimeout(function(){ location.reload(); }, 800);
-  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }
 
 function toggleMyInvites(header) {
