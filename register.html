@@ -181,8 +181,8 @@ auth.onAuthStateChanged(function(user) {
 });
 
 // Загружаем ссылку политики из настроек
-firebase.firestore().collection('_config').doc('platform').get().then(function(snap) {
-  if (snap.exists && snap.data().policyUrl) {
+db.collection('_config').doc('platform').get().then(function(snap) {
+  if (snap.exists && snap.data() && snap.data().policyUrl) {
     document.getElementById('policyLink').href = snap.data().policyUrl;
   }
 }).catch(function() {});

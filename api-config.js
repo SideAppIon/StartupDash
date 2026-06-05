@@ -289,11 +289,14 @@ class DocRef {
   }
 }
 
-// Совместимость с firebase.firestore.FieldValue.serverTimestamp()
+// Совместимость с Firebase API
+// firebase.firestore() вызывается в некоторых старых местах — делаем его функцией
+function _firestoreCompat() { return db; }
+_firestoreCompat.FieldValue = { serverTimestamp: () => new Date().toISOString() };
+
 const firebase = {
-  firestore: {
-    FieldValue: { serverTimestamp: () => new Date().toISOString() },
-  },
+  firestore: _firestoreCompat,
+  auth:      () => auth,
 };
 
 // ─────────────────────────────────────────────────────────
