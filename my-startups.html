@@ -117,12 +117,15 @@ requireAuth('login.html');
 
 var editRoleCtx = null; // {startupId, uid, inviteId, currentRole}
 
+var myRole = 'user'; // глобально для использования в empty state
+
 onAuthReady(async function(user, userData) {
   if (!user) return;
   renderNav(userData);
+  myRole = userData ? userData.role : 'user';
   // Кнопка "Создать" — только для стартапера и эксперта
   var cb = document.getElementById('createStartupBtn');
-  if (cb && (userData.role === 'startup' || userData.role === 'expert' || userData.role === 'admin')) {
+  if (cb && (myRole === 'startup' || myRole === 'expert' || myRole === 'admin')) {
     cb.style.display = '';
   }
 
@@ -160,7 +163,15 @@ onAuthReady(async function(user, userData) {
     var allVisible = myStartups.concat(participatingStartups);
 
     if (!allVisible.length) {
-      el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🚀</div><div class="empty-state__title">Нет стартапов</div><p style="font-size:14px;margin-bottom:24px">Создай первый проект или подай заявку</p><a href="create-startup.html" class="btn btn--primary btn--lg">Создать стартап</a></div>';
+      var canCreate = myRole === 'startup' || myRole === 'expert' || myRole === 'admin';
+      el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🚀</div>' +
+        '<div class="empty-state__title">Нет стартапов</div>' +
+        '<p style="font-size:14px;margin-bottom:24px">' +
+          (canCreate ? 'Создай первый проект или подай заявку' : 'Подай заявку в команду стартапа') +
+        '</p>' +
+        (canCreate ? '<a href="create-startup.html" class="btn btn--primary btn--lg">Создать стартап</a>' : '') +
+        '<a href="startups.html" class="btn btn--outline btn--lg" style="margin-left:12px">Найти стартап</a>' +
+        '</div>';
       return;
     }
 
@@ -335,8 +346,8 @@ function toggleSection(header) {
 // Контекст для модального принятия
 var acceptCtx = null;
 
-function openAcceptModal(inviteId, startupId, fromName, suggestedRole) {
-  acceptCtx = { inviteId, startupId };
+function openAcceptModal(inviteId, startupId, fromName, suggestedRole, fromUid) {
+  acceptCtx = { inviteId, startupId, fromName: fromName || '', fromUid: fromUid || '' };
   document.getElementById('acceptModalName').textContent = 'Принять ' + fromName + ' в команду';
   document.getElementById('acceptRoleInput').value = suggestedRole || '';
   document.getElementById('acceptModal').classList.add('open');
@@ -346,35 +357,43 @@ async function confirmAccept() {
   if (!acceptCtx) return;
   var role = document.getElementById('acceptRoleInput').value.trim() || 'Участник';
   try {
-    var invSnap = await db.collection('invites').doc(acceptCtx.inviteId).get();
-    var inv = invSnap.data();
-    await db.collection('startups').doc(acceptCtx.startupId).collection('team').add({
-      uid:  inv.fromUid, name: inv.fromName||'', role: role,
-      joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+    // Добавляем в команду через API
+    await api.post('/startups/' + acceptCtx.startupId + '/team', {
+      user_uid: acceptCtx.fromUid,
+      role:     role,
+      permissions: {}
     });
-    await db.collection('invites').doc(acceptCtx.inviteId).update({ status:'accepted', role: role });
+    // Обновляем статус заявки
+    await api.patch('/invites/' + acceptCtx.inviteId, { status: 'accepted', role: role });
     document.getElementById('acceptModal').classList.remove('open');
-    showToast('✅ '+inv.fromName+' принят как «'+role+'»','success');
+    showToast('✅ ' + acceptCtx.fromName + ' принят как «' + role + '»', 'success');
     setTimeout(function(){ location.reload(); }, 700);
-  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }
 
 async function answerInvite(inviteId, status, startupId) {
   if (status === 'accepted') {
-    // Показываем модал для указания роли
-    var invSnap = await db.collection('invites').doc(inviteId).get();
-    var inv = invSnap.data();
-    var suggestedRole = '';
-    if (inv.applications&&inv.applications.length&&inv.applications[0].role) suggestedRole=inv.applications[0].role;
-    else if (inv.role&&inv.role!=='Специалист') suggestedRole=inv.role;
-    openAcceptModal(inviteId, startupId, inv.fromName||'участника', suggestedRole);
+    try {
+      // Получаем данные заявки через API
+      var invData = await api.get('/invites/' + inviteId);
+      var inv = invData.invite || invData;
+      var suggestedRole = '';
+      if (inv.applications && inv.applications.length && inv.applications[0].role) {
+        suggestedRole = inv.applications[0].role;
+      } else if (inv.role && inv.role !== 'Специалист') {
+        suggestedRole = inv.role;
+      }
+      var fromUid  = inv.fromUid  || inv.from_uid  || '';
+      var fromName = inv.fromName || inv.from_name || 'участника';
+      openAcceptModal(inviteId, startupId, fromName, suggestedRole, fromUid);
+    } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
     return;
   }
   try {
-    await db.collection('invites').doc(inviteId).update({ status: status });
-    showToast('❌ Отклонено','success');
+    await api.patch('/invites/' + inviteId, { status: status });
+    showToast('❌ Отклонено', 'success');
     setTimeout(function(){ location.reload(); }, 700);
-  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }
 
 // ── EDIT ROLE ─────────────────────────────────────────

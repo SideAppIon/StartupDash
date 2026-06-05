@@ -53,6 +53,24 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
+// GET /invites/:id — получить одно приглашение
+router.get('/:id', requireAuth, async (req, res) => {
+  try {
+    const invite = await queryOne('SELECT * FROM invites WHERE id = $1', [req.params.id]);
+    if (!invite) return res.status(404).json({ error: 'Приглашение не найдено' });
+
+    // Проверяем что пользователь связан с этим приглашением
+    const uid = req.user.uid;
+    if (invite.from_uid !== uid && invite.to_uid !== uid &&
+        invite.startup_owner !== uid && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
+    res.json({ invite: parseInvite(invite) });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // POST /invites — создать заявку (специалист → стартап) или приглашение (стартап → специалист)
 router.post('/', requireAuth, async (req, res) => {
   try {
