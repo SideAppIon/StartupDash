@@ -1,0 +1,18 @@
+openapi: "3.0.0"
+info:
+  title: StartupHelper API
+  version: "1.0"
+
+paths:
+  /{path+}:
+    x-yc-apigateway-any-method:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4et8dfjkpiutsev09c0
+        service_account_id: aje2ennnoh2h0247ev78
+      parameters:
+        - name: path
+          in: path
+          required: false
+          schema:
+            type: string

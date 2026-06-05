@@ -1,0 +1,193 @@
+-- ============================================================
+-- StartupDash — PostgreSQL Schema
+-- Выполнить в Yandex Cloud: Managed Service for PostgreSQL
+-- psql -h <HOST> -U <USER> -d <DATABASE> -f schema.sql
+-- ============================================================
+
+-- Расширения
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ── Пользователи ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS users (
+  uid           TEXT PRIMARY KEY,
+  email         TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL DEFAULT '',
+  name          TEXT NOT NULL DEFAULT '',
+  role          TEXT NOT NULL DEFAULT 'user'
+                  CHECK (role IN ('user','startup','expert','admin')),
+  bio           TEXT DEFAULT '',
+  skills        TEXT DEFAULT '[]',       -- JSON array
+  avatar        TEXT DEFAULT '',
+  contacts      TEXT DEFAULT '',
+  portfolio     TEXT DEFAULT '',
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ
+);
+
+-- ── Стартапы ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS startups (
+  id             TEXT PRIMARY KEY,
+  owner_uid      TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  owner_name     TEXT DEFAULT '',
+  name           TEXT NOT NULL,
+  tagline        TEXT DEFAULT '',
+  stage          TEXT DEFAULT 'Идея',
+  category       TEXT DEFAULT '',
+  website        TEXT DEFAULT '',
+  looking_for    TEXT DEFAULT '',
+  cover_image    TEXT DEFAULT '',
+  emoji          TEXT DEFAULT '🚀',
+  icon_image     TEXT DEFAULT '',
+  tags           TEXT DEFAULT '[]',            -- JSON array
+  privacy        TEXT DEFAULT 'public'
+                   CHECK (privacy IN ('public','private','closed')),
+  content_blocks TEXT DEFAULT '[]',            -- JSON array [{type, content}]
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_startups_owner   ON startups(owner_uid);
+CREATE INDEX IF NOT EXISTS idx_startups_privacy ON startups(privacy);
+
+-- ── Команда стартапа ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS startup_team (
+  id          SERIAL PRIMARY KEY,
+  startup_id  TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+  user_uid    TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  role        TEXT DEFAULT 'Участник',
+  permissions TEXT DEFAULT '{}',   -- JSON {updates: bool, kanban: bool}
+  joined_at   TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(startup_id, user_uid)
+);
+
+-- ── Обновления проекта ────────────────────────────────────
+CREATE TABLE IF NOT EXISTS startup_updates (
+  id         TEXT PRIMARY KEY,
+  startup_id TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+  author_uid TEXT NOT NULL REFERENCES users(uid),
+  title      TEXT DEFAULT '',
+  content    TEXT NOT NULL DEFAULT '',
+  type       TEXT DEFAULT 'text',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_updates_startup ON startup_updates(startup_id);
+
+-- ── Задачи (Roadmap / Kanban) ─────────────────────────────
+CREATE TABLE IF NOT EXISTS startup_tasks (
+  id          TEXT PRIMARY KEY,
+  startup_id  TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL DEFAULT '',
+  description TEXT DEFAULT '',
+  status      TEXT DEFAULT 'todo'
+                CHECK (status IN ('todo','in_progress','done')),
+  assigned_to TEXT REFERENCES users(uid) ON DELETE SET NULL,
+  position    INTEGER DEFAULT 0,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_startup ON startup_tasks(startup_id);
+
+-- ── Вакансии ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS startup_vacancies (
+  id          TEXT PRIMARY KEY,
+  startup_id  TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL DEFAULT '',
+  description TEXT DEFAULT '',
+  skills      TEXT DEFAULT '[]',      -- JSON array
+  applicants  TEXT DEFAULT '[]',      -- JSON array [{uid, appliedAt}]
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Форум ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS forum_topics (
+  id          TEXT PRIMARY KEY,
+  author_uid  TEXT NOT NULL REFERENCES users(uid),
+  title       TEXT NOT NULL,
+  content     TEXT NOT NULL DEFAULT '',
+  reply_count INTEGER DEFAULT 0,
+  views       INTEGER DEFAULT 0,
+  hidden      BOOLEAN DEFAULT FALSE,
+  last_at     TIMESTAMPTZ DEFAULT NOW(),
+  last_author TEXT DEFAULT '',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS forum_posts (
+  id         TEXT PRIMARY KEY,
+  topic_id   TEXT NOT NULL REFERENCES forum_topics(id) ON DELETE CASCADE,
+  author_uid TEXT NOT NULL REFERENCES users(uid),
+  content    TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_posts_topic ON forum_posts(topic_id);
+
+-- ── Приглашения / Заявки ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS invites (
+  id             TEXT PRIMARY KEY,
+  from_uid       TEXT NOT NULL REFERENCES users(uid),
+  from_name      TEXT DEFAULT '',
+  from_avatar    TEXT DEFAULT '',
+  from_skills    TEXT DEFAULT '[]',   -- JSON array
+  to_uid         TEXT REFERENCES users(uid),   -- для приглашений от стартапа
+  startup_id     TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+  startup_name   TEXT DEFAULT '',
+  startup_owner  TEXT DEFAULT '',
+  type           TEXT DEFAULT 'specialist'
+                   CHECK (type IN ('specialist','role','expert','from_startup')),
+  role           TEXT DEFAULT 'Специалист',
+  expert_area    TEXT DEFAULT '',
+  message        TEXT DEFAULT '',
+  applications   TEXT DEFAULT '[]',   -- JSON array
+  status         TEXT DEFAULT 'pending'
+                   CHECK (status IN ('pending','accepted','rejected')),
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_invites_from    ON invites(from_uid);
+CREATE INDEX IF NOT EXISTS idx_invites_startup ON invites(startup_id);
+CREATE INDEX IF NOT EXISTS idx_invites_owner   ON invites(startup_owner);
+
+-- ── Диалоги ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS conversations (
+  id                  TEXT PRIMARY KEY,
+  participant_names   TEXT DEFAULT '{}',    -- JSON {uid: name}
+  participant_avatars TEXT DEFAULT '{}',    -- JSON {uid: avatar}
+  participant_roles   TEXT DEFAULT '{}',    -- JSON {uid: role}
+  last_message        TEXT DEFAULT '',
+  last_at             TIMESTAMPTZ DEFAULT NOW(),
+  created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS conversation_participants (
+  conv_id  TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  user_uid TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  PRIMARY KEY (conv_id, user_uid)
+);
+
+CREATE INDEX IF NOT EXISTS idx_conv_participants ON conversation_participants(user_uid);
+
+-- ── Сообщения ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS messages (
+  id         TEXT PRIMARY KEY,
+  conv_id    TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  sender_uid TEXT NOT NULL,
+  text       TEXT NOT NULL,
+  type       TEXT DEFAULT 'user',   -- 'user' | 'system'
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conv_id, created_at);
+
+-- ── Настройки платформы ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS platform_config (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL DEFAULT '{}',   -- JSON
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Вставляем дефолтную конфигурацию
+INSERT INTO platform_config (key, value) VALUES
+  ('platform', '{"categories":["FinTech","EdTech","HealthTech","E-commerce","SaaS","AI / ML","Gaming","GreenTech","Marketplace","Другое"],"stages":[{"name":"Идея","icon":"💡"},{"name":"MVP","icon":"⚡"},{"name":"Бета","icon":"🔬"},{"name":"Запущен","icon":"🚀"},{"name":"Масштабирование","icon":"📈"}],"feedLimit":25}')
+ON CONFLICT (key) DO NOTHING;
