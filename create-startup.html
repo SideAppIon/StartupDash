@@ -67,11 +67,11 @@
             <img id="iconPreviewImg" style="width:100%;height:100%;object-fit:cover;display:none" alt=""/>
           </div>
           <div style="flex:1">
-            <label class="form-label" style="margin-bottom:6px">Или вставь ссылку на своё изображение</label>
-            <input type="url" class="form-input" id="iconImage"
-              placeholder="https://i.imgur.com/... (оставь пустым для смайла)"
-              oninput="onIconImageInput(this.value)"/>
-            <div class="form-hint">Квадратное изображение, минимум 64×64px</div>
+            <label class="form-label" style="margin-bottom:6px">Или загрузи своё изображение</label>
+            <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" id="iconImageFile"
+              class="form-input" style="padding:6px" onchange="uploadIconFile(this)"/>
+            <input type="hidden" id="iconImage"/>
+            <div id="iconUploadStatus" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
           </div>
         </div>
       </div>
@@ -95,11 +95,11 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Обложка стартапа (ссылка на изображение)</label>
-        <input type="url" class="form-input" id="coverImage"
-          placeholder="https://i.imgur.com/..."
-          oninput="previewCover(this.value)"/>
-        <div class="form-hint">Загрузи на imgur.com → правая кнопка → «Копировать адрес изображения»</div>
+        <label class="form-label">Обложка стартапа</label>
+        <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" id="coverImageFile"
+          class="form-input" style="padding:6px" onchange="uploadAndPreview(this,'coverImage','coverPreview','coverUploadStatus')"/>
+        <input type="hidden" id="coverImage"/>
+        <div id="coverUploadStatus" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
         <img id="coverPreview" class="img-preview-small" alt="Обложка"/>
       </div>
 
@@ -202,24 +202,72 @@ EMOJIS.forEach(function(e){
   grid.appendChild(btn);
 });
 
+async function uploadFile(base64, contentType, folder) {
+  var res = await api.post('/upload', { data: base64, contentType: contentType, folder: folder || 'startups' });
+  return res.url;
+}
+
+function readFileAsBase64(file) {
+  return new Promise(function(resolve, reject) {
+    var r = new FileReader();
+    r.onload = function(e) { resolve(e.target.result.split(',')[1]); };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+async function uploadAndPreview(input, hiddenId, previewId, statusId) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    document.getElementById(statusId).textContent = 'Файл слишком большой (макс. 2 МБ)';
+    input.value = ''; return;
+  }
+  document.getElementById(statusId).textContent = 'Загружаю...';
+  try {
+    var base64 = await readFileAsBase64(file);
+    var url = await uploadFile(base64, file.type, 'startups');
+    document.getElementById(hiddenId).value = url;
+    var prev = document.getElementById(previewId);
+    prev.src = url; prev.className = 'img-preview-small show';
+    document.getElementById(statusId).textContent = '✓ Загружено';
+  } catch(e) {
+    document.getElementById(statusId).textContent = 'Ошибка: ' + e.message;
+  }
+}
+
+async function uploadIconFile(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    document.getElementById('iconUploadStatus').textContent = 'Файл слишком большой (макс. 2 МБ)';
+    input.value = ''; return;
+  }
+  document.getElementById('iconUploadStatus').textContent = 'Загружаю...';
+  try {
+    var base64 = await readFileAsBase64(file);
+    var url = await uploadFile(base64, file.type, 'startups');
+    document.getElementById('iconImage').value = url;
+    var emoji = document.getElementById('iconPreviewEmoji');
+    var img   = document.getElementById('iconPreviewImg');
+    img.src = url; img.style.display = 'block'; emoji.style.display = 'none';
+    document.getElementById('iconPreviewWrap').style.borderColor = 'var(--accent)';
+    document.getElementById('iconUploadStatus').textContent = '✓ Загружено';
+  } catch(e) {
+    document.getElementById('iconUploadStatus').textContent = 'Ошибка: ' + e.message;
+  }
+}
+
 function onIconImageInput(url) {
   var emoji = document.getElementById('iconPreviewEmoji');
   var img   = document.getElementById('iconPreviewImg');
-  var wrap  = document.getElementById('iconPreviewWrap');
   if (url && url.startsWith('http')) {
-    img.src = url;
-    img.style.display = 'block';
-    emoji.style.display = 'none';
-    img.onerror = function() {
-      img.style.display = 'none';
-      emoji.style.display = 'block';
-    };
-    wrap.style.borderColor = 'var(--accent)';
+    img.src = url; img.style.display = 'block'; emoji.style.display = 'none';
+    img.onerror = function() { img.style.display = 'none'; emoji.style.display = 'block'; };
+    document.getElementById('iconPreviewWrap').style.borderColor = 'var(--accent)';
   } else {
-    img.style.display = 'none';
-    emoji.style.display = 'block';
-    wrap.style.borderColor = 'var(--border2)';
-    // Восстанавливаем выбранный emoji
+    img.style.display = 'none'; emoji.style.display = 'block';
+    document.getElementById('iconPreviewWrap').style.borderColor = 'var(--border2)';
     emoji.textContent = selectedEmoji;
   }
 }
@@ -321,18 +369,29 @@ function renderBlocks(){
       inp.setAttribute('data-bid', b.id);
       inp.addEventListener('input', function(){ updateBlock(this.getAttribute('data-bid'),'content',this.value); });
     } else if (b.type==='image'){
-      inp=document.createElement('input');
-      inp.type='url';
-      inp.className='form-input';
-      inp.placeholder='https://i.imgur.com/...';
-      inp.value=b.content||'';
-      inp.setAttribute('data-bid', b.id);
       var prevId='prev-'+b.id;
-      inp.addEventListener('input', function(){
-        updateBlock(this.getAttribute('data-bid'),'content',this.value);
-        previewBlockImg(prevId, this.value);
-      });
-      wrap.appendChild(inp);
+      var fileInp=document.createElement('input');
+      fileInp.type='file';
+      fileInp.accept='image/jpeg,image/png,image/gif,image/webp';
+      fileInp.className='form-input';
+      fileInp.style.padding='6px';
+      (function(bid, pid){
+        fileInp.addEventListener('change', async function(){
+          var file=this.files[0];
+          if (!file) return;
+          if (file.size > 2*1024*1024){ showToast('Файл слишком большой (макс. 2 МБ)','error'); return; }
+          try {
+            var base64=await readFileAsBase64(file);
+            var url=await uploadFile(base64, file.type, 'startups');
+            updateBlock(bid,'content',url);
+            previewBlockImg(pid, url);
+          } catch(e){ showToast('Ошибка загрузки: '+e.message,'error'); }
+        });
+      })(b.id, prevId);
+      var statusSpan=document.createElement('div');
+      statusSpan.style.cssText='font-size:12px;color:var(--text2);margin-top:4px';
+      wrap.appendChild(fileInp);
+      wrap.appendChild(statusSpan);
       var prev=document.createElement('img');
       prev.id=prevId;
       prev.className='img-preview-small'+(b.content?' show':'');

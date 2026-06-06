@@ -40,7 +40,8 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Файл слишком большой. Максимум 2 МБ' });
     }
 
-    const safeFolder = folder === 'avatars' ? 'avatars' : 'chat';
+    const allowed = ['avatars', 'chat', 'startups', 'updates'];
+  const safeFolder = allowed.includes(folder) ? folder : 'chat';
     const ext = ALLOWED_TYPES[contentType];
     const key = `${safeFolder}/${uuidv4()}.${ext}`;
     const buffer = Buffer.from(data, 'base64');

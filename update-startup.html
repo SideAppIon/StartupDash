@@ -68,10 +68,10 @@
 
       <div class="form-group">
         <label class="form-label">Фото <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
-        <input type="url" class="form-input" id="imageInput"
-          placeholder="https://i.imgur.com/..."
-          oninput="previewImage(this.value)"/>
-        <div class="form-hint">Загрузи фото на imgur.com и вставь прямую ссылку (.jpg, .png)</div>
+        <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" id="imageFileInput"
+          class="form-input" style="padding:6px" onchange="uploadUpdatePhoto(this)"/>
+        <input type="hidden" id="imageInput"/>
+        <div id="imageUploadStatus" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
         <img id="imgPreview" class="img-preview" alt="Превью"/>
       </div>
 
@@ -105,11 +105,28 @@ document.getElementById('cancelLink').href = 'startup.html?id=' + startupId;
 function previewImage(url) {
   var img = document.getElementById('imgPreview');
   if (url && url.startsWith('http')) {
-    img.src = url;
-    img.className = 'img-preview show';
+    img.src = url; img.className = 'img-preview show';
     img.onerror = function(){ img.className = 'img-preview'; };
-  } else {
-    img.className = 'img-preview';
+  } else { img.className = 'img-preview'; }
+}
+
+async function uploadUpdatePhoto(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    document.getElementById('imageUploadStatus').textContent = 'Файл слишком большой (макс. 2 МБ)';
+    input.value = ''; return;
+  }
+  document.getElementById('imageUploadStatus').textContent = 'Загружаю...';
+  try {
+    var r = new FileReader();
+    var base64 = await new Promise(function(res, rej){ r.onload=function(e){res(e.target.result.split(',')[1]);}; r.onerror=rej; r.readAsDataURL(file); });
+    var result = await api.post('/upload', { data: base64, contentType: file.type, folder: 'updates' });
+    document.getElementById('imageInput').value = result.url;
+    previewImage(result.url);
+    document.getElementById('imageUploadStatus').textContent = '✓ Загружено';
+  } catch(e) {
+    document.getElementById('imageUploadStatus').textContent = 'Ошибка: ' + e.message;
   }
 }
 
