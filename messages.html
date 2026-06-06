@@ -101,6 +101,8 @@
     </div>
     <div class="chat-messages" id="chatMessages" style="display:none"></div>
     <div class="chat-input-area" id="chatInputArea" style="display:none">
+      <input type="file" id="photoFileInput" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="sendPhoto(this)"/>
+      <button class="send-btn" style="background:var(--bg3);color:var(--text2);font-size:20px" title="Прикрепить фото" onclick="document.getElementById('photoFileInput').click()">📎</button>
       <textarea class="chat-textarea" id="msgInput" placeholder="Напиши сообщение..." rows="1"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
@@ -359,6 +361,13 @@ async function openConv(convId) {
         if (ds&&ds!==lastDate){html+='<div class="chat-date-sep">'+ds+'</div>';lastDate=ds;}
         if (sys) {
           html+='<div class="msg msg--system"><div class="msg__bubble">'+esc(m.text||'').replace(/\n/g,'<br>')+'</div></div>';
+        } else if (m.type==='image') {
+          html+='<div class="msg '+(mine?'msg--mine':'msg--theirs')+'">'+
+            '<div class="msg__bubble" style="padding:4px">'+
+              '<img src="'+esc(m.text)+'" style="max-width:260px;max-height:320px;border-radius:8px;display:block;cursor:pointer" onclick="window.open(this.src,\'_blank\')"/>'+
+            '</div>'+
+            '<div class="msg__time">'+timeStr(m.createdAt)+'</div>'+
+          '</div>';
         } else {
           html+='<div class="msg '+(mine?'msg--mine':'msg--theirs')+'">'+
             '<div class="msg__bubble">'+esc(m.text||'').replace(/\n/g,'<br>')+'</div>'+
@@ -399,12 +408,32 @@ async function send() {
   inp.value=''; inp.style.height='auto'; btn.disabled=true;
   try {
     var sid=activeId;
-    // Бэкенд сам обновляет last_message и last_at
     await db.collection('conversations').doc(sid).collection('messages').add({
       text: text, type: 'user'
     });
   } catch(e){showToast('Ошибка: '+e.message,'error');}
   finally{btn.disabled=false;}
+}
+
+async function sendPhoto(input) {
+  var file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { showToast('Файл слишком большой (макс. 2 МБ)', 'error'); return; }
+  if (!activeId || !myUid) return;
+  showToast('Загружаю фото...', 'info');
+  try {
+    var base64 = await new Promise(function(resolve, reject) {
+      var r = new FileReader();
+      r.onload = function(e) { resolve(e.target.result.split(',')[1]); };
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    var res = await api.post('/upload', { data: base64, contentType: file.type, folder: 'chat' });
+    await db.collection('conversations').doc(activeId).collection('messages').add({
+      text: res.url, type: 'image'
+    });
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }
 
 // ── ENSURE/CREATE CONV ────────────────────────────────

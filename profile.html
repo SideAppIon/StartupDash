@@ -149,15 +149,13 @@
       <div class="modal__title">Изменить аватар</div>
       <button class="modal__close" type="button" onclick="document.getElementById('avatarModal').classList.remove('open')">×</button>
     </div>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:16px">
-      Загрузи фото на <a href="https://imgur.com" target="_blank" style="color:var(--accent)">imgur.com</a> и вставь прямую ссылку.
-    </p>
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:20px">
       <img id="avatarPreview" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);background:var(--bg3);flex-shrink:0" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
       <div style="flex:1">
-        <label class="form-label">URL изображения</label>
-        <input type="url" class="form-input" id="avatarUrlInput" placeholder="https://i.imgur.com/..."
-          oninput="document.getElementById('avatarPreview').src=this.value||'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U'"/>
+        <label class="form-label">Выбери фото (макс. 2 МБ)</label>
+        <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" id="avatarFileInput"
+          class="form-input" style="padding:6px" onchange="onAvatarFileChange(this)"/>
+        <div id="avatarUploadStatus" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
       </div>
     </div>
     <div style="display:flex;gap:10px">
@@ -334,24 +332,53 @@ async function saveProfile() {
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
+var _avatarBase64 = null;
+var _avatarContentType = null;
+
 function openAvatarModal() {
-  document.getElementById('avatarUrlInput').value = uData&&uData.avatar?uData.avatar:'';
-  document.getElementById('avatarPreview').src = (uData&&uData.avatar)||
-    'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U';
+  _avatarBase64 = null;
+  _avatarContentType = null;
+  document.getElementById('avatarFileInput').value = '';
+  document.getElementById('avatarUploadStatus').textContent = '';
+  var cur = (uData&&uData.avatar)||'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U';
+  document.getElementById('avatarPreview').src = cur;
   document.getElementById('avatarModal').classList.add('open');
 }
+
+function onAvatarFileChange(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    document.getElementById('avatarUploadStatus').textContent = 'Файл слишком большой (макс. 2 МБ)';
+    input.value = '';
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var dataUrl = e.target.result;
+    // dataUrl = "data:image/jpeg;base64,XXXX"
+    var parts = dataUrl.split(',');
+    _avatarBase64 = parts[1];
+    _avatarContentType = file.type;
+    document.getElementById('avatarPreview').src = dataUrl;
+    document.getElementById('avatarUploadStatus').textContent = file.name + ' (' + (file.size/1024).toFixed(0) + ' КБ)';
+  };
+  reader.readAsDataURL(file);
+}
+
 async function doSaveAvatar() {
-  var url = document.getElementById('avatarUrlInput').value.trim();
-  if (!url){showToast('Вставь ссылку','error');return;}
-  if (!url.startsWith('http')){showToast('Ссылка должна начинаться с http','error');return;}
+  if (!_avatarBase64) { showToast('Выбери файл', 'error'); return; }
   try {
-    await db.collection('users').doc(currentUser.uid).update({avatar:url});
-    uData.avatar=url;
-    document.getElementById('profileAvatar').src=url;
-    document.getElementById('navAvatar').src=url;
+    document.getElementById('avatarUploadStatus').textContent = 'Загружаю...';
+    var res = await api.post('/upload', { data: _avatarBase64, contentType: _avatarContentType, folder: 'avatars' });
+    var url = res.url;
+    await db.collection('users').doc(currentUser.uid).update({ avatar: url });
+    uData.avatar = url;
+    document.getElementById('profileAvatar').src = url;
+    document.getElementById('navAvatar').src = url;
     document.getElementById('avatarModal').classList.remove('open');
-    showToast('Аватар обновлён!','success');
-  } catch(e){showToast('Ошибка: '+e.message,'error');}
+    showToast('Аватар обновлён!', 'success');
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); document.getElementById('avatarUploadStatus').textContent = ''; }
 }
 
 function escHtml(s){ return esc(s); }
