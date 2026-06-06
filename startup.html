@@ -984,7 +984,11 @@ async function loadVacancies(isOwnerOrAdmin, isTeamMember) {
     }
     el.innerHTML = snap.docs.map(function(d) {
       var v = d.data();
-      var hasApplied = pageUser && safeArray(v.applicants).indexOf(pageUser.uid) !== -1;
+      var applicants = safeArray(v.applicants);
+      // applicants — массив объектов {uid, appliedAt} или строк uid
+      var hasApplied = pageUser && applicants.some(function(a){
+        return (a && typeof a === 'object' ? a.uid : a) === pageUser.uid;
+      });
       var applyBtn = '';
       if (pageUser && !isOwnerOrAdmin) {
         if (hasApplied) {
@@ -994,7 +998,7 @@ async function loadVacancies(isOwnerOrAdmin, isTeamMember) {
         }
       }
       var appCount = isOwnerOrAdmin
-        ? '<span class="badge badge--gray" style="cursor:default">👥 Откликнулись: ' + safeArray(v.applicants).length + '</span>'
+        ? '<span class="badge badge--gray" style="cursor:default">👥 Откликнулись: ' + applicants.length + '</span>'
         : '';
       var delBtn = isOwnerOrAdmin
         ? '<button class="btn btn--danger btn--sm" data-vid="'+d.id+'" onclick="deleteVacancy(this)">Удалить</button>'
@@ -1077,10 +1081,8 @@ async function sendVacApply() {
   } catch(e) {}
 
   try {
-    // Добавляем uid в список откликнувшихся на вакансию
-    await db.collection('startups').doc(startupId).collection('vacancies').doc(vid).update({
-      applicants: firebase.firestore.FieldValue.arrayUnion(pageUser.uid)
-    });
+    // Добавляем uid в список откликнувшихся через специальный эндпоинт
+    await api.post('/startups/' + startupId + '/vacancies/' + vid + '/apply', {});
     // Создаём invite с указанием роли (вакансии)
     await db.collection('invites').add({
       fromUid:      pageUser.uid,

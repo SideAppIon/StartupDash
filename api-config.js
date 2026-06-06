@@ -346,6 +346,8 @@ class _DocRef {
   }
 
   _apiPath() {
+    // Путь уже является API-путём (начинается с '/') — вернуть как есть
+    if (this._path.startsWith('/')) return this._path;
     const parts = this._path.split('/');
     // Длина 2: 'collection/id'
     if (parts.length === 2) {
