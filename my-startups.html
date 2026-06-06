@@ -233,7 +233,19 @@ async function buildStartupCard(s, uid) {
   // Команда (владелец + участники через team + через accepted invites)
   var teamMembers = [];
   if (teamSnap.docs) {
-    teamSnap.docs.forEach(function(d){ if(d.data().uid) teamMembers.push({uid:d.data().uid,name:d.data().name||'',role:d.data().role||'Участник',src:'team',docId:d.id}); });
+    teamSnap.docs.forEach(function(d){
+      var td = d.data();
+      // После _toCamel: user_uid → userUid; name приходит из JOIN с users
+      var memberUid = td.userUid || td.user_uid || td.uid || '';
+      if (!memberUid) return;
+      teamMembers.push({
+        uid:    memberUid,
+        name:   td.name || '',
+        role:   td.role || 'Участник',
+        src:    'team',
+        docId:  memberUid  // используем uid пользователя как docId для DELETE
+      });
+    });
   }
   try {
     var accInvs = await db.collection('invites').where('startupId','==',s.id).where('status','==','accepted').get();
@@ -445,13 +457,15 @@ async function removeMember(startupId, uid, src, docId) {
   if (!confirm('Удалить участника из команды?')) return;
   try {
     if (src === 'team') {
-      await db.collection('startups').doc(startupId).collection('team').doc(docId).delete();
+      // docId = user_uid участника, DELETE /startups/:id/team/:uid
+      await api.delete('/startups/' + startupId + '/team/' + (docId || uid));
     } else {
-      await db.collection('invites').doc(docId).update({ status: 'removed' });
+      // Для invite-участников: отклоняем заявку
+      await api.patch('/invites/' + docId, { status: 'rejected' });
     }
-    showToast('Участник удалён','success');
+    showToast('Участник удалён', 'success');
     setTimeout(function(){ location.reload(); }, 700);
-  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }
 
 // ── DELETE STARTUP ────────────────────────────────────

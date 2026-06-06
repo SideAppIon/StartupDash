@@ -206,31 +206,8 @@ onAuthReady(async function(user, userData) {
       '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
   }
 
-  // Проверяем статус приглашения — только pending/accepted считаем "уже приглашён"
-  // 'pending' → кнопка заблокирована, 'accepted' → в команде, иначе → можно пригласить снова
-  var inviteStatus = null; // null | 'pending' | 'accepted'
-  if (user && userData && userData.role === 'startup') {
-    try {
-      var invData = await api.get(
-        '/invites?to_uid=' + profileUid
-      );
-      var allInvites = invData.invites || [];
-      // Получаем стартапы текущего пользователя
-      var myStartupsData = await api.get('/startups?owner_uid=' + user.uid);
-      var myStartupIds = (myStartupsData.startups || []).map(function(s){ return s.id; });
-
-      for (var ii = 0; ii < allInvites.length; ii++) {
-        var inv = allInvites[ii];
-        var invSid = inv.startupId || inv.startup_id;
-        if (myStartupIds.indexOf(invSid) === -1) continue; // не наш стартап
-        if (inv.status === 'accepted') { inviteStatus = 'accepted'; break; }
-        if (inv.status === 'pending')  { inviteStatus = 'pending'; }
-        // rejected/removed — игнорируем, можно пригласить снова
-      }
-    } catch(e) { console.warn('invite check:', e.message); }
-  }
-  // Кнопки действий
-  renderActions(user, userData, inviteStatus);
+  // Кнопки действий — приглашение проверяется внутри модала для каждого стартапа отдельно
+  renderActions(user, userData, null);
 
   // Стартапы (если role=startup)
   if (profileData.role === 'startup') {
