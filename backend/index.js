@@ -20,29 +20,12 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Yandex Cloud API Gateway обрезает тело PATCH/DELETE запросов.
-// Фронтенд отправляет POST с _method в теле — здесь подменяем метод.
+// 1. Парсер тела — ДОЛЖЕН быть ДО метод-оверрайда
 app.use((req, res, next) => {
-  if (req.method === 'POST' && req.body && req.body._method) {
-    const override = String(req.body._method).toUpperCase();
-    if (override === 'PATCH' || override === 'DELETE') {
-      req.method = override;
-      delete req.body._method; // убираем служебное поле перед роутингом
-    }
-  }
-  next();
-});
-
-// Собственный парсер тела — express.json() ненадёжно работает с нашим фейковым Readable
-// Если тело уже предпарсено в handler'е (req._yc_body), используем его.
-// Иначе читаем из потока (для локальной разработки).
-app.use((req, res, next) => {
-  // Тело уже предпарсено Yandex Cloud handler'ом
   if (req._yc_body !== undefined) {
     req.body = req._yc_body;
     return next();
   }
-  // Локальная разработка — читаем из потока
   const ct = (req.headers['content-type'] || '').toLowerCase();
   if (!ct.includes('application/json')) {
     req.body = {};
@@ -55,6 +38,18 @@ app.use((req, res, next) => {
     next();
   });
   req.on('error', () => { req.body = {}; next(); });
+});
+
+// 2. Метод-оверрайд — ПОСЛЕ парсера, когда req.body уже установлен
+app.use((req, res, next) => {
+  if (req.method === 'POST' && req.body && req.body._method) {
+    const override = String(req.body._method).toUpperCase();
+    if (override === 'PATCH' || override === 'DELETE') {
+      req.method = override;
+      delete req.body._method;
+    }
+  }
+  next();
 });
 
 // ── Healthcheck ───────────────────────────────────────────
