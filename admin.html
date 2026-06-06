@@ -277,7 +277,7 @@ function renderUsers(users) {
         '<div class="user-row__actions">'+
           '<a href="member.html?uid='+esc(u.uid||'')+'" class="btn btn--ghost btn--sm">👁</a>'+
           '<button class="btn btn--outline btn--sm" data-action="role" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'" data-role="'+esc(u.role||'')+'">Роль</button>'+
-          '<button class="btn btn--ghost btn--sm" data-action="pwd" data-email="'+esc(u.email||'')+'">🔑</button>'+
+          '<button class="btn btn--ghost btn--sm" data-action="pwd" data-uid="'+esc(u.uid||'')+'" data-email="'+esc(u.email||'')+'">🔑</button>'+
           '<button class="btn btn--danger btn--sm" data-action="delusr" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'">✕</button>'+
         '</div>'+
       '</div>';
