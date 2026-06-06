@@ -21,11 +21,14 @@ app.use(cors({
 }));
 
 // Yandex Cloud API Gateway обрезает тело PATCH/DELETE запросов.
-// Фронтенд отправляет POST ?_method=PATCH — здесь подменяем метод.
+// Фронтенд отправляет POST с _method в теле — здесь подменяем метод.
 app.use((req, res, next) => {
-  const override = req.query && req.query._method;
-  if (req.method === 'POST' && (override === 'PATCH' || override === 'DELETE')) {
-    req.method = override;
+  if (req.method === 'POST' && req.body && req.body._method) {
+    const override = String(req.body._method).toUpperCase();
+    if (override === 'PATCH' || override === 'DELETE') {
+      req.method = override;
+      delete req.body._method; // убираем служебное поле перед роутингом
+    }
   }
   next();
 });

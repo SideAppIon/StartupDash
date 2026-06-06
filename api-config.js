@@ -35,10 +35,9 @@ const api = {
   get:    (path)       => apiRequest('GET',  path),
   post:   (path, body) => apiRequest('POST', path, body),
   // Yandex Cloud API Gateway обрезает тело у PATCH/DELETE запросов.
-  // Отправляем POST с ?_method=PATCH / ?_method=DELETE,
-  // бэкенд подменяет метод через middleware.
-  patch:  (path, body) => apiRequest('POST', path + (path.includes('?') ? '&' : '?') + '_method=PATCH',  body),
-  delete: (path)       => apiRequest('POST', path + (path.includes('?') ? '&' : '?') + '_method=DELETE', {}),
+  // Передаём _method в теле POST-запроса — бэкенд подменяет метод через middleware.
+  patch:  (path, body) => apiRequest('POST', path, Object.assign({}, body || {}, { _method: 'PATCH' })),
+  delete: (path)       => apiRequest('POST', path, { _method: 'DELETE' }),
 };
 
 // ─────────────────────────────────────────────────────────
