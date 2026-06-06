@@ -49,6 +49,25 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
+// GET /forum/:id — одна тема
+router.get('/:id', optionalAuth, async (req, res) => {
+  try {
+    const topic = await queryOne(
+      `SELECT t.*, u.name AS author_name, u.avatar AS author_avatar
+       FROM forum_topics t
+       JOIN users u ON u.uid = t.author_uid
+       WHERE t.id = $1`,
+      [req.params.id]
+    );
+    if (!topic) return res.status(404).json({ error: 'Тема не найдена' });
+    const isAdmin = req.user && req.user.role === 'admin';
+    if (topic.hidden && !isAdmin) return res.status(404).json({ error: 'Тема не найдена' });
+    res.json({ topic });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // PATCH /forum/:id — обновить тему (автор или счётчики)
 router.patch('/:id', requireAuth, async (req, res) => {
   try {
