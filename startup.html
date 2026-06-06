@@ -939,7 +939,7 @@ async function removeFromTeam(btn) {
     for (var j = 0; j < invSnap.docs.length; j++) {
       var inv = invSnap.docs[j].data();
       if (inv.fromUid === uid || inv.toUid === uid) {
-        await invSnap.docs[j].ref.update({ status: 'rejected' });
+        await api.delete('/invites/' + invSnap.docs[j].id);
       }
     }
     showToast(name + ' удалён из команды', 'success');
@@ -1066,17 +1066,18 @@ async function sendVacApply() {
   err.style.display = 'none';
   if (!msg) { err.textContent='Напиши сопроводительное письмо'; err.style.display='block'; return; }
 
-  // Проверяем дубль заявки
+  // Проверяем дубль по вакансии (через список откликнувшихся)
   try {
-    var existing = await db.collection('invites')
-      .where('fromUid','==', pageUser.uid)
-      .where('startupId','==', startupId).get();
-    var alreadyApplied = existing.docs.some(function(d){
-      var s = d.data().status; return s === 'pending' || s === 'accepted';
-    });
-    if (alreadyApplied) {
-      showToast('Ты уже подавал заявку в этот стартап', 'warn');
-      document.getElementById('vacApplyModal').classList.remove('open'); return;
+    var vacCheck = await api.get('/startups/' + startupId + '/vacancies');
+    var vacItem = (vacCheck.vacancies || []).find(function(v){ return v.id === vid; });
+    if (vacItem) {
+      var alreadyInVac = safeArray(vacItem.applicants).some(function(a){
+        return (a && typeof a === 'object' ? a.uid : a) === pageUser.uid;
+      });
+      if (alreadyInVac) {
+        showToast('Ты уже откликнулся на эту вакансию', 'warn');
+        document.getElementById('vacApplyModal').classList.remove('open'); return;
+      }
     }
   } catch(e) {}
 

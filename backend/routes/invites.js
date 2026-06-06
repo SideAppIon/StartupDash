@@ -173,6 +173,23 @@ router.patch('/:id', requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /invites/:id — удалить инвайт (владелец стартапа или участник)
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const invite = await queryOne('SELECT * FROM invites WHERE id=$1', [req.params.id]);
+    if (!invite) return res.status(404).json({ error: 'Приглашение не найдено' });
+    const canDelete = invite.startup_owner === req.user.uid
+      || invite.from_uid === req.user.uid
+      || invite.to_uid === req.user.uid
+      || req.user.role === 'admin';
+    if (!canDelete) return res.status(403).json({ error: 'Нет доступа' });
+    await queryOne('DELETE FROM invites WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 function parseInvite(inv) {
   return {
     ...inv,
