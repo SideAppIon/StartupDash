@@ -360,10 +360,7 @@ async function loadTopic(topicId) {
       formatDate(t.createdAt)+' · '+
       '<span style="color:var(--text3)">'+(t.replyCount||0)+' ответов · '+(t.views||0)+' просмотров</span>';
 
-    // Увеличиваем счётчик просмотров
-    db.collection('forum_topics').doc(topicId).update({
-      views: firebase.firestore.FieldValue.increment(1)
-    }).catch(function(){});
+    // views обновляет бэкенд при GET /forum/:id/posts
 
     // Загружаем посты
     var pSnap = await db.collection('forum_topics').doc(topicId).collection('posts')
@@ -374,7 +371,7 @@ async function loadTopic(topicId) {
     if (posts.length === 0) {
       posts = [{
         id:'op', authorUid:t.authorUid, authorName:t.authorName, authorAvatar:t.authorAvatar,
-        authorRole:t.authorRole, body:t.body, createdAt:t.createdAt, isOp:true
+        authorRole:t.authorRole, content:t.content||t.body, createdAt:t.createdAt, isOp:true
       }];
     }
 
@@ -411,7 +408,7 @@ function renderPosts(posts) {
         '</div>'+
         '<div class="post-card__date">'+formatDate(p.createdAt)+'</div>'+
       '</div>'+
-      '<div class="post-card__body">'+esc(p.body||'')+'</div>'+
+      '<div class="post-card__body">'+esc(p.content||p.body||'')+'</div>'+
       '<div class="post-card__footer">'+
         '<span class="post-num">#'+(i+1)+'</span>'+
         (canDel && !isOp ? '<button class="btn btn--ghost btn--sm" data-pid="'+p.id+'" onclick="deletePost(this)">Удалить</button>' : '')+
@@ -457,17 +454,8 @@ async function createTopic() {
   try {
     var ref = await db.collection('forum_topics').add({
       title,
-      body,
-      category:    cat,
-      authorUid:   pageUser.uid,
-      authorName:  pageUserData ? pageUserData.name : '',
-      authorAvatar:pageUserData ? (pageUserData.avatar||'') : '',
-      authorRole:  pageUserData ? pageUserData.role : '',
-      replyCount:  0,
-      views:       0,
-      pinned:      false,
-      createdAt:   firebase.firestore.FieldValue.serverTimestamp(),
-      lastAt:      firebase.firestore.FieldValue.serverTimestamp()
+      content: body,
+      category: cat
     });
     showToast('Тема создана!','success');
     await openTopic(ref.id);
@@ -487,18 +475,9 @@ async function sendReply() {
   err.style.display = 'none';
   try {
     await db.collection('forum_topics').doc(currentTopicId).collection('posts').add({
-      body,
-      authorUid:   pageUser.uid,
-      authorName:  pageUserData ? pageUserData.name : '',
-      authorAvatar:pageUserData ? (pageUserData.avatar||'') : '',
-      authorRole:  pageUserData ? pageUserData.role : '',
-      createdAt:   firebase.firestore.FieldValue.serverTimestamp()
+      content: body
     });
-    await db.collection('forum_topics').doc(currentTopicId).update({
-      replyCount: firebase.firestore.FieldValue.increment(1),
-      lastAt:     firebase.firestore.FieldValue.serverTimestamp(),
-      lastAuthor: pageUserData ? pageUserData.name : ''
-    });
+    // reply_count и last_at обновляет сам бэкенд при POST /forum/:id/posts
     ta.value = '';
     showToast('Ответ опубликован!','success');
     await loadTopic(currentTopicId);
@@ -514,9 +493,7 @@ async function deletePost(btn) {
   if (!pid || !confirm('Удалить сообщение?')) return;
   try {
     await db.collection('forum_topics').doc(currentTopicId).collection('posts').doc(pid).delete();
-    await db.collection('forum_topics').doc(currentTopicId).update({
-      replyCount: firebase.firestore.FieldValue.increment(-1)
-    });
+    // reply_count декрементирует сам бэкенд при DELETE /forum/:id/posts/:postId
     showToast('Удалено','success');
     await loadTopic(currentTopicId);
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
