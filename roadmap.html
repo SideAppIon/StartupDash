@@ -251,12 +251,15 @@ onAuthReady(async function(user, userData) {
           archBtn.style.display = archivedCount > 0 ? 'flex' : 'none';
           document.getElementById('archiveCount').textContent = archivedCount;
         }
-        renderBoard(canEdit);
+        // Не перерисовываем доску пока открыта форма создания/редактирования
+        if (!formCol && !document.getElementById('active-task-form')) {
+          renderBoard(canEdit);
+        }
       }, function() {
         db.collection('startups').doc(startupId).collection('tasks').get().then(function(snap){
           allTasks = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
           if (!isOwner && !isMember) allTasks = allTasks.filter(function(t){ return t.isPublic !== false; });
-          renderBoard(canEdit);
+          if (!formCol && !document.getElementById('active-task-form')) renderBoard(canEdit);
         });
       });
 
