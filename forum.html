@@ -367,13 +367,12 @@ async function loadTopic(topicId) {
       .orderBy('createdAt','asc').get();
     var posts = pSnap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
 
-    // Первый пост — ОП
-    if (posts.length === 0) {
-      posts = [{
-        id:'op', authorUid:t.authorUid, authorName:t.authorName, authorAvatar:t.authorAvatar,
-        authorRole:t.authorRole, content:t.content||t.body, createdAt:t.createdAt, isOp:true
-      }];
-    }
+    // OP всегда первый — контент из самой темы
+    var opPost = {
+      id:'op', authorUid:t.authorUid, authorName:t.authorName, authorAvatar:t.authorAvatar,
+      authorRole:t.authorRole, content:t.content||t.body, createdAt:t.createdAt, isOp:true
+    };
+    posts = [opPost].concat(posts);
 
     renderPosts(posts);
 
