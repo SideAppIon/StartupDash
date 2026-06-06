@@ -85,7 +85,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     }
 
     const allowed = isAdmin || isAuthor
-      ? ['title', 'content', 'hidden', ...serviceFields]
+      ? ['title', 'content', 'hidden', 'pinned', ...serviceFields]
       : serviceFields;
 
     const updates = []; const values = [];

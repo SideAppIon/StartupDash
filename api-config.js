@@ -67,6 +67,8 @@ function _notifyCallbacks() {
   if (token) {
     try {
       const data = await api.get('/auth/me');
+      // Если бэкенд вернул свежий токен (роль изменилась) — сохраняем
+      if (data.token) setToken(data.token);
       _currentUser     = { uid: data.user.uid, email: data.user.email };
       _currentUserData = data.user;
     } catch (e) {

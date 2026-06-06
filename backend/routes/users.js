@@ -53,6 +53,7 @@ router.patch('/:uid', requireAuth, async (req, res) => {
     }
 
     const allowed = ['name', 'bio', 'skills', 'avatar', 'contacts', 'portfolio'];
+    if (req.user.role === 'admin') allowed.push('role', 'blocked');
     const updates = [];
     const values  = [];
 

@@ -73,12 +73,14 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /auth/me — получить текущего пользователя по токену
+// GET /auth/me — получить текущего пользователя + свежий токен с актуальной ролью из БД
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const user = await queryOne('SELECT * FROM users WHERE uid = $1', [req.user.uid]);
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
-    res.json({ user: sanitizeUser(user) });
+    // Если роль в БД отличается от роли в токене — выдаём новый токен
+    const token = (user.role !== req.user.role) ? signToken(user) : null;
+    res.json({ user: sanitizeUser(user), ...(token ? { token } : {}) });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
