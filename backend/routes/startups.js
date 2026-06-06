@@ -225,6 +225,26 @@ router.post('/:id/team', requireAuth, async (req, res) => {
   }
 });
 
+router.patch('/:id/team/:uid', requireAuth, async (req, res) => {
+  try {
+    await assertOwnerOrAdmin(req.params.id, req.user);
+    const { role, permissions } = req.body;
+    const updates = []; const values = [];
+    if (role !== undefined) { values.push(role); updates.push(`role=$${values.length}`); }
+    if (permissions !== undefined) { values.push(JSON.stringify(permissions)); updates.push(`permissions=$${values.length}`); }
+    if (!updates.length) return res.status(400).json({ error: 'Нечего обновлять' });
+    values.push(req.params.id, req.params.uid);
+    await queryOne(
+      `UPDATE startup_team SET ${updates.join(', ')} WHERE startup_id=$${values.length-1} AND user_uid=$${values.length}`,
+      values
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ error: e.message });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 router.delete('/:id/team/:uid', requireAuth, async (req, res) => {
   try {
     await assertOwnerOrAdmin(req.params.id, req.user);

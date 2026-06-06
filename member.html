@@ -295,9 +295,16 @@ async function loadTeamOf() {
     var items = '';
     var shownStartups = {};
 
-    // Через accepted invites
+    // Инвайты где профиль = from_uid (пользователь сам подавал заявку)
     var invData = await api.get('/invites?from_uid=' + profileUid + '&status=accepted');
     var invites = invData.invites || [];
+
+    // Также инвайты where to_uid = profileUid (стартап пригласил пользователя)
+    try {
+      var inv2Data = await api.get('/invites?to_uid=' + profileUid + '&status=accepted');
+      var inv2 = (inv2Data.invites || []).filter(function(i){ return i.type === 'from_startup'; });
+      invites = invites.concat(inv2);
+    } catch(e2) {}
 
     for (var j = 0; j < invites.length; j++) {
       var inv = invites[j];

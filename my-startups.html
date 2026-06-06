@@ -251,12 +251,15 @@ async function buildStartupCard(s, uid) {
     var accInvs = await db.collection('invites').where('startupId','==',s.id).where('status','==','accepted').get();
     accInvs.docs.forEach(function(d){
       var inv=d.data();
-      if (!inv.fromUid) return;
-      if (teamMembers.find(function(m){return m.uid===inv.fromUid;})) return;
+      // from_startup: владелец пригласил → member = toUid; иначе → member = fromUid
+      var memberUid  = (inv.type==='from_startup' && inv.toUid) ? inv.toUid  : inv.fromUid;
+      var memberName = (inv.type==='from_startup')               ? ''         : (inv.fromName||'');
+      if (!memberUid) return;
+      if (teamMembers.find(function(m){return m.uid===memberUid;})) return;
       var role='Участник';
       if (inv.applications&&inv.applications.length&&inv.applications[0].role) role=inv.applications[0].role;
       else if (inv.role&&inv.role!=='Специалист') role=inv.role;
-      teamMembers.push({uid:inv.fromUid,name:inv.fromName||'',role:role,src:'invite',inviteId:d.id});
+      teamMembers.push({uid:memberUid,name:memberName,role:role,src:'invite',inviteId:d.id});
     });
   } catch(e){}
 
@@ -415,10 +418,9 @@ function openEditRole(startupId, uid, name, role, src, docId) {
 async function loadMemberPerms(src, docId) {
   var perms = {};
   try {
-    var snap = src === 'team'
-      ? await db.collection('startups').doc(editRoleCtx.startupId).collection('team').doc(docId).get()
-      : await db.collection('invites').doc(docId).get();
-    if (snap.exists) perms = snap.data().permissions || {};
+    var tData = await api.get('/startups/' + editRoleCtx.startupId + '/team');
+    var tm = (tData.team || []).find(function(m){ return m.user_uid === editRoleCtx.uid; });
+    if (tm && typeof tm.permissions === 'object') perms = tm.permissions;
   } catch(e) {}
   document.getElementById('permKanban').checked  = !!perms.kanban;
   document.getElementById('permUpdates').checked = !!perms.updates;
@@ -434,17 +436,20 @@ async function saveEditRole() {
     team:    document.getElementById('permTeam').checked
   };
   try {
-    if (editRoleCtx.src === 'team') {
-      await db.collection('startups').doc(editRoleCtx.startupId).collection('team').doc(editRoleCtx.docId).update({ role: newRole, permissions: permissions });
-    } else {
-      var upd = { role: newRole, permissions: permissions };
-      var invSnap = await db.collection('invites').doc(editRoleCtx.docId).get();
-      if (invSnap.exists && invSnap.data().applications) {
-        var apps = invSnap.data().applications.slice();
-        if (apps[0]) apps[0] = Object.assign({},apps[0],{role:newRole});
-        upd.applications = apps;
-      }
-      await db.collection('invites').doc(editRoleCtx.docId).update(upd);
+    // Обновляем роль и permissions в startup_team через API
+    await api.patch('/startups/' + editRoleCtx.startupId + '/team/' + editRoleCtx.uid, { role: newRole, permissions: permissions });
+    // Если участник через invite — обновляем также роль в invite
+    if (editRoleCtx.src === 'invite' && editRoleCtx.docId) {
+      var upd = { role: newRole };
+      try {
+        var invSnap = await db.collection('invites').doc(editRoleCtx.docId).get();
+        if (invSnap.exists && invSnap.data().applications) {
+          var apps = invSnap.data().applications.slice();
+          if (apps[0]) apps[0] = Object.assign({},apps[0],{role:newRole});
+          upd.applications = apps;
+        }
+      } catch(e2) {}
+      await api.patch('/invites/' + editRoleCtx.docId, upd);
     }
     document.getElementById('editRoleModal').classList.remove('open');
     showToast('Роль и права обновлены','success');

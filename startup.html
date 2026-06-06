@@ -359,24 +359,28 @@ onAuthReady(async function(user, userData) {
     var isTeamMember = false;
     var memberPerms  = {};  // разрешения текущего участника команды
     if (user) {
-      // Проверяем принят ли в команду (через team subcollection или accepted invite)
+      // Проверяем принят ли в команду через API
       try {
-        var myTeamSnap = await db.collection('startups').doc(startupId)
-          .collection('team').where('uid','==',user.uid).get();
-        if (!myTeamSnap.empty) {
+        var teamData = await api.get('/startups/' + startupId + '/team');
+        var myEntry  = (teamData.team || []).find(function(m){ return m.user_uid === user.uid; });
+        if (myEntry) {
           isTeamMember = true;
-          memberPerms  = myTeamSnap.docs[0].data().permissions || {};
+          memberPerms  = (typeof myEntry.permissions === 'object' ? myEntry.permissions : {});
         }
       } catch(e) {}
       if (!isTeamMember) {
         try {
+          // Проверяем accepted invite (пользователь подавал заявку или был приглашён)
           var myInvSnap = await db.collection('invites')
-            .where('fromUid','==', user.uid)
             .where('startupId','==', startupId)
             .where('status','==','accepted').get();
-          if (!myInvSnap.empty) {
+          var myInv = myInvSnap.docs.find(function(d){
+            var inv = d.data();
+            return inv.fromUid === user.uid || inv.toUid === user.uid;
+          });
+          if (myInv) {
             isTeamMember = true;
-            memberPerms  = myInvSnap.docs[0].data().permissions || {};
+            memberPerms  = myInv.data().permissions || {};
           }
         } catch(e) {}
       }
@@ -580,33 +584,37 @@ async function loadTeam(isOwnerOrAdmin, isTeamMember, memberPerms) {
     var teamUids = [];
     for (var i = 0; i < teamSnap.docs.length; i++) {
       var t = teamSnap.docs[i].data();
-      if (!t.uid) continue;
-      teamUids.push(t.uid);
-      teamDocs[t.uid] = { docId: teamSnap.docs[i].id, permissions: t.permissions || {}, role: t.role || 'Участник', src: 'team' };
+      // После миграции поле может быть userUid, user_uid или uid
+      var tUid = t.userUid || t.user_uid || t.uid || '';
+      if (!tUid) continue;
+      teamUids.push(tUid);
+      teamDocs[tUid] = { docId: tUid, permissions: t.permissions || {}, role: t.role || 'Участник', src: 'team' };
       try {
-        var uSnap = await db.collection('users').doc(t.uid).get();
+        var uSnap = await db.collection('users').doc(tUid).get();
         if (uSnap.exists) {
-          members.push(Object.assign({ _teamRole: t.role || 'Участник', _teamDocId: teamSnap.docs[i].id, _src: 'team', _perms: t.permissions || {} }, uSnap.data()));
+          members.push(Object.assign({ _teamRole: t.role || 'Участник', _teamDocId: tUid, _src: 'team', _perms: t.permissions || {} }, uSnap.data()));
         }
       } catch(e) {}
     }
 
-    // Участники через accepted invites
+    // Участники через accepted invites (fallback для исторических данных)
     try {
       var accSnap = await db.collection('invites')
         .where('startupId','==', startupId)
         .where('status','==','accepted').get();
       for (var j = 0; j < accSnap.docs.length; j++) {
         var inv = accSnap.docs[j].data();
-        if (!inv.fromUid || inv.fromUid === startupData.ownerUid) continue;
-        if (teamUids.indexOf(inv.fromUid) !== -1) continue;
+        // from_startup: владелец пригласил → member = toUid; иначе → member = fromUid
+        var memberUid = (inv.type === 'from_startup' && inv.toUid) ? inv.toUid : inv.fromUid;
+        if (!memberUid || memberUid === startupData.ownerUid) continue;
+        if (teamUids.indexOf(memberUid) !== -1) continue;
         var invRole = 'Участник';
         if (inv.applications && inv.applications.length && inv.applications[0].role) {
           invRole = inv.applications[0].role;
         } else if (inv.role) { invRole = inv.role; }
-        teamDocs[inv.fromUid] = { docId: accSnap.docs[j].id, permissions: inv.permissions || {}, role: invRole, src: 'invite' };
+        teamDocs[memberUid] = { docId: accSnap.docs[j].id, permissions: inv.permissions || {}, role: invRole, src: 'invite' };
         try {
-          var iUsnap = await db.collection('users').doc(inv.fromUid).get();
+          var iUsnap = await db.collection('users').doc(memberUid).get();
           if (iUsnap.exists) {
             members.push(Object.assign({ _teamRole: invRole, _teamDocId: accSnap.docs[j].id, _src: 'invite', _perms: inv.permissions || {} }, iUsnap.data()));
           }
@@ -884,25 +892,30 @@ async function editMemberRole(btn) {
   if (!newRole || newRole.trim() === cur) return;
   newRole = newRole.trim();
   try {
-    // Обновляем в subcollection team
-    var teamSnap = await db.collection('startups').doc(startupId)
-      .collection('team').where('uid','==',uid).get();
-    if (!teamSnap.empty) {
-      await teamSnap.docs[0].ref.update({ role: newRole });
-    } else {
+    // Обновляем в startup_team через API
+    var teamPatched = false;
+    try {
+      await api.patch('/startups/' + startupId + '/team/' + uid, { role: newRole });
+      teamPatched = true;
+    } catch(e2) {}
+    if (!teamPatched) {
       // Участник через invite — обновляем invite.role и applications[0].role
       var invSnap = await db.collection('invites')
-        .where('fromUid','==',uid).where('startupId','==',startupId)
+        .where('startupId','==',startupId)
         .where('status','==','accepted').get();
-      if (!invSnap.empty) {
+      var invDoc = invSnap.docs.find(function(d){
+        var inv = d.data();
+        return inv.fromUid === uid || inv.toUid === uid;
+      });
+      if (invDoc) {
         var upd = { role: newRole };
-        var inv = invSnap.docs[0].data();
+        var inv = invDoc.data();
         if (inv.applications && inv.applications.length) {
           var apps = inv.applications.slice();
           apps[0] = Object.assign({}, apps[0], { role: newRole });
           upd.applications = apps;
         }
-        await invSnap.docs[0].ref.update(upd);
+        await invDoc.ref.update(upd);
       }
     }
     showToast('Должность обновлена: ' + newRole, 'success');
@@ -918,18 +931,16 @@ async function removeFromTeam(btn) {
   if (!uid) return;
   if (!confirm('Удалить ' + name + ' из команды?')) return;
   try {
-    // Удаляем из subcollection team
-    var teamSnap = await db.collection('startups').doc(startupId)
-      .collection('team').where('uid','==',uid).get();
-    for (var i = 0; i < teamSnap.docs.length; i++) {
-      await teamSnap.docs[i].ref.delete();
-    }
-    // Также меняем статус invite на removed
+    // Удаляем из startup_team через API
+    try { await api.delete('/startups/' + startupId + '/team/' + uid); } catch(e2) {}
+    // Также меняем статус invite на removed (ищем по fromUid или toUid)
     var invSnap = await db.collection('invites')
-      .where('fromUid','==',uid)
       .where('startupId','==',startupId).get();
     for (var j = 0; j < invSnap.docs.length; j++) {
-      await invSnap.docs[j].ref.update({ status: 'removed' });
+      var inv = invSnap.docs[j].data();
+      if (inv.fromUid === uid || inv.toUid === uid) {
+        await invSnap.docs[j].ref.update({ status: 'removed' });
+      }
     }
     showToast(name + ' удалён из команды', 'success');
     var _isOA = pageUser && startupData && (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'));
@@ -940,13 +951,16 @@ async function removeFromTeam(btn) {
 // ── SAVE PERMISSION ──────────────────────────────────
 async function savePerm(uid, src, docId, permKey, value) {
   try {
-    var update = {};
-    update['permissions.' + permKey] = value;
-    if (src === 'team') {
-      await db.collection('startups').doc(startupId).collection('team').doc(docId).update(update);
-    } else {
-      await db.collection('invites').doc(docId).update(update);
-    }
+    // Получаем текущие разрешения из startup_team
+    var currentPerms = {};
+    try {
+      var tData = await api.get('/startups/' + startupId + '/team');
+      var tm = (tData.team || []).find(function(m){ return m.user_uid === uid; });
+      if (tm && typeof tm.permissions === 'object') currentPerms = tm.permissions;
+    } catch(e) {}
+    currentPerms[permKey] = value;
+    // Всегда сохраняем в startup_team (единственное место для permissions)
+    await api.patch('/startups/' + startupId + '/team/' + uid, { permissions: currentPerms });
     showToast('Разрешение обновлено', 'success');
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }

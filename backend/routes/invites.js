@@ -128,24 +128,40 @@ router.patch('/:id', requireAuth, async (req, res) => {
 
     if (!canUpdate) return res.status(403).json({ error: 'Нет доступа' });
 
-    const { status } = req.body;
-    if (!['pending', 'accepted', 'rejected'].includes(status)) {
+    const { status, role, permissions, applications } = req.body;
+
+    if (status !== undefined && !['pending', 'accepted', 'rejected', 'removed'].includes(status)) {
       return res.status(400).json({ error: 'Неверный статус' });
     }
 
-    // Если принимаем специалиста/эксперта — добавляем в команду стартапа
+    // Если принимаем — добавляем в команду стартапа
     if (status === 'accepted') {
+      const memberUid = (invite.type === 'from_startup' && invite.to_uid)
+        ? invite.to_uid
+        : invite.from_uid;
+      const memberRole = role || invite.role || 'Участник';
       await queryOne(
         `INSERT INTO startup_team (startup_id, user_uid, role, permissions)
          VALUES ($1,$2,$3,'{}')
-         ON CONFLICT (startup_id, user_uid) DO NOTHING`,
-        [invite.startup_id, invite.from_uid, invite.role || 'Участник']
+         ON CONFLICT (startup_id, user_uid) DO UPDATE SET role=$3`,
+        [invite.startup_id, memberUid, memberRole]
       );
     }
 
+    // Обновляем только переданные поля
+    const invUpdates = [];
+    const invParams  = [];
+    if (status !== undefined)      { invParams.push(status);                       invUpdates.push(`status=$${invParams.length}`); }
+    if (role !== undefined)        { invParams.push(role);                          invUpdates.push(`role=$${invParams.length}`); }
+    if (permissions !== undefined) { invParams.push(JSON.stringify(permissions));   invUpdates.push(`permissions=$${invParams.length}`); }
+    if (applications !== undefined){ invParams.push(JSON.stringify(applications));  invUpdates.push(`applications=$${invParams.length}`); }
+
+    if (!invUpdates.length) return res.status(400).json({ error: 'Нечего обновлять' });
+
+    invParams.push(req.params.id);
     const updated = await queryOne(
-      'UPDATE invites SET status=$1 WHERE id=$2 RETURNING *',
-      [status, req.params.id]
+      `UPDATE invites SET ${invUpdates.join(', ')} WHERE id=$${invParams.length} RETURNING *`,
+      invParams
     );
 
     res.json({ invite: parseInvite(updated) });
