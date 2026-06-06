@@ -275,15 +275,23 @@ async function loadTeamMembers() {
   // Из subcollection team
   try {
     var ts = await db.collection('startups').doc(startupId).collection('team').get();
-    ts.docs.forEach(function(d){ if (d.data().uid) teamMembers.push({ uid:d.data().uid, name:d.data().name||d.data().uid }); });
+    ts.docs.forEach(function(d){
+      var td = d.data();
+      var tuid = td.userUid || td.user_uid || td.uid || '';
+      if (tuid && !teamMembers.find(function(m){ return m.uid===tuid; })) {
+        teamMembers.push({ uid: tuid, name: td.name || tuid });
+      }
+    });
   } catch(e) {}
   // Из accepted invites
   try {
     var invs = await db.collection('invites').where('startupId','==',startupId).where('status','==','accepted').get();
     invs.docs.forEach(function(d){
       var inv = d.data();
-      if (inv.fromUid && !teamMembers.find(function(m){ return m.uid===inv.fromUid; })) {
-        teamMembers.push({ uid: inv.fromUid, name: inv.fromName||inv.fromUid });
+      var muid = (inv.type==='from_startup' && inv.toUid) ? inv.toUid : inv.fromUid;
+      var mname = (inv.type==='from_startup') ? '' : (inv.fromName||'');
+      if (muid && !teamMembers.find(function(m){ return m.uid===muid; })) {
+        teamMembers.push({ uid: muid, name: mname || muid });
       }
     });
   } catch(e) {}
@@ -404,8 +412,10 @@ function cancelForm() {
   formCol = null;
 }
 
-async function saveTask(btn) { var existingId = btn ? btn.getAttribute("data-id") : null;
-  if (!isOwner) return;
+async function saveTask(btn) {
+  var existingId = btn ? btn.getAttribute('data-id') : null;
+  var canEdit = isOwner || (memberPerms && memberPerms.kanban === true);
+  if (!canEdit) return;
   var title = (document.getElementById('tf-title').value||'').trim();
   if (!title) { showToast('Введи название','error'); return; }
 
@@ -416,28 +426,33 @@ async function saveTask(btn) { var existingId = btn ? btn.getAttribute("data-id"
     if (m) assigneeName = m.name;
   }
 
+  var taskStatus = existingId ? undefined : formCol;
   var data = {
-    title,
+    title:        title,
     description:  (document.getElementById('tf-desc').value||'').trim(),
     priority:     document.getElementById('tf-priority').value,
-    assigneeUid:  assigneeUid,
+    assigned_to:  assigneeUid || null,
     assigneeName: assigneeName,
-    isPublic:     document.getElementById('tf-public').checked,
-    status:       existingId ? undefined : formCol,
-    updatedAt:    firebase.firestore.FieldValue.serverTimestamp()
+    is_public:    document.getElementById('tf-public').checked,
   };
-  if (!existingId) data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-
-  // Убираем undefined поля
-  Object.keys(data).forEach(function(k){ if (data[k]===undefined) delete data[k]; });
+  if (taskStatus !== undefined) data.status = taskStatus;
 
   try {
+    var result;
     if (existingId) {
       await db.collection('startups').doc(startupId).collection('tasks').doc(existingId).update(data);
+      // Обновляем локально
+      var idx = allTasks.findIndex(function(t){ return t.id===existingId; });
+      if (idx !== -1) allTasks[idx] = Object.assign({}, allTasks[idx], data, { isPublic: data.is_public, assigneeUid: assigneeUid });
     } else {
-      await db.collection('startups').doc(startupId).collection('tasks').add(data);
+      result = await db.collection('startups').doc(startupId).collection('tasks').add(data);
+      // Добавляем локально для немедленного отображения
+      allTasks.push(Object.assign({ id: result.id || String(Math.random()) }, data, {
+        isPublic: data.is_public, assigneeUid: assigneeUid, archived: false
+      }));
     }
     cancelForm();
+    renderBoard(canEdit);
     showToast(existingId ? 'Задача обновлена' : 'Задача добавлена','success');
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }

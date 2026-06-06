@@ -75,15 +75,19 @@ CREATE INDEX IF NOT EXISTS idx_updates_startup ON startup_updates(startup_id);
 
 -- ── Задачи (Roadmap / Kanban) ─────────────────────────────
 CREATE TABLE IF NOT EXISTS startup_tasks (
-  id          TEXT PRIMARY KEY,
-  startup_id  TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
-  title       TEXT NOT NULL DEFAULT '',
-  description TEXT DEFAULT '',
-  status      TEXT DEFAULT 'todo'
-                CHECK (status IN ('todo','in_progress','done')),
-  assigned_to TEXT REFERENCES users(uid) ON DELETE SET NULL,
-  position    INTEGER DEFAULT 0,
-  created_at  TIMESTAMPTZ DEFAULT NOW()
+  id            TEXT PRIMARY KEY,
+  startup_id    TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+  title         TEXT NOT NULL DEFAULT '',
+  description   TEXT DEFAULT '',
+  status        TEXT DEFAULT 'todo',
+  assigned_to   TEXT REFERENCES users(uid) ON DELETE SET NULL,
+  position      INTEGER DEFAULT 0,
+  priority      TEXT DEFAULT 'med',
+  assignee_name TEXT DEFAULT '',
+  is_public     BOOLEAN DEFAULT true,
+  archived      BOOLEAN DEFAULT false,
+  deadline      DATE,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_startup ON startup_tasks(startup_id);

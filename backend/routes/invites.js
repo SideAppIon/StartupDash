@@ -74,11 +74,14 @@ router.get('/:id', requireAuth, async (req, res) => {
 // POST /invites — создать заявку (специалист → стартап) или приглашение (стартап → специалист)
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const {
-      startup_id, startup_name, startup_owner,
-      to_uid,
-      type, role, expert_area, message, applications, from_skills
-    } = req.body;
+    const b = req.body;
+    // Принимаем и snake_case и camelCase
+    const startup_id    = b.startup_id    || b.startupId;
+    const startup_name  = b.startup_name  || b.startupName  || '';
+    const startup_owner = b.startup_owner || b.startupOwner || '';
+    const to_uid        = b.to_uid        || b.toUid        || null;
+    const from_skills   = b.from_skills   || b.fromSkills   || [];
+    const { type, role, expert_area, message, applications } = b;
 
     if (!startup_id) return res.status(400).json({ error: 'startup_id обязателен' });
 

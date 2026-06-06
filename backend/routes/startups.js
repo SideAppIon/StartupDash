@@ -329,12 +329,21 @@ router.post('/:id/tasks', requireAuth, async (req, res) => {
     const hasPerm = await checkTeamPermission(req.params.id, req.user.uid, 'kanban');
     if (!isOwner && !isAdmin && !hasPerm) return res.status(403).json({ error: 'Нет доступа' });
 
-    const { title, description, status, assigned_to, position } = req.body;
+    const b = req.body;
+    const title       = b.title       || '';
+    const description = b.description || '';
+    const status      = b.status      || 'todo';
+    const assigned_to = b.assigned_to || b.assignedTo || null;
+    const position    = b.position    || 0;
+    const priority    = b.priority    || 'med';
+    const assignee_name = b.assigneeName || b.assignee_name || '';
+    const is_public   = b.is_public !== undefined ? b.is_public : (b.isPublic !== undefined ? b.isPublic : true);
+
     const id = uuidv4();
     const task = await queryOne(
-      `INSERT INTO startup_tasks (id, startup_id, title, description, status, assigned_to, position, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *`,
-      [id, req.params.id, title || '', description || '', status || 'todo', assigned_to || null, position || 0]
+      `INSERT INTO startup_tasks (id, startup_id, title, description, status, assigned_to, position, priority, assignee_name, is_public, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()) RETURNING *`,
+      [id, req.params.id, title, description, status, assigned_to, position, priority, assignee_name, is_public]
     );
     res.status(201).json({ task });
   } catch (e) {
@@ -350,10 +359,15 @@ router.patch('/:id/tasks/:taskId', requireAuth, async (req, res) => {
     const hasPerm = await checkTeamPermission(req.params.id, req.user.uid, 'kanban');
     if (!isOwner && !isAdmin && !hasPerm) return res.status(403).json({ error: 'Нет доступа' });
 
-    const allowed = ['title', 'description', 'status', 'assigned_to', 'position'];
+    const bT = req.body;
+    // Нормализуем camelCase → snake_case
+    if (bT.assignedTo  !== undefined && bT.assigned_to  === undefined) bT.assigned_to  = bT.assignedTo;
+    if (bT.assigneeName!== undefined && bT.assignee_name=== undefined) bT.assignee_name= bT.assigneeName;
+    if (bT.isPublic    !== undefined && bT.is_public    === undefined) bT.is_public    = bT.isPublic;
+    const allowed = ['title', 'description', 'status', 'assigned_to', 'position', 'priority', 'assignee_name', 'is_public'];
     const updates = []; const values = [];
     allowed.forEach(f => {
-      if (req.body[f] !== undefined) { values.push(req.body[f]); updates.push(`${f}=$${values.length}`); }
+      if (bT[f] !== undefined) { values.push(bT[f]); updates.push(`${f}=$${values.length}`); }
     });
     if (!updates.length) return res.status(400).json({ error: 'Нечего обновлять' });
     values.push(req.params.taskId);

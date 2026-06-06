@@ -138,11 +138,24 @@ onAuthReady(async function(user, userData) {
       return ((b.createdAt&&b.createdAt.seconds)||0) - ((a.createdAt&&a.createdAt.seconds)||0);
     });
 
-    // Стартапы где участвую (accepted invites)
+    // Стартапы где участвую (accepted invites — от своего имени или приглашённый)
     var participatingStartups = [];
     try {
-      var invSnap = await db.collection('invites')
+      // Запросы: сам подавал заявку (from_uid) + был приглашён стартапом (to_uid)
+      var invSnap1 = await db.collection('invites')
         .where('fromUid','==',user.uid).where('status','==','accepted').get();
+      var invSnap2 = { docs: [] };
+      try {
+        invSnap2 = await db.collection('invites')
+          .where('toUid','==',user.uid).where('status','==','accepted').get();
+      } catch(e2) {}
+      // Объединяем, избегая дублей по id инвайта
+      var seenInvIds = {};
+      var allInvDocs = [];
+      invSnap1.docs.concat(invSnap2.docs).forEach(function(d){
+        if (!seenInvIds[d.id]) { seenInvIds[d.id]=true; allInvDocs.push(d); }
+      });
+      var invSnap = { docs: allInvDocs };
       for (var ii = 0; ii < invSnap.docs.length; ii++) {
         var inv = invSnap.docs[ii].data();
         if (!inv.startupId) continue;
