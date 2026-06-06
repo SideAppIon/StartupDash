@@ -35,19 +35,32 @@ router.get('/platform', async (req, res) => {
   }
 });
 
-// PATCH /platform-config — только администратор
-router.patch('/', requireAdmin, async (req, res) => {
+// Общий обработчик сохранения конфига (merge с существующим)
+async function upsertConfig(body, res) {
   try {
-    const value = JSON.stringify(req.body);
+    const row = await queryOne("SELECT value FROM platform_config WHERE key='platform'");
+    const existing = row ? JSON.parse(row.value) : DEFAULT_CONFIG;
+    // Удаляем служебные поля Firestore-совместимости
+    const { _method, id, ...data } = body;
+    const updated = Object.assign({}, existing, data);
     await queryOne(
       `INSERT INTO platform_config (key, value, updated_at) VALUES ('platform', $1, NOW())
        ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
-      [value]
+      [JSON.stringify(updated)]
     );
-    res.json({ ok: true });
+    res.json({ ok: true, config: updated });
   } catch(e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
-});
+}
+
+// PATCH /platform-config
+router.patch('/', requireAdmin, (req, res) => upsertConfig(req.body, res));
+// POST /platform-config (fallback от _DocRef.set при 404)
+router.post('/', requireAdmin, (req, res) => upsertConfig(req.body, res));
+// PATCH /platform-config/platform (db.collection('_config').doc('platform').set/update)
+router.patch('/platform', requireAdmin, (req, res) => upsertConfig(req.body, res));
+// POST /platform-config/platform
+router.post('/platform', requireAdmin, (req, res) => upsertConfig(req.body, res));
 
 module.exports = router;
