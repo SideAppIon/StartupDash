@@ -179,15 +179,29 @@
   </div>
 </div>
 
-<!-- Reset pwd modal -->
+<!-- Password modal -->
 <div class="modal-overlay" id="pwdModal">
   <div class="modal">
     <div class="modal__header">
-      <div class="modal__title">Сброс пароля</div>
+      <div class="modal__title">Управление паролем</div>
       <button class="modal__close" onclick="closePwdModal()">×</button>
     </div>
-    <p style="color:var(--text2);font-size:14px;margin-bottom:20px">Письмо для сброса будет отправлено на: <strong id="pwdEmail"></strong></p>
-    <button class="btn btn--danger" style="width:100%;justify-content:center" onclick="confirmReset()">Отправить письмо</button>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px">Пользователь: <strong id="pwdEmail"></strong></p>
+
+    <div class="form-group">
+      <label class="form-label">Новый пароль</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="form-input" id="pwdInput" placeholder="Введите или сгенерируйте..." style="flex:1;font-family:monospace"/>
+        <button class="btn btn--outline btn--sm" onclick="generatePwd()" title="Сгенерировать">🎲</button>
+        <button class="btn btn--outline btn--sm" onclick="copyPwd()" title="Скопировать">📋</button>
+      </div>
+      <div class="form-hint">Минимум 6 символов. После установки сообщите пользователю новый пароль.</div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn--primary" style="flex:1;justify-content:center" onclick="confirmSetPwd()">✅ Установить пароль</button>
+      <button class="btn btn--danger btn--sm" onclick="confirmReset()" title="Отправить письмо для сброса">✉️ Письмо</button>
+    </div>
   </div>
 </div>
 
@@ -445,16 +459,46 @@ async function applyRole() {
   closeModal(); showToast('Роль обновлена','success');
   await loadUsers(); await loadStats();
 }
-function openPwdModal(email) {
-  resetEmail=email;
-  document.getElementById('pwdEmail').textContent=email;
+function openPwdModal(uid, email) {
+  selUid     = uid;
+  resetEmail = email;
+  document.getElementById('pwdEmail').textContent = email;
+  document.getElementById('pwdInput').value = '';
   document.getElementById('pwdModal').classList.add('open');
 }
 function closePwdModal() { document.getElementById('pwdModal').classList.remove('open'); }
+
+function generatePwd() {
+  var chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$%';
+  var pwd = '';
+  for (var i = 0; i < 12; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  document.getElementById('pwdInput').value = pwd;
+}
+
+function copyPwd() {
+  var val = document.getElementById('pwdInput').value;
+  if (!val) { showToast('Сначала введите или сгенерируйте пароль','warn'); return; }
+  navigator.clipboard.writeText(val).then(function(){
+    showToast('Пароль скопирован в буфер','success');
+  }).catch(function(){
+    showToast('Не удалось скопировать: ' + val, 'warn');
+  });
+}
+
+async function confirmSetPwd() {
+  var pwd = document.getElementById('pwdInput').value.trim();
+  if (!pwd || pwd.length < 6) { showToast('Пароль минимум 6 символов','error'); return; }
+  try {
+    await api.patch('/users/' + selUid + '/password', { newPassword: pwd });
+    closePwdModal();
+    showToast('Пароль установлен. Не забудьте сообщить пользователю.','success');
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
 async function confirmReset() {
   try {
     await auth.sendPasswordResetEmail(resetEmail);
-    closePwdModal(); showToast('Письмо отправлено','success');
+    showToast('Письмо для сброса отправлено','success');
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 async function delUser(uid, name) {
@@ -549,7 +593,7 @@ document.addEventListener('click', function(e) {
   if (a==='hidetopic') hideTopic(btn.getAttribute('data-tid'), btn.getAttribute('data-hidden')==='1');
   if (a==='deltopic')  delTopic(btn.getAttribute('data-tid'),  btn.getAttribute('data-name'));
   if (a==='role')   openRoleModal(btn.getAttribute('data-uid'), btn.getAttribute('data-name'), btn.getAttribute('data-role'));
-  if (a==='pwd')    openPwdModal(btn.getAttribute('data-email'));
+  if (a==='pwd')    openPwdModal(btn.getAttribute('data-uid'), btn.getAttribute('data-email'));
   if (a==='delusr') delUser(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));
   if (a==='delst')  delStartup(btn.getAttribute('data-sid'), btn.getAttribute('data-name'));
 });

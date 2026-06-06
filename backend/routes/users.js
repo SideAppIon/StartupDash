@@ -80,23 +80,27 @@ router.patch('/:uid', requireAuth, async (req, res) => {
   }
 });
 
-// PATCH /users/:uid/password — сменить пароль
+// PATCH /users/:uid/password — сменить пароль (себе или admin принудительно)
 router.patch('/:uid/password', requireAuth, async (req, res) => {
   try {
-    if (req.user.uid !== req.params.uid) {
-      return res.status(403).json({ error: 'Нет доступа' });
-    }
+    const isAdmin = req.user.role === 'admin';
+    const isSelf  = req.user.uid === req.params.uid;
+    if (!isSelf && !isAdmin) return res.status(403).json({ error: 'Нет доступа' });
+
     const { currentPassword, newPassword } = req.body;
     if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: 'Новый пароль минимум 6 символов' });
+      return res.status(400).json({ error: 'Пароль минимум 6 символов' });
     }
 
-    const user = await queryOne('SELECT * FROM users WHERE uid = $1', [req.params.uid]);
-    const valid = await bcrypt.compare(currentPassword, user.password_hash);
-    if (!valid) return res.status(401).json({ error: 'Неверный текущий пароль' });
+    // Обычный пользователь должен подтвердить старый пароль; admin — нет
+    if (isSelf && !isAdmin) {
+      const user = await queryOne('SELECT password_hash FROM users WHERE uid=$1', [req.params.uid]);
+      const valid = await bcrypt.compare(currentPassword || '', user.password_hash);
+      if (!valid) return res.status(401).json({ error: 'Неверный текущий пароль' });
+    }
 
     const hash = await bcrypt.hash(newPassword, 10);
-    await queryOne('UPDATE users SET password_hash = $1 WHERE uid = $2', [hash, req.params.uid]);
+    await queryOne('UPDATE users SET password_hash=$1 WHERE uid=$2', [hash, req.params.uid]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
