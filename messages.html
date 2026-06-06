@@ -288,7 +288,10 @@ function filterConvs(q) {
 }
 
 function getOtherUid(c) {
-  return (c.participants||[]).find(function(p){return p!==myUid;})||'';
+  // Новый бэкенд: participantNames — объект {uid: name}, нет массива participants
+  var names = c.participantNames || c.participant_names || {};
+  if (typeof names === 'string') { try { names = JSON.parse(names); } catch(e) { names = {}; } }
+  return Object.keys(names).find(function(k){ return k !== myUid; }) || '';
 }
 function getOtherName(c) {
   var o=getOtherUid(c);
@@ -314,9 +317,13 @@ async function openConv(convId) {
   document.getElementById('chatMessages').innerHTML =
     '<div style="text-align:center;padding:32px 0"><div class="spinner" style="width:22px;height:22px;border-width:2px;margin:0 auto"></div></div>';
 
-  var snap = await db.collection('conversations').doc(convId).get();
-  if (!snap.exists) return;
-  var conv  = snap.data();
+  // Берём из кэша или запрашиваем с сервера
+  var conv = allConvs.find(function(c){ return c.id === convId; });
+  if (!conv) {
+    var snap = await db.collection('conversations').doc(convId).get();
+    if (!snap.exists) return;
+    conv = snap.data();
+  }
   var other = getOtherUid(conv);
   currentOtherUid = other;
   var name  = (conv.participantNames&&conv.participantNames[other])||'Неизвестно';
@@ -392,13 +399,9 @@ async function send() {
   inp.value=''; inp.style.height='auto'; btn.disabled=true;
   try {
     var sid=activeId;
+    // Бэкенд сам обновляет last_message и last_at
     await db.collection('conversations').doc(sid).collection('messages').add({
-      text:text, senderUid:myUid, type:'user',
-      createdAt:firebase.firestore.FieldValue.serverTimestamp()
-    });
-    await db.collection('conversations').doc(sid).update({
-      lastMessage:text.substring(0,80),
-      lastAt:firebase.firestore.FieldValue.serverTimestamp()
+      text: text, type: 'user'
     });
   } catch(e){showToast('Ошибка: '+e.message,'error');}
   finally{btn.disabled=false;}
@@ -406,27 +409,22 @@ async function send() {
 
 // ── ENSURE/CREATE CONV ────────────────────────────────
 async function ensureConv(otherUid) {
-  var snap=await db.collection('conversations').where('participants','array-contains',myUid).get();
-  for (var i=0;i<snap.docs.length;i++){
-    if ((snap.docs[i].data().participants||[]).indexOf(otherUid)!==-1) return snap.docs[i].id;
+  // Ищем в кэше уже загруженных диалогов
+  for (var i = 0; i < allConvs.length; i++) {
+    var names = allConvs[i].participantNames || {};
+    if (Object.prototype.hasOwnProperty.call(names, otherUid)) return allConvs[i].id;
   }
   return createConv(otherUid);
 }
 async function createConv(otherUid) {
-  var os=await db.collection('users').doc(otherUid).get();
-  var o=os.exists?os.data():{name:'Unknown',avatar:'',role:'user'};
-  var names={},avatars={},roles={};
-  names[myUid]=(myData&&myData.name)||''; names[otherUid]=o.name||'';
-  avatars[myUid]=(myData&&myData.avatar)||''; avatars[otherUid]=o.avatar||'';
-  roles[myUid]=(myData&&myData.role)||''; roles[otherUid]=o.role||'';
-  var ref=await db.collection('conversations').add({
-    participants:[myUid,otherUid],
-    participantNames:names, participantAvatars:avatars, participantRoles:roles,
-    lastMessage:'',
-    lastAt:firebase.firestore.FieldValue.serverTimestamp(),
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  });
-  return ref.id;
+  // Бэкенд сам создаёт диалог и заполняет данные участников
+  var data = await api.post('/messages/conversations', { other_uid: otherUid });
+  var conv = data.conversation || data;
+  // Добавляем в кэш чтобы сразу было доступно
+  if (conv && conv.id && !allConvs.find(function(c){ return c.id === conv.id; })) {
+    allConvs.unshift(Object.assign({}, conv));
+  }
+  return conv.id;
 }
 
 // ── INVITE → SYSTEM MSG ───────────────────────────────
@@ -441,12 +439,7 @@ async function handleInviteMsg(inviteId) {
     :inv.status==='rejected'?'❌ Заявка в «'+(inv.startupName||'')+'» отклонена'
     :'📋 Заявка в «'+(inv.startupName||'')+'»\n'+(inv.message||'');
   await db.collection('conversations').doc(convId).collection('messages').add({
-    text:txt,senderUid:'system',type:'system',inviteId:inviteId,
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  });
-  await db.collection('conversations').doc(convId).update({
-    lastMessage:txt.substring(0,80),
-    lastAt:firebase.firestore.FieldValue.serverTimestamp()
+    text: txt, type: 'system'
   });
 }
 

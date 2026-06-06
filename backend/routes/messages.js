@@ -72,6 +72,22 @@ router.post('/conversations', requireAuth, async (req, res) => {
   }
 });
 
+// GET /conversations/:id
+router.get('/conversations/:id', requireAuth, async (req, res) => {
+  try {
+    const member = await queryOne(
+      'SELECT 1 FROM conversation_participants WHERE conv_id=$1 AND user_uid=$2',
+      [req.params.id, req.user.uid]
+    );
+    if (!member) return res.status(403).json({ error: 'Нет доступа' });
+    const conv = await queryOne('SELECT * FROM conversations WHERE id=$1', [req.params.id]);
+    if (!conv) return res.status(404).json({ error: 'Диалог не найден' });
+    res.json({ conversation: parseConv(conv) });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // GET /conversations/:id/messages
 router.get('/conversations/:id/messages', requireAuth, async (req, res) => {
   try {
