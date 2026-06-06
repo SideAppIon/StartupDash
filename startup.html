@@ -939,7 +939,7 @@ async function removeFromTeam(btn) {
     for (var j = 0; j < invSnap.docs.length; j++) {
       var inv = invSnap.docs[j].data();
       if (inv.fromUid === uid || inv.toUid === uid) {
-        await invSnap.docs[j].ref.update({ status: 'removed' });
+        await invSnap.docs[j].ref.update({ status: 'rejected' });
       }
     }
     showToast(name + ' удалён из команды', 'success');
