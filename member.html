@@ -206,22 +206,31 @@ onAuthReady(async function(user, userData) {
       '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
   }
 
-  // Проверяем уже отправлено ли приглашение
-  var alreadyInvited = false;
+  // Проверяем статус приглашения — только pending/accepted считаем "уже приглашён"
+  // 'pending' → кнопка заблокирована, 'accepted' → в команде, иначе → можно пригласить снова
+  var inviteStatus = null; // null | 'pending' | 'accepted'
   if (user && userData && userData.role === 'startup') {
     try {
-      var myStartupsCheck = await db.collection('startups').where('ownerUid','==',user.uid).get();
-      for (var si = 0; si < myStartupsCheck.docs.length; si++) {
-        var sid = myStartupsCheck.docs[si].id;
-        var invCheck = await db.collection('invites')
-          .where('toUid','==', profileUid)
-          .where('startupId','==', sid).get();
-        if (!invCheck.empty) { alreadyInvited = true; break; }
+      var invData = await api.get(
+        '/invites?to_uid=' + profileUid
+      );
+      var allInvites = invData.invites || [];
+      // Получаем стартапы текущего пользователя
+      var myStartupsData = await api.get('/startups?owner_uid=' + user.uid);
+      var myStartupIds = (myStartupsData.startups || []).map(function(s){ return s.id; });
+
+      for (var ii = 0; ii < allInvites.length; ii++) {
+        var inv = allInvites[ii];
+        var invSid = inv.startupId || inv.startup_id;
+        if (myStartupIds.indexOf(invSid) === -1) continue; // не наш стартап
+        if (inv.status === 'accepted') { inviteStatus = 'accepted'; break; }
+        if (inv.status === 'pending')  { inviteStatus = 'pending'; }
+        // rejected/removed — игнорируем, можно пригласить снова
       }
-    } catch(e) {}
+    } catch(e) { console.warn('invite check:', e.message); }
   }
   // Кнопки действий
-  renderActions(user, userData, alreadyInvited);
+  renderActions(user, userData, inviteStatus);
 
   // Стартапы (если role=startup)
   if (profileData.role === 'startup') {
@@ -235,7 +244,7 @@ onAuthReady(async function(user, userData) {
   document.getElementById('pageContent').style.display  = 'block';
 });
 
-function renderActions(user, userData, alreadyInvited) {
+function renderActions(user, userData, inviteStatus) {
   var el = document.getElementById('profileActions');
   if (!user) {
     el.innerHTML = '<a href="login.html" class="btn btn--outline btn--sm">Войти</a>';
@@ -243,11 +252,13 @@ function renderActions(user, userData, alreadyInvited) {
   }
   var btns = '';
   // Написать сообщение
-  btns += '<button class="btn btn--outline btn--sm" data-href="messages.html?to=' + profileUid + '" onclick="window.location.href=this.getAttribute(\"data-href\")">💬 Написать</button>';
-  // Пригласить в команду (только стартаперы, и только если ещё не приглашён)
+  btns += '<button class="btn btn--outline btn--sm" onclick="window.location.href=\'messages.html?to=' + profileUid + '\'">💬 Написать</button>';
+  // Пригласить в команду — только стартаперы
   if (userData && userData.role === 'startup') {
-    if (alreadyInvited) {
-      btns += '<span class="badge badge--gray" style="padding:7px 14px;font-size:13px">✓ Уже приглашён</span>';
+    if (inviteStatus === 'accepted') {
+      btns += '<span class="badge badge--green" style="padding:7px 14px;font-size:13px">✅ В команде</span>';
+    } else if (inviteStatus === 'pending') {
+      btns += '<span class="badge badge--gray" style="padding:7px 14px;font-size:13px">⏳ Приглашение отправлено</span>';
     } else {
       btns += '<button class="btn btn--primary btn--sm" onclick="openInviteModal()">+ Пригласить</button>';
     }
@@ -408,8 +419,8 @@ async function sendInviteFromStartup() {
     document.getElementById('inviteModal').classList.remove('open');
     showToast('✅ Приглашение отправлено!', 'success');
 
-    // Обновляем кнопку — показываем что уже приглашён
-    renderActions(pageViewer, pageViewerData, true);
+    // Обновляем кнопку — показываем статус "ожидает"
+    renderActions(pageViewer, pageViewerData, 'pending');
   } catch(e) {
     showToast('Ошибка: ' + e.message, 'error');
   }
