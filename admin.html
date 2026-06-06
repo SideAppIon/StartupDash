@@ -400,8 +400,7 @@ function removeStage(i) {
 // Icon picker
 function renderIconPicker() {
   document.getElementById('emojiPicker').innerHTML = ICON_OPTS.map(function(e) {
-    var b=document.createElement('button'); b.className='ep-btn'; b.title=e; b.textContent=e;
-    b.setAttribute('data-emoji',e); b.addEventListener('click',function(){pickIcon(this.getAttribute('data-emoji'));}); return b.outerHTML;
+    return '<button class="ep-btn" title="'+e+'" onclick="pickIcon(\''+e+'\')">'+e+'</button>';
   }).join('');
 }
 function openIconPicker(idx) {
