@@ -10,7 +10,8 @@ const invitesRoutes  = require('./routes/invites');
 const messagesRoutes = require('./routes/messages');
 const forumRoutes    = require('./routes/forum');
 const configRoutes   = require('./routes/config');
-const uploadRoutes   = require('./routes/upload');
+const uploadRoutes    = require('./routes/upload');
+const teamChatRoutes  = require('./routes/team-chat');
 
 const app = express();
 
@@ -65,6 +66,7 @@ app.use('/messages',        messagesRoutes);
 app.use('/forum',           forumRoutes);
 app.use('/platform-config', configRoutes);
 app.use('/upload',          uploadRoutes);
+app.use('/team-chat',       teamChatRoutes);
 
 // ── 404 ───────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ error: `Маршрут ${req.method} ${req.path} не найден` }));

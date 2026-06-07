@@ -445,16 +445,16 @@ function renderActions(user, userData, inviteStatus, isTeamMember, memberPerms) 
   if (isOwner || isAdmin) {
     el.innerHTML =
       '<a href="roadmap.html?id=' + startupId + '" class="btn btn--outline">🗺 Roadmap</a>' +
+      '<a href="team-chat.html?startup_id=' + startupId + '" class="btn btn--outline">💬 Командный чат</a>' +
       '<a href="create-startup.html?edit=' + startupId + '" class="btn btn--outline">✏️ Редактировать</a>' +
       '<a href="update-startup.html?id='   + startupId + '" class="btn btn--primary">+ Обновление</a>';
     document.getElementById('ownerUpdateBtn').style.display = 'block';
     document.getElementById('addUpdateLink').href = 'update-startup.html?id=' + startupId;
 
   } else if (isTeamMember) {
-    // Участник команды — показываем кнопки по разрешениям
     var btns = [];
-    // Kanban всегда доступен для чтения; редактирование — только с разрешением
     btns.push('<a href="roadmap.html?id=' + startupId + '" class="btn btn--outline btn--sm">🗺 Roadmap</a>');
+    btns.push('<a href="team-chat.html?startup_id=' + startupId + '" class="btn btn--outline btn--sm">💬 Командный чат</a>');
     if (memberPerms.updates) {
       btns.push('<a href="update-startup.html?id=' + startupId + '" class="btn btn--primary btn--sm">+ Обновление</a>');
     }

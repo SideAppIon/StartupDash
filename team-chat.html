@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Командный чат — LaunchPad</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    html,body{height:100%;overflow:hidden}
+    .chat-layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - var(--nav-h));margin-top:var(--nav-h)}
+    .chat-sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+    .chat-main{display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+    .sidebar-head{padding:16px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .sidebar-head h3{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:4px}
+    .sidebar-head p{font-size:12px;color:var(--text2)}
+    .conv-list{flex:1;overflow-y:auto}
+    .conv-item{display:flex;align-items:center;gap:11px;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .15s}
+    .conv-item:hover{background:var(--bg3)}
+    .conv-item.active{background:var(--accent-dim);border-left:2px solid var(--accent)}
+    .conv-item__icon{width:40px;height:40px;border-radius:12px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden}
+    .conv-item__icon img{width:100%;height:100%;object-fit:cover}
+    .conv-item__info{flex:1;min-width:0}
+    .conv-item__name{font-size:13px;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .conv-item__preview{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .conv-item__time{font-size:11px;color:var(--text3);flex-shrink:0}
+    .sidebar-empty{padding:24px 16px;text-align:center;color:var(--text2);font-size:13px;line-height:1.6}
+    .chat-header{padding:14px 20px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;align-items:center;gap:12px;flex-shrink:0}
+    .chat-header__icon{width:38px;height:38px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden;flex-shrink:0}
+    .chat-header__icon img{width:100%;height:100%;object-fit:cover}
+    .chat-header__name{font-family:var(--font-head);font-size:15px;font-weight:700}
+    .chat-header__sub{font-size:12px;color:var(--text2);margin-top:1px}
+    .chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+    .chat-date-sep{text-align:center;font-size:11px;color:var(--text3);margin:4px 0}
+    .msg{display:flex;gap:8px;max-width:76%}
+    .msg--mine{align-self:flex-end;flex-direction:row-reverse}
+    .msg--theirs{align-self:flex-start}
+    .msg--system{align-self:center;max-width:80%}
+    .msg__av{width:32px;height:32px;border-radius:50%;background:var(--bg3);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent)}
+    .msg__av img{width:100%;height:100%;object-fit:cover}
+    .msg__body{display:flex;flex-direction:column;gap:3px}
+    .msg__sender{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:6px}
+    .msg--mine .msg__sender{justify-content:flex-end}
+    .role-badge{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--bg3);color:var(--text2);border:1px solid var(--border2);font-weight:500}
+    .role-badge--startup{background:rgba(0,230,118,.12);color:var(--accent);border-color:rgba(0,230,118,.3)}
+    .role-badge--expert{background:rgba(255,193,7,.12);color:#ffc107;border-color:rgba(255,193,7,.3)}
+    .msg__bubble{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap}
+    .msg--theirs .msg__bubble{background:var(--bg2);border:1px solid var(--border);border-radius:4px 14px 14px 14px}
+    .msg--mine .msg__bubble{background:var(--accent-dim);border:1px solid rgba(0,230,118,.25);border-radius:14px 4px 14px 14px}
+    .msg--system .msg__bubble{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;font-size:12px;color:var(--text2);text-align:center;padding:8px 16px;font-style:italic}
+    .msg__time{font-size:11px;color:var(--text3);padding:0 2px}
+    .msg--mine .msg__time{text-align:right}
+    .chat-input-area{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:flex-end;flex-shrink:0;background:var(--bg2)}
+    .chat-textarea{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:14px;padding:10px 14px;outline:none;resize:none;transition:border-color .2s;line-height:1.5;max-height:120px}
+    .chat-textarea:focus{border-color:var(--accent)}
+    .send-btn{width:40px;height:40px;border-radius:var(--radius);background:var(--accent);border:none;color:#000;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s}
+    .send-btn:hover{background:var(--accent2)}
+    .send-btn:disabled{opacity:.4;cursor:not-allowed}
+    .empty-chat{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--text2)}
+    .empty-chat__icon{font-size:52px;opacity:.25}
+    @media(max-width:640px){.chat-layout{grid-template-columns:1fr}.chat-sidebar{display:none}}
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav__inner">
+    <a class="nav__logo" href="dashboard.html">🚀 LaunchPad</a>
+    <div class="nav__links">
+      <a href="feed.html">Лента</a>
+      <a href="startups.html">Стартапы</a>
+      <a href="members.html">Участники</a>
+      <a href="messages.html">Сообщения</a>
+      <a href="team-chat.html" class="active">Командный чат</a>
+    </div>
+    <img class="nav__avatar" id="navAvatar"
+      src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"
+      onclick="goProfile()"/>
+  </div>
+</nav>
+
+<div class="chat-layout">
+  <!-- SIDEBAR -->
+  <div class="chat-sidebar">
+    <div class="sidebar-head">
+      <h3>💬 Командные чаты</h3>
+      <p>Только для участников стартапа</p>
+    </div>
+    <div class="conv-list" id="convList">
+      <div style="padding:20px;text-align:center"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="chat-main">
+    <div class="empty-chat" id="emptyState">
+      <div class="empty-chat__icon">💬</div>
+      <div style="font-size:15px;font-weight:600">Выбери стартап</div>
+      <div style="font-size:13px;color:var(--text3)">Командный чат доступен участникам стартапа</div>
+    </div>
+
+    <div id="chatView" style="display:none;flex-direction:column;flex:1;overflow:hidden;display:none">
+      <div class="chat-header" id="chatHeader">
+        <div class="chat-header__icon" id="chatIcon"></div>
+        <div>
+          <div class="chat-header__name" id="chatName"></div>
+          <div class="chat-header__sub" id="chatSub"></div>
+        </div>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input-area">
+        <input type="file" id="photoFileInput" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="sendPhoto(this)"/>
+        <button class="send-btn" style="background:var(--bg3);color:var(--text2);font-size:20px" title="Прикрепить фото" onclick="document.getElementById('photoFileInput').click()">📎</button>
+        <textarea class="chat-textarea" id="msgInput" placeholder="Напиши сообщение команде..." rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="send()">→</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="api-config.js"></script>
+<script>
+requireAuth('login.html');
+
+var myUid = null;
+var activeStartupId = null;
+var pollTimer = null;
+
+onAuthReady(async function(user, userData) {
+  if (!user) return;
+  myUid = user.uid;
+  renderNav(userData);
+  await loadStartups();
+
+  // Если пришли с параметром startup_id — открываем сразу
+  var params = new URLSearchParams(location.search);
+  var sid = params.get('startup_id');
+  if (sid) openChat(sid);
+});
+
+// ── SIDEBAR ──────────────────────────────────────────────
+var startupsCache = [];
+
+async function loadStartups() {
+  try {
+    var res = await api.get('/team-chat/my');
+    startupsCache = res.startups || [];
+    renderSidebar(startupsCache);
+  } catch(e) {
+    document.getElementById('convList').innerHTML =
+      '<div class="sidebar-empty">Ошибка загрузки</div>';
+  }
+}
+
+function renderSidebar(startups) {
+  var list = document.getElementById('convList');
+  if (!startups.length) {
+    list.innerHTML = '<div class="sidebar-empty">Ты не состоишь ни в одном стартапе.<br>Вступи в стартап или создай свой.</div>';
+    return;
+  }
+  list.innerHTML = startups.map(function(s) {
+    var icon = s.icon_image
+      ? '<img src="'+esc(s.icon_image)+'" onerror="this.style.display=\'none\'"/>'
+      : (s.emoji || '🚀');
+    var preview = s.last_message ? esc(s.last_message) : '<span style="color:var(--text3)">Нет сообщений</span>';
+    var time = s.last_at ? timeAgo(s.last_at) : '';
+    return '<div class="conv-item" id="si-'+esc(s.id)+'" onclick="openChat(\''+esc(s.id)+'\')">'+
+      '<div class="conv-item__icon">'+icon+'</div>'+
+      '<div class="conv-item__info">'+
+        '<div class="conv-item__name">'+esc(s.name)+'</div>'+
+        '<div class="conv-item__preview">'+preview+'</div>'+
+      '</div>'+
+      '<div class="conv-item__time">'+time+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+// ── OPEN CHAT ────────────────────────────────────────────
+async function openChat(startupId) {
+  activeStartupId = startupId;
+  if (pollTimer) clearInterval(pollTimer);
+
+  // Highlight sidebar
+  document.querySelectorAll('.conv-item').forEach(function(el) {
+    el.classList.toggle('active', el.id === 'si-'+startupId);
+  });
+
+  document.getElementById('emptyState').style.display = 'none';
+  var chatView = document.getElementById('chatView');
+  chatView.style.display = 'flex';
+
+  // Загружаем чат
+  try {
+    var res = await api.get('/team-chat/' + startupId);
+    var conv = res.conversation;
+
+    // Заголовок
+    var s = startupsCache.find(function(x){ return x.id === startupId; });
+    var iconHtml = (s && s.icon_image)
+      ? '<img src="'+esc(s.icon_image)+'" style="width:100%;height:100%;object-fit:cover"/>'
+      : (s ? (s.emoji || '🚀') : '🚀');
+    document.getElementById('chatIcon').innerHTML = iconHtml;
+    document.getElementById('chatName').textContent = s ? s.name : 'Командный чат';
+    var members = Object.keys(conv.participantNames || {}).length;
+    document.getElementById('chatSub').textContent = members + ' участник' + plural(members);
+
+    await loadMessages();
+
+    // Поллинг каждые 5 сек
+    pollTimer = setInterval(loadMessages, 5000);
+  } catch(e) {
+    showToast('Ошибка: ' + e.message, 'error');
+  }
+}
+
+// ── MESSAGES ─────────────────────────────────────────────
+var lastMsgCount = 0;
+
+async function loadMessages() {
+  if (!activeStartupId) return;
+  try {
+    var res = await api.get('/team-chat/' + activeStartupId + '/messages');
+    var msgs = res.messages || [];
+    if (msgs.length === lastMsgCount) return; // не перерисовываем если ничего нового
+    lastMsgCount = msgs.length;
+    renderMessages(msgs);
+  } catch(e) { /* тихо */ }
+}
+
+function renderMessages(msgs) {
+  var el = document.getElementById('chatMessages');
+  if (!msgs.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;margin-top:40px">Напиши первое сообщение команде 👋</div>';
+    return;
+  }
+  var html = '', lastDate = '';
+  msgs.forEach(function(m) {
+    var mine = m.sender_uid === myUid;
+    var sys  = m.type === 'system';
+    var ds   = m.created_at ? dayStr(m.created_at) : '';
+    if (ds && ds !== lastDate) {
+      html += '<div class="chat-date-sep">'+esc(ds)+'</div>';
+      lastDate = ds;
+    }
+    if (sys) {
+      html += '<div class="msg msg--system"><div class="msg__bubble">'+esc(m.text||'')+'</div></div>';
+      return;
+    }
+
+    var name   = esc(m.sender_name || '?');
+    var avatar = m.sender_avatar
+      ? '<img src="'+esc(m.sender_avatar)+'" onerror="this.style.display=\'none\'"/>'
+      : name.charAt(0).toUpperCase();
+    var roleLabel = roleBadge(m.sender_role);
+    var bubble = m.type === 'image'
+      ? '<div class="msg__bubble" style="padding:4px"><img src="'+esc(m.text)+'" style="max-width:260px;max-height:320px;border-radius:8px;display:block;cursor:pointer" onclick="window.open(this.src,\'_blank\')"/></div>'
+      : '<div class="msg__bubble">'+esc(m.text||'').replace(/\n/g,'<br>')+'</div>';
+
+    html += '<div class="msg '+(mine?'msg--mine':'msg--theirs')+'">'+
+      '<div class="msg__av">'+avatar+'</div>'+
+      '<div class="msg__body">'+
+        (mine ? '' : '<div class="msg__sender">'+name+roleLabel+'</div>')+
+        bubble+
+        '<div class="msg__time">'+timeStr(m.created_at)+'</div>'+
+      '</div>'+
+    '</div>';
+  });
+  el.innerHTML = html;
+  el.scrollTop = el.scrollHeight;
+}
+
+function roleBadge(role) {
+  if (!role) return '';
+  var cls = 'role-badge';
+  if (role === 'startup') cls += ' role-badge--startup';
+  if (role === 'expert')  cls += ' role-badge--expert';
+  var labels = {startup:'Стартапер',expert:'Эксперт',user:'Участник',admin:'Админ'};
+  var label = labels[role] || role;
+  return '<span class="'+cls+'">'+esc(label)+'</span>';
+}
+
+// ── SEND ─────────────────────────────────────────────────
+async function send() {
+  if (!activeStartupId) return;
+  var inp = document.getElementById('msgInput');
+  var btn = document.getElementById('sendBtn');
+  var text = inp ? inp.value.trim() : '';
+  if (!text) return;
+  inp.value = ''; inp.style.height = 'auto'; btn.disabled = true;
+  try {
+    await api.post('/team-chat/' + activeStartupId + '/messages', { text: text, type: 'user' });
+    await loadMessages();
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
+  finally { btn.disabled = false; }
+}
+
+async function sendPhoto(input) {
+  var file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { showToast('Файл слишком большой (макс. 2 МБ)', 'error'); return; }
+  if (!activeStartupId) return;
+  showToast('Загружаю фото...', 'info');
+  try {
+    var base64 = await new Promise(function(resolve, reject) {
+      var r = new FileReader();
+      r.onload = function(e) { resolve(e.target.result.split(',')[1]); };
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    var res = await api.post('/upload', { data: base64, contentType: file.type, folder: 'chat' });
+    await api.post('/team-chat/' + activeStartupId + '/messages', { text: res.url, type: 'image' });
+    await loadMessages();
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
+}
+
+// ── UTILS ─────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function dayStr(ts) {
+  var d = new Date(ts), now = new Date(), y = new Date();
+  y.setDate(y.getDate()-1);
+  if (d.toDateString()===now.toDateString()) return 'Сегодня';
+  if (d.toDateString()===y.toDateString()) return 'Вчера';
+  return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+}
+function timeStr(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+}
+function timeAgo(ts) {
+  if (!ts) return '';
+  var diff = Math.floor((Date.now() - new Date(ts)) / 1000);
+  if (diff < 60) return 'сейчас';
+  if (diff < 3600) return Math.floor(diff/60) + ' мин';
+  if (diff < 86400) return Math.floor(diff/3600) + ' ч';
+  return Math.floor(diff/86400) + ' д';
+}
+function plural(n) {
+  if (n%10===1 && n%100!==11) return '';
+  if (n%10>=2 && n%10<=4 && (n%100<10||n%100>=20)) return 'а';
+  return 'ов';
+}
+</script>
+</body>
+</html>
