@@ -13,6 +13,7 @@ router.get('/conversations', requireAuth, async (req, res) => {
        FROM conversations c
        JOIN conversation_participants cp ON cp.conv_id = c.id
        WHERE cp.user_uid = $1
+         AND (c.is_group IS NULL OR c.is_group = FALSE)
        ORDER BY c.last_at DESC`,
       [req.user.uid]
     );
