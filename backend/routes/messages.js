@@ -9,11 +9,11 @@ const router = express.Router();
 router.get('/conversations', requireAuth, async (req, res) => {
   try {
     const convs = await queryAll(
-      `SELECT c.*
+      `SELECT c.*, s.name AS startup_name, s.emoji AS startup_emoji, s.icon_image AS startup_icon
        FROM conversations c
        JOIN conversation_participants cp ON cp.conv_id = c.id
+       LEFT JOIN startups s ON s.id = c.startup_id
        WHERE cp.user_uid = $1
-         AND (c.is_group IS NULL OR c.is_group = FALSE)
        ORDER BY c.last_at DESC`,
       [req.user.uid]
     );
@@ -200,6 +200,10 @@ function parseConv(c) {
     participantRoles:   tryParse(c.participant_roles, {}),
     lastMessage: c.last_message,
     lastAt: c.last_at,
+    isGroup: c.is_group || false,
+    startupName: c.startup_name || null,
+    startupEmoji: c.startup_emoji || '🚀',
+    startupIcon: c.startup_icon || null,
   };
 }
 

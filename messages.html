@@ -273,11 +273,25 @@ function filterConvs(q) {
     return;
   }
   el.innerHTML = list.map(function(c) {
+    var t = c.lastAt ? shortTime(c.lastAt) : '';
+    if (c.isGroup) {
+      // Групповой чат стартапа
+      var icon = c.startupIcon
+        ? '<img src="'+esc(c.startupIcon)+'" class="avatar avatar--sm" style="border-radius:10px" onerror="this.style.display=\'none\'"/>'
+        : '<span style="width:32px;height:32px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">'+esc(c.startupEmoji||'🚀')+'</span>';
+      return '<div class="conv-item'+(activeId===c.id?' active':'')+'" data-cid="'+c.id+'" onclick="openConvById(this)" style="border-left:2px solid var(--accent-dim)">'+
+        icon+
+        '<div class="conv-item__info">'+
+          '<div class="conv-item__name">'+esc(c.startupName||'Командный чат')+' <span style="font-size:10px;color:var(--text3);font-weight:400">команда</span></div>'+
+          '<div class="conv-item__preview">'+esc(c.lastMessage||'...')+'</div>'+
+        '</div>'+
+        '<div class="conv-item__time">'+t+'</div>'+
+      '</div>';
+    }
     var other = getOtherUid(c);
     var name  = getOtherName(c);
     var av    = (c.participantAvatars&&c.participantAvatars[other])||
       'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(name);
-    var t = c.lastAt ? shortTime(c.lastAt) : '';
     return '<div class="conv-item'+(activeId===c.id?' active':'')+'" data-cid="'+c.id+'" onclick="openConvById(this)">'+
       '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
       '<div class="conv-item__info">'+
@@ -534,7 +548,16 @@ async function startConvWith(otherUid) {
   } catch(e){showToast('Ошибка: '+e.message,'error');}
 }
 
-function openConvById(el) { openConv(el.getAttribute('data-cid')); }
+function openConvById(el) {
+  var cid = el.getAttribute('data-cid');
+  // Если групповой чат — переходим на team-chat
+  var conv = allConvs && allConvs.find(function(c){ return c.id === cid; });
+  if (conv && conv.isGroup && conv.startup_id) {
+    window.location.href = 'team-chat.html?startup_id=' + conv.startup_id;
+    return;
+  }
+  openConv(cid);
+}
 function startConvByEl(el) { startConvWith(el.getAttribute('data-uid')); }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 </script>
