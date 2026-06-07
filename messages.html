@@ -321,9 +321,14 @@ function shortTime(ts) {
 }
 
 // ── OPEN CONV ─────────────────────────────────────────
+var groupPollTimer = null;
+var activeGroupStartupId = null;
+
 async function openConv(convId) {
   if (msgUnsub) { msgUnsub(); msgUnsub=null; }
+  if (groupPollTimer) { clearInterval(groupPollTimer); groupPollTimer=null; }
   activeId=convId;
+  activeGroupStartupId=null;
   highlightActive(convId);
 
   document.getElementById('emptyState').style.display    = 'none';
@@ -333,13 +338,32 @@ async function openConv(convId) {
   document.getElementById('chatMessages').innerHTML =
     '<div style="text-align:center;padding:32px 0"><div class="spinner" style="width:22px;height:22px;border-width:2px;margin:0 auto"></div></div>';
 
-  // Берём из кэша или запрашиваем с сервера
   var conv = allConvs.find(function(c){ return c.id === convId; });
   if (!conv) {
     var snap = await db.collection('conversations').doc(convId).get();
     if (!snap.exists) return;
     conv = snap.data();
   }
+
+  // ── ГРУППОВОЙ ЧАТ ─────────────────────────────────────
+  if (conv.isGroup && conv.startup_id) {
+    activeGroupStartupId = conv.startup_id;
+    var members = Object.keys(conv.participantNames||{}).length;
+    document.getElementById('chatAvatar').src =
+      conv.startupIcon || 'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(conv.startupName||'Команда');
+    document.getElementById('chatAvatar').style.borderRadius = '10px';
+    document.getElementById('chatName').textContent = (conv.startupEmoji||'🚀')+' '+(conv.startupName||'Командный чат');
+    document.getElementById('chatSub').innerHTML =
+      '<span style="font-size:12px;color:var(--text2)">'+members+' участник'+pluralRu(members)+'</span>';
+    var inp=document.getElementById('msgInput');
+    if (inp){inp.value='';inp.style.height='auto';inp.focus();}
+    await loadGroupMessages(conv.startup_id, convId);
+    groupPollTimer = setInterval(function(){ loadGroupMessages(conv.startup_id, convId); }, 5000);
+    return;
+  }
+
+  // ── ЛИЧНЫЙ ЧАТ ────────────────────────────────────────
+  document.getElementById('chatAvatar').style.borderRadius = '50%';
   var other = getOtherUid(conv);
   currentOtherUid = other;
   var name  = (conv.participantNames&&conv.participantNames[other])||'Неизвестно';
@@ -412,6 +436,53 @@ function timeStr(ts){
   return d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
 }
 
+// ── GROUP CHAT MESSAGES ───────────────────────────────
+var lastGroupMsgCount = 0;
+async function loadGroupMessages(startupId, convId) {
+  if (activeId !== convId) return;
+  try {
+    var res = await api.get('/team-chat/' + startupId + '/messages');
+    var msgs = res.messages || [];
+    if (msgs.length === lastGroupMsgCount) return;
+    lastGroupMsgCount = msgs.length;
+    var el = document.getElementById('chatMessages');
+    if (!el) return;
+    if (!msgs.length) {
+      el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;margin-top:40px">Напиши первое сообщение команде 👋</div>';
+      return;
+    }
+    var html = '', lastDate = '';
+    msgs.forEach(function(m) {
+      var mine = m.sender_uid === myUid, sys = m.type === 'system';
+      var ds = m.created_at ? dayStr({toDate:function(){return new Date(m.created_at);}}) : '';
+      if (ds && ds !== lastDate) { html += '<div class="chat-date-sep">'+ds+'</div>'; lastDate = ds; }
+      if (sys) {
+        html += '<div class="msg msg--system"><div class="msg__bubble">'+esc(m.text||'')+'</div></div>';
+      } else {
+        var senderName = esc(m.sender_name || '?');
+        var av = m.sender_avatar
+          ? '<img src="'+esc(m.sender_avatar)+'" class="avatar avatar--sm" style="flex-shrink:0"/>'
+          : '<div class="avatar avatar--sm" style="background:var(--bg3);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);flex-shrink:0">'+senderName.charAt(0)+'</div>';
+        var roleLbl = m.sender_role ? ' <span style="font-size:10px;color:var(--text3)">('+esc(m.sender_role)+')</span>' : '';
+        var bubble = m.type === 'image'
+          ? '<div class="msg__bubble" style="padding:4px"><img src="'+esc(m.text)+'" style="max-width:260px;max-height:320px;border-radius:8px;display:block;cursor:pointer" onclick="window.open(this.src,\'_blank\')"/></div>'
+          : '<div class="msg__bubble">'+esc(m.text||'').replace(/\n/g,'<br>')+'</div>';
+        if (mine) {
+          html += '<div class="msg msg--mine">'+bubble+'<div class="msg__time">'+timeStr({toDate:function(){return new Date(m.created_at);}})+'</div></div>';
+        } else {
+          html += '<div class="msg msg--theirs" style="align-items:flex-start;gap:8px;display:flex">'+
+            av+'<div style="display:flex;flex-direction:column;gap:2px">'+
+            '<div style="font-size:11px;color:var(--text2)">'+senderName+roleLbl+'</div>'+
+            bubble+'<div class="msg__time">'+timeStr({toDate:function(){return new Date(m.created_at);}})+'</div>'+
+            '</div></div>';
+        }
+      }
+    });
+    el.innerHTML = html;
+    el.scrollTop = el.scrollHeight;
+  } catch(e) { /* тихо */ }
+}
+
 // ── SEND ──────────────────────────────────────────────
 async function send() {
   if (!activeId||!myUid) return;
@@ -421,10 +492,12 @@ async function send() {
   if (!text) return;
   inp.value=''; inp.style.height='auto'; btn.disabled=true;
   try {
-    var sid=activeId;
-    await db.collection('conversations').doc(sid).collection('messages').add({
-      text: text, type: 'user'
-    });
+    if (activeGroupStartupId) {
+      await api.post('/team-chat/' + activeGroupStartupId + '/messages', { text: text, type: 'user' });
+      await loadGroupMessages(activeGroupStartupId, activeId);
+    } else {
+      await db.collection('conversations').doc(activeId).collection('messages').add({ text: text, type: 'user' });
+    }
   } catch(e){showToast('Ошибка: '+e.message,'error');}
   finally{btn.disabled=false;}
 }
@@ -444,10 +517,19 @@ async function sendPhoto(input) {
       r.readAsDataURL(file);
     });
     var res = await api.post('/upload', { data: base64, contentType: file.type, folder: 'chat' });
-    await db.collection('conversations').doc(activeId).collection('messages').add({
-      text: res.url, type: 'image'
-    });
+    if (activeGroupStartupId) {
+      await api.post('/team-chat/' + activeGroupStartupId + '/messages', { text: res.url, type: 'image' });
+      await loadGroupMessages(activeGroupStartupId, activeId);
+    } else {
+      await db.collection('conversations').doc(activeId).collection('messages').add({ text: res.url, type: 'image' });
+    }
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
+}
+
+function pluralRu(n) {
+  if (n%10===1&&n%100!==11) return '';
+  if (n%10>=2&&n%10<=4&&(n%100<10||n%100>=20)) return 'а';
+  return 'ов';
 }
 
 // ── ENSURE/CREATE CONV ────────────────────────────────
@@ -549,14 +631,7 @@ async function startConvWith(otherUid) {
 }
 
 function openConvById(el) {
-  var cid = el.getAttribute('data-cid');
-  // Если групповой чат — переходим на team-chat
-  var conv = allConvs && allConvs.find(function(c){ return c.id === cid; });
-  if (conv && conv.isGroup && conv.startup_id) {
-    window.location.href = 'team-chat.html?startup_id=' + conv.startup_id;
-    return;
-  }
-  openConv(cid);
+  openConv(el.getAttribute('data-cid'));
 }
 function startConvByEl(el) { startConvWith(el.getAttribute('data-uid')); }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
