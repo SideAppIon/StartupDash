@@ -218,6 +218,19 @@ router.post('/:id/team', requireAuth, async (req, res) => {
        ON CONFLICT (startup_id, user_uid) DO UPDATE SET role=$3, permissions=$4`,
       [req.params.id, user_uid, role || 'Участник', JSON.stringify(permissions || {})]
     );
+
+    // Если групповой чат уже существует — добавляем нового участника в него
+    const conv = await queryOne(
+      'SELECT id FROM conversations WHERE startup_id=$1 AND is_group=TRUE LIMIT 1',
+      [req.params.id]
+    );
+    if (conv) {
+      await queryOne(
+        'INSERT INTO conversation_participants (conv_id, user_uid) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+        [conv.id, user_uid]
+      );
+    }
+
     res.json({ ok: true });
   } catch (e) {
     if (e.status) return res.status(e.status).json({ error: e.message });
@@ -250,6 +263,20 @@ router.delete('/:id/team/:uid', requireAuth, async (req, res) => {
     await assertOwnerOrAdmin(req.params.id, req.user);
     await queryOne('DELETE FROM startup_team WHERE startup_id=$1 AND user_uid=$2',
       [req.params.id, req.params.uid]);
+
+    // Убираем исключённого из участников группового чата стартапа
+    // (сообщения остаются, но человек теряет доступ к чату)
+    await queryOne(
+      `DELETE FROM conversation_participants
+       WHERE user_uid=$1
+         AND conv_id = (
+           SELECT id FROM conversations
+           WHERE startup_id=$2 AND is_group=TRUE
+           LIMIT 1
+         )`,
+      [req.params.uid, req.params.id]
+    );
+
     res.json({ ok: true });
   } catch (e) {
     if (e.status) return res.status(e.status).json({ error: e.message });
