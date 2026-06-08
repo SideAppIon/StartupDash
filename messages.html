@@ -480,7 +480,21 @@ async function loadGroupMessages(startupId, convId) {
     });
     el.innerHTML = html;
     el.scrollTop = el.scrollHeight;
-  } catch(e) { /* тихо */ }
+  } catch(e) {
+    if (e.code === 403 || (e.message && e.message.includes('403'))) {
+      // Нет доступа — исключён из стартапа
+      if (groupPollTimer) { clearInterval(groupPollTimer); groupPollTimer = null; }
+      var el2 = document.getElementById('chatMessages');
+      if (el2) el2.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;margin-top:60px;padding:0 24px">Вы больше не участник этого стартапа 🚫<br><br>Доступ к чату закрыт</div>';
+      // Прячем поле ввода
+      var fi = document.getElementById('footerInput');
+      if (fi) fi.style.display = 'none';
+      // Убираем этот чат из сайдбара
+      var item = document.querySelector('[data-conv="'+convId+'"]');
+      if (item) item.closest('.conv-item') && item.closest('.conv-item').remove() || item.remove();
+    }
+    /* остальные ошибки — тихо, не ломаем интерфейс */
+  }
 }
 
 // ── SEND ──────────────────────────────────────────────

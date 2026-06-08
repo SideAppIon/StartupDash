@@ -14,6 +14,15 @@ router.get('/conversations', requireAuth, async (req, res) => {
        JOIN conversation_participants cp ON cp.conv_id = c.id
        LEFT JOIN startups s ON s.id = c.startup_id
        WHERE cp.user_uid = $1
+         AND (
+           c.is_group = FALSE
+           OR c.startup_id IS NULL
+           OR s.owner_uid = $1
+           OR EXISTS (
+             SELECT 1 FROM startup_team st
+             WHERE st.startup_id = c.startup_id AND st.user_uid = $1
+           )
+         )
        ORDER BY c.last_at DESC`,
       [req.user.uid]
     );
