@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Добро пожаловать — LaunchPad</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px 16px; }
+    .ob-wrap { width:100%; max-width:520px; }
+    .ob-logo { font-family:var(--font-head); font-size:26px; font-weight:800; color:var(--accent); text-decoration:none; display:block; text-align:center; margin-bottom:36px; }
+    .ob-logo span { color:var(--text); }
+
+    /* Progress */
+    .ob-progress { display:flex; align-items:center; gap:0; margin-bottom:40px; }
+    .ob-step-dot { width:32px; height:32px; border-radius:50%; border:2px solid var(--border2); background:var(--bg2); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:var(--text3); transition:all .3s; flex-shrink:0; }
+    .ob-step-dot.active { border-color:var(--accent); background:var(--accent); color:#000; }
+    .ob-step-dot.done { border-color:var(--accent); background:var(--accent-dim); color:var(--accent); }
+    .ob-step-line { flex:1; height:2px; background:var(--border2); transition:background .3s; }
+    .ob-step-line.done { background:var(--accent); }
+
+    /* Cards */
+    .ob-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg); padding:32px; animation:fadeIn .3s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+    .ob-icon { font-size:52px; text-align:center; margin-bottom:16px; }
+    .ob-title { font-family:var(--font-head); font-size:24px; font-weight:800; letter-spacing:-0.5px; text-align:center; margin-bottom:8px; }
+    .ob-sub { color:var(--text2); font-size:14px; text-align:center; margin-bottom:28px; line-height:1.5; }
+
+    /* Role cards */
+    .role-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:24px; }
+    .role-card { border:2px solid var(--border2); border-radius:var(--radius); padding:16px 8px; text-align:center; cursor:pointer; transition:all .2s; background:var(--bg3); }
+    .role-card__icon { font-size:28px; margin-bottom:8px; }
+    .role-card__name { font-size:13px; font-weight:600; }
+    .role-card__desc { font-size:11px; color:var(--text3); margin-top:4px; line-height:1.3; }
+    .role-card.sel-user    { border-color:var(--info);   background:rgba(61,142,245,.12); }
+    .role-card.sel-startup { border-color:var(--accent);  background:var(--accent-dim); }
+    .role-card.sel-expert  { border-color:var(--expert);  background:var(--expert-dim); }
+
+    /* Step 2 profile */
+    .tag-input-wrap { display:flex; flex-wrap:wrap; gap:6px; background:var(--bg3); border:1px solid var(--border2); border-radius:var(--radius); padding:8px 12px; min-height:44px; cursor:text; transition:border-color .2s; }
+    .tag-input-wrap:focus-within { border-color:var(--accent); }
+    .tag { display:inline-flex; align-items:center; gap:4px; background:var(--accent-dim); border:1px solid var(--accent); color:var(--accent); border-radius:20px; padding:3px 10px; font-size:12px; font-weight:500; }
+    .tag__del { cursor:pointer; opacity:.6; font-size:14px; line-height:1; }
+    .tag__del:hover { opacity:1; }
+    .tag-input { border:none; background:transparent; color:var(--text); font-size:13px; font-family:var(--font-body); outline:none; min-width:80px; flex:1; }
+
+    /* Step 3 tiles */
+    .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:24px; }
+    .action-tile { background:var(--bg3); border:1px solid var(--border2); border-radius:var(--radius); padding:18px 14px; text-decoration:none; color:var(--text); transition:all .2s; display:block; }
+    .action-tile:hover { border-color:var(--accent); background:var(--accent-dim); transform:translateY(-2px); }
+    .action-tile__icon { font-size:28px; margin-bottom:8px; }
+    .action-tile__name { font-size:13px; font-weight:600; }
+    .action-tile__desc { font-size:11px; color:var(--text3); margin-top:3px; }
+
+    .ob-nav { display:flex; gap:10px; margin-top:24px; }
+    .ob-nav .btn { flex:1; justify-content:center; }
+  </style>
+</head>
+<body>
+<div class="ob-wrap">
+  <a href="index.html" class="ob-logo">Launch<span>Pad</span></a>
+
+  <!-- Progress bar -->
+  <div class="ob-progress">
+    <div class="ob-step-dot active" id="pd0">1</div>
+    <div class="ob-step-line" id="pl0"></div>
+    <div class="ob-step-dot" id="pd1">2</div>
+    <div class="ob-step-line" id="pl1"></div>
+    <div class="ob-step-dot" id="pd2">3</div>
+  </div>
+
+  <!-- STEP 1: Welcome + role -->
+  <div class="ob-card" id="step1">
+    <div class="ob-icon">🎉</div>
+    <div class="ob-title">Добро пожаловать!</div>
+    <div class="ob-sub">Ты зарегистрировался на <strong>LaunchPad</strong>. Давай настроим твой профиль — это займёт пару минут.</div>
+
+    <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px">Кто ты?</div>
+    <div class="role-grid">
+      <div class="role-card" id="rc-user" onclick="selRole('user')">
+        <div class="role-card__icon">👨‍💻</div>
+        <div class="role-card__name">Специалист</div>
+        <div class="role-card__desc">Разработчик, дизайнер, маркетолог</div>
+      </div>
+      <div class="role-card" id="rc-startup" onclick="selRole('startup')">
+        <div class="role-card__icon">🚀</div>
+        <div class="role-card__name">Стартапер</div>
+        <div class="role-card__desc">Строю продукт, ищу команду</div>
+      </div>
+      <div class="role-card" id="rc-expert" onclick="selRole('expert')">
+        <div class="role-card__icon">🎓</div>
+        <div class="role-card__name">Эксперт</div>
+        <div class="role-card__desc">Менторю, инвестирую, консультирую</div>
+      </div>
+    </div>
+
+    <div class="ob-nav">
+      <button class="btn btn--primary" id="step1Next" onclick="goStep2()" disabled style="opacity:.4">Далее →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: Profile -->
+  <div class="ob-card" id="step2" style="display:none">
+    <div class="ob-icon">✍️</div>
+    <div class="ob-title">Расскажи о себе</div>
+    <div class="ob-sub">Эта информация отображается в твоём профиле и помогает найти нужных людей.</div>
+
+    <div class="form-group">
+      <label class="form-label">О себе <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
+      <textarea class="form-input" id="obBio" rows="3" placeholder="Пару слов о твоём опыте и целях..." style="resize:vertical"></textarea>
+    </div>
+
+    <div class="form-group" id="skillsGroup">
+      <label class="form-label" id="skillsLabel">Навыки</label>
+      <div class="tag-input-wrap" id="skillsWrap" onclick="document.getElementById('skillInput').focus()">
+        <input class="tag-input" id="skillInput" placeholder="Введи навык и нажми Enter" maxlength="30"
+          onkeydown="handleTagKey(event,'skillInput','skillsWrap','skillTags')"/>
+      </div>
+      <div class="form-hint" id="skillsHint">Например: React, Node.js, дизайн, продажи…</div>
+      <div id="skillTags" style="display:none"></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Ссылка (портфолио / LinkedIn)</label>
+      <input type="url" class="form-input" id="obPortfolio" placeholder="https://..."/>
+    </div>
+
+    <div class="ob-nav">
+      <button class="btn btn--ghost" onclick="goStep(1)">← Назад</button>
+      <button class="btn btn--primary" onclick="goStep3()">Далее →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: What's next -->
+  <div class="ob-card" id="step3" style="display:none">
+    <div class="ob-icon">🗺️</div>
+    <div class="ob-title">Готово! Что дальше?</div>
+    <div class="ob-sub">Твой профиль сохранён. Вот с чего можно начать:</div>
+
+    <div class="action-grid" id="actionGrid">
+      <!-- Заполняется динамически под роль -->
+    </div>
+
+    <button class="btn btn--primary" style="width:100%;justify-content:center" onclick="finish()">
+      Перейти в дашборд →
+    </button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="api-config.js"></script>
+<script>
+requireAuth('login.html');
+
+var myUid  = null;
+var myRole = null;
+var skills = [];
+
+var ROLE_ACTIONS = {
+  user: [
+    { icon:'🚀', name:'Стартапы', desc:'Найди проект куда вступить', href:'startups.html' },
+    { icon:'👥', name:'Люди', desc:'Познакомься с командой', href:'members.html' },
+    { icon:'💬', name:'Форум', desc:'Задай вопрос сообществу', href:'forum.html' },
+    { icon:'👤', name:'Профиль', desc:'Дополни своё портфолио', href:'profile.html' },
+  ],
+  startup: [
+    { icon:'✨', name:'Создать стартап', desc:'Оформи свою идею', href:'create-startup.html' },
+    { icon:'👥', name:'Найти команду', desc:'Специалисты для твоего проекта', href:'members.html' },
+    { icon:'💬', name:'Форум', desc:'Узнай опыт других основателей', href:'forum.html' },
+    { icon:'👤', name:'Профиль', desc:'Заполни свою страницу', href:'profile.html' },
+  ],
+  expert: [
+    { icon:'🚀', name:'Стартапы', desc:'Посмотри проекты на платформе', href:'startups.html' },
+    { icon:'👥', name:'Сообщество', desc:'Найди стартаперов для менторства', href:'members.html' },
+    { icon:'💬', name:'Форум', desc:'Поделись экспертизой', href:'forum.html' },
+    { icon:'👤', name:'Профиль', desc:'Расскажи о своих компетенциях', href:'profile.html' },
+  ],
+};
+
+onAuthReady(async function(user, userData) {
+  if (!user) return;
+  myUid  = user.uid;
+  myRole = userData ? userData.role : 'user';
+
+  // Если онбординг уже пройден — сразу в дашборд
+  if (userData && userData.onboarding_done) {
+    window.location.href = 'dashboard.html';
+    return;
+  }
+
+  // Предвыбираем роль
+  if (myRole && myRole !== 'admin') selRole(myRole);
+
+  // Если роль уже есть — можно перейти к шагу 2 сразу
+  if (myRole && myRole !== 'admin') {
+    document.getElementById('step1Next').disabled = false;
+    document.getElementById('step1Next').style.opacity = '1';
+  }
+});
+
+// ── Step navigation ──────────────────────────────────────
+function goStep(n) {
+  ['step1','step2','step3'].forEach(function(id, i) {
+    document.getElementById(id).style.display = i === n-1 ? 'block' : 'none';
+  });
+  updateProgress(n);
+}
+
+function updateProgress(step) {
+  for (var i = 0; i < 3; i++) {
+    var dot  = document.getElementById('pd'+i);
+    var line = document.getElementById('pl'+i);
+    if (i < step-1) {
+      dot.className = 'ob-step-dot done';
+      dot.textContent = '✓';
+      if (line) line.className = 'ob-step-line done';
+    } else if (i === step-1) {
+      dot.className = 'ob-step-dot active';
+      dot.textContent = i+1;
+      if (line) line.className = 'ob-step-line';
+    } else {
+      dot.className = 'ob-step-dot';
+      dot.textContent = i+1;
+      if (line) line.className = 'ob-step-line';
+    }
+  }
+}
+
+// ── Step 1: role ─────────────────────────────────────────
+function selRole(r) {
+  myRole = r;
+  ['user','startup','expert'].forEach(function(role) {
+    var el = document.getElementById('rc-'+role);
+    el.className = 'role-card' + (role === r ? ' sel-'+role : '');
+  });
+  var btn = document.getElementById('step1Next');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+
+  // Поменять подписи для шага 2
+  var labels = {
+    user:    { label:'Навыки', hint:'Например: React, дизайн, продажи, аналитика…' },
+    startup: { label:'Теги проекта / стека', hint:'Например: FinTech, MVP, SaaS, React…' },
+    expert:  { label:'Области экспертизы', hint:'Например: инвестиции, менторство, Go-to-Market…' },
+  };
+  if (labels[r]) {
+    document.getElementById('skillsLabel').textContent = labels[r].label;
+    document.getElementById('skillsHint').textContent  = labels[r].hint;
+    document.getElementById('skillInput').placeholder  = 'Введи тег и нажми Enter';
+  }
+}
+
+async function goStep2() {
+  if (!myRole) return;
+  // Сохраняем роль если изменилась
+  try { await api.patch('/users/'+myUid+'/role', { role: myRole }); } catch(e){}
+  goStep(2);
+}
+
+// ── Step 2: profile ──────────────────────────────────────
+function handleTagKey(e, inputId, wrapId, hiddenId) {
+  var inp = document.getElementById(inputId);
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    var v = inp.value.trim().replace(/,$/,'');
+    if (v && !skills.includes(v) && skills.length < 15) {
+      skills.push(v);
+      renderTags(wrapId, inputId);
+    }
+    inp.value = '';
+  } else if (e.key === 'Backspace' && !inp.value && skills.length) {
+    skills.pop();
+    renderTags(wrapId, inputId);
+  }
+}
+
+function renderTags(wrapId, inputId) {
+  var wrap = document.getElementById(wrapId);
+  // Удаляем старые теги
+  wrap.querySelectorAll('.tag').forEach(function(t){ t.remove(); });
+  var inp = document.getElementById(inputId);
+  skills.forEach(function(s, i) {
+    var tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.innerHTML = esc(s) + '<span class="tag__del" onclick="removeTag('+i+',\''+wrapId+'\',\''+inputId+'\')">×</span>';
+    wrap.insertBefore(tag, inp);
+  });
+}
+
+function removeTag(i, wrapId, inputId) {
+  skills.splice(i, 1);
+  renderTags(wrapId, inputId);
+}
+
+async function goStep3() {
+  // Сохраняем профиль
+  var bio       = document.getElementById('obBio').value.trim();
+  var portfolio = document.getElementById('obPortfolio').value.trim();
+  try {
+    await api.patch('/users/'+myUid, { bio: bio, skills: skills, portfolio: portfolio });
+  } catch(e) { showToast('Ошибка сохранения: '+e.message,'error'); return; }
+
+  // Строим тайлы для шага 3
+  var actions = ROLE_ACTIONS[myRole] || ROLE_ACTIONS['user'];
+  document.getElementById('actionGrid').innerHTML = actions.map(function(a) {
+    return '<a class="action-tile" href="'+a.href+'">'+
+      '<div class="action-tile__icon">'+a.icon+'</div>'+
+      '<div class="action-tile__name">'+esc(a.name)+'</div>'+
+      '<div class="action-tile__desc">'+esc(a.desc)+'</div>'+
+    '</a>';
+  }).join('');
+
+  goStep(3);
+}
+
+async function finish() {
+  try { await api.patch('/users/'+myUid+'/onboarding-done', {}); } catch(e){}
+  window.location.href = 'dashboard.html';
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>

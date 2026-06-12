@@ -1,15 +1,16 @@
 const express = require('express');
 const bcrypt  = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
 const { queryOne, queryAll } = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, signToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /users — список всех (публично)
+// GET /users — список всех (публично); admin видит onboarding_done
 router.get('/', async (req, res) => {
   try {
     const { role, search } = req.query;
-    let sql = `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, created_at
+    let sql = `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, created_at, onboarding_done
                FROM users WHERE 1=1`;
     const params = [];
 
@@ -127,6 +128,59 @@ router.delete('/:uid', requireAuth, async (req, res) => {
   try {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
     await queryOne('DELETE FROM users WHERE uid = $1', [req.params.uid]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// Admin: POST /users/admin/create — создать пользователя из админки
+router.post('/admin/create', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
+    const { email, password, name, role } = req.body;
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'email, password и name обязательны' });
+    }
+    if (password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
+    const validRoles = ['user', 'startup', 'expert', 'admin'];
+    const userRole = validRoles.includes(role) ? role : 'user';
+
+    const existing = await queryOne('SELECT uid FROM users WHERE email=$1', [email.toLowerCase()]);
+    if (existing) return res.status(409).json({ error: 'Email уже занят' });
+
+    const uid          = uuidv4();
+    const passwordHash = await bcrypt.hash(password, 10);
+    await queryOne(
+      `INSERT INTO users (uid, email, password_hash, name, role, bio, skills, contacts, portfolio, avatar, onboarding_done, created_at)
+       VALUES ($1,$2,$3,$4,$5,'','[]','','','',FALSE,NOW())`,
+      [uid, email.toLowerCase(), passwordHash, name, userRole]
+    );
+    res.status(201).json({ ok: true, uid });
+  } catch (e) {
+    console.error('admin create user:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// PATCH /users/:uid/onboarding-done — пользователь завершил онбординг
+router.patch('/:uid/onboarding-done', requireAuth, async (req, res) => {
+  try {
+    if (req.user.uid !== req.params.uid && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
+    await queryOne('UPDATE users SET onboarding_done=TRUE WHERE uid=$1', [req.params.uid]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// Admin: PATCH /users/:uid/reset-onboarding — сброс онбординга
+router.patch('/:uid/reset-onboarding', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
+    await queryOne('UPDATE users SET onboarding_done=FALSE WHERE uid=$1', [req.params.uid]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });

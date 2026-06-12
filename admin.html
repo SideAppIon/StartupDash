@@ -79,10 +79,14 @@
       <button class="tab-a" onclick="showTab('settings',this)">⚙️ Настройки</button>
       <button class="tab-a" onclick="showTab('forum',this)">💬 Форум</button>
     </div>
+    </div>
 
     <!-- USERS -->
     <div id="tab-users">
-      <input type="text" class="search-bar" id="userSearch" placeholder="🔍 Поиск по имени или email..." oninput="filterUsers()"/>
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <input type="text" class="search-bar" id="userSearch" placeholder="🔍 Поиск по имени или email..." oninput="filterUsers()" style="margin-bottom:0"/>
+        <button class="btn btn--primary btn--sm" onclick="openCreateUser()" style="white-space:nowrap;flex-shrink:0">+ Создать</button>
+      </div>
       <div id="usersList"><div class="spinner"></div></div>
     </div>
 
@@ -205,14 +209,49 @@
   </div>
 </div>
 
+<!-- Create User modal -->
+<div class="modal-overlay" id="createUserModal">
+  <div class="modal">
+    <div class="modal__header">
+      <div class="modal__title">Создать пользователя</div>
+      <button class="modal__close" onclick="closeCreateUser()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Имя</label>
+      <input type="text" class="form-input" id="cuName" placeholder="Иван Иванов"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-input" id="cuEmail" placeholder="ivan@example.com"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Пароль</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="form-input" id="cuPwd" placeholder="Минимум 6 символов" style="flex:1;font-family:monospace"/>
+        <button class="btn btn--outline btn--sm" onclick="genCuPwd()" title="Сгенерировать">🎲</button>
+        <button class="btn btn--outline btn--sm" onclick="copyCuPwd()" title="Скопировать">📋</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Роль</label>
+      <select class="form-select" id="cuRole">
+        <option value="user">Специалист</option>
+        <option value="startup">Стартапер</option>
+        <option value="expert">Эксперт</option>
+        <option value="admin">Администратор</option>
+      </select>
+    </div>
+    <div class="form-hint" style="margin-bottom:16px">После создания пользователь может войти с этими данными. Онбординг будет показан при первом входе.</div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center" onclick="doCreateUser()">✅ Создать аккаунт</button>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 <script src="api-config.js"></script>
 <script>
 requireAuth('login.html');
 
 var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',user:'badge--blue',admin:'badge--red'};
-
-// Дефолтные категории и стадии (используются если в Firestore ещё нет)
 var DEFAULT_CATS   = ['FinTech','EdTech','HealthTech','E-commerce','SaaS','AI / ML','Gaming','GreenTech','Marketplace','Другое'];
 var DEFAULT_STAGES = [
   {name:'Идея',icon:'💡'},{name:'MVP',icon:'⚡'},{name:'Бета',icon:'🔬'},
@@ -224,10 +263,9 @@ var allUsers    = [];
 var allStartups = [];
 var selUid      = null;
 var resetEmail  = null;
-// Settings state
 var cats   = [];
 var stages = [];
-var editingStageIdx = null; // индекс стадии для которой меняем иконку
+var editingStageIdx = null;
 
 onAuthReady(async function(user, userData) {
   if (!user) return;
@@ -235,27 +273,32 @@ onAuthReady(async function(user, userData) {
   document.getElementById('navAvatar').src = userData && userData.avatar
     ? userData.avatar
     : 'https://ui-avatars.com/api/?background=181c24&color=ff4757&name=A';
-
   await Promise.all([loadStats(), loadUsers(), loadStartupsAdmin(), loadSettings()]);
 });
 
 // ── STATS ─────────────────────────────────────────────
 async function loadStats() {
-  var [u, s] = await Promise.all([
-    db.collection('users').get(),
-    db.collection('startups').get()
-  ]);
-  document.getElementById('statUsers').textContent    = u.size;
-  document.getElementById('statStartups').textContent = s.size;
-  document.getElementById('statExperts').textContent= u.docs.filter(function(d){return d.data().role==='expert';}).length;
-  document.getElementById('statPublic').textContent   = s.docs.filter(function(d){return !d.data().privacy||d.data().privacy==='public';}).length;
+  try {
+    var [ud, sd] = await Promise.all([
+      api.get('/users'),
+      api.get('/startups')
+    ]);
+    var users    = ud.users    || [];
+    var startups = sd.startups || [];
+    document.getElementById('statUsers').textContent    = users.length;
+    document.getElementById('statStartups').textContent = startups.length;
+    document.getElementById('statExperts').textContent  = users.filter(function(u){return u.role==='expert';}).length;
+    document.getElementById('statPublic').textContent   = startups.filter(function(s){return !s.privacy||s.privacy==='public';}).length;
+  } catch(e) { console.warn('loadStats:', e.message); }
 }
 
 // ── USERS ─────────────────────────────────────────────
 async function loadUsers() {
-  var snap = await db.collection('users').get();
-  allUsers = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
-  renderUsers(allUsers);
+  try {
+    var data = await api.get('/users');
+    allUsers = data.users || [];
+    renderUsers(allUsers);
+  } catch(e) { document.getElementById('usersList').innerHTML='<p style="color:var(--danger)">Ошибка загрузки</p>'; }
 }
 function filterUsers() {
   var q = document.getElementById('userSearch').value.toLowerCase();
@@ -267,10 +310,13 @@ function renderUsers(users) {
   el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' +
     users.map(function(u) {
       var av = u.avatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(u.name||'U');
+      var obBadge = u.onboarding_done
+        ? '<span title="Онбординг пройден" style="font-size:12px;color:var(--success)">✅</span>'
+        : '<span title="Онбординг не пройден" style="font-size:12px;color:var(--text3)">🔘</span>';
       return '<div class="user-row">'+
         '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
         '<div class="user-row__info">'+
-          '<div class="user-row__name">'+esc(u.name||'—')+'</div>'+
+          '<div class="user-row__name">'+esc(u.name||'—')+' '+obBadge+'</div>'+
           '<div class="user-row__email">'+esc(u.email||'—')+'</div>'+
         '</div>'+
         '<span class="badge '+(ROLE_CLASSES[u.role]||'badge--gray')+'">'+esc(ROLE_LABELS[u.role]||u.role||'')+'</span>'+
@@ -278,6 +324,7 @@ function renderUsers(users) {
           '<a href="member.html?uid='+esc(u.uid||'')+'" class="btn btn--ghost btn--sm">👁</a>'+
           '<button class="btn btn--outline btn--sm" data-action="role" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'" data-role="'+esc(u.role||'')+'">Роль</button>'+
           '<button class="btn btn--ghost btn--sm" data-action="pwd" data-uid="'+esc(u.uid||'')+'" data-email="'+esc(u.email||'')+'">🔑</button>'+
+          '<button class="btn btn--outline btn--sm" data-action="resetob" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'" title="Сбросить онбординг">🔄 Онбординг</button>'+
           '<button class="btn btn--danger btn--sm" data-action="delusr" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'">✕</button>'+
         '</div>'+
       '</div>';
@@ -286,9 +333,11 @@ function renderUsers(users) {
 
 // ── STARTUPS ──────────────────────────────────────────
 async function loadStartupsAdmin() {
-  var snap = await db.collection('startups').get();
-  allStartups = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
-  renderStartups(allStartups);
+  try {
+    var data = await api.get('/startups');
+    allStartups = data.startups || [];
+    renderStartups(allStartups);
+  } catch(e) { document.getElementById('startupsList').innerHTML='<p style="color:var(--danger)">Ошибка загрузки</p>'; }
 }
 function filterStartups() {
   var q = document.getElementById('startupSearch').value.toLowerCase();
@@ -300,11 +349,12 @@ function renderStartups(list) {
   el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' +
     list.map(function(s) {
       var privBadge = s.privacy==='private'?'🔒 ':s.privacy==='closed'?'🔐 ':'';
+      var ownerName = s.owner_name || s.ownerName || '?';
       return '<div class="user-row">'+
         '<span style="font-size:24px">'+(s.emoji||'🚀')+'</span>'+
         '<div class="user-row__info">'+
           '<div class="user-row__name">'+privBadge+esc(s.name||'')+'</div>'+
-          '<div class="user-row__email">'+esc(s.ownerName||'?')+' · '+esc(s.category||'')+'</div>'+
+          '<div class="user-row__email">'+esc(ownerName)+' · '+esc(s.category||'')+'</div>'+
         '</div>'+
         '<span class="badge badge--green">'+esc(s.stage||'Идея')+'</span>'+
         '<div class="user-row__actions">'+
@@ -318,51 +368,42 @@ function renderStartups(list) {
 // ── SETTINGS ──────────────────────────────────────────
 async function loadSettings() {
   try {
-    var snap = await db.collection('_config').doc('platform').get();
-    if (snap.exists && snap.data().categories) {
-      cats   = snap.data().categories;
-      stages = snap.data().stages || DEFAULT_STAGES;
-      var lim = snap.data().feedLimit || 25;
-      document.getElementById('feedLimitInput').value = lim;
-      if (snap.data().policyUrl) document.getElementById('policyUrlInput').value = snap.data().policyUrl;
-    } else {
-      cats   = DEFAULT_CATS.slice();
-      stages = DEFAULT_STAGES.map(function(s){ return Object.assign({},s); });
-    }
+    var data = await api.get('/platform-config');
+    var cfg  = data.config || {};
+    cats   = cfg.categories || DEFAULT_CATS.slice();
+    stages = cfg.stages     || DEFAULT_STAGES.map(function(s){ return Object.assign({},s); });
+    document.getElementById('feedLimitInput').value = cfg.feedLimit || 25;
+    if (cfg.policyUrl) document.getElementById('policyUrlInput').value = cfg.policyUrl;
   } catch(e) {
     cats   = DEFAULT_CATS.slice();
     stages = DEFAULT_STAGES.map(function(s){ return Object.assign({},s); });
   }
-  renderCats();
-  renderStages();
-  renderIconPicker();
+  renderCats(); renderStages(); renderIconPicker();
 }
 
 async function savePolicyUrl() {
   var url = document.getElementById('policyUrlInput').value.trim();
   if (!url) { showToast('Введи ссылку','error'); return; }
-  await db.collection('_config').doc('platform').set({ policyUrl: url }, { merge: true });
-  showToast('Ссылка на политику сохранена','success');
+  try {
+    await api.post('/platform-config', { policyUrl: url });
+    showToast('Ссылка на политику сохранена','success');
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
 async function saveFeedLimit() {
   var val = parseInt(document.getElementById('feedLimitInput').value, 10);
-  if (isNaN(val) || val < 5 || val > 100) {
-    showToast('Введи число от 5 до 100', 'error'); return;
-  }
-  await db.collection('_config').doc('platform').set(
-    { feedLimit: val }, { merge: true }
-  );
-  showToast('Лимит ленты сохранён: ' + val, 'success');
+  if (isNaN(val)||val<5||val>100) { showToast('Введи число от 5 до 100','error'); return; }
+  try {
+    await api.post('/platform-config', { feedLimit: val });
+    showToast('Лимит ленты сохранён: '+val,'success');
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
 async function saveSettings() {
-  try {
-    await db.collection('_config').doc('platform').set({ categories: cats, stages: stages });
-  } catch(e) { console.warn('saveSettings:', e.message); }
+  try { await api.post('/platform-config', { categories: cats, stages: stages }); }
+  catch(e) { console.warn('saveSettings:', e.message); }
 }
 
-// Категории
 function renderCats() {
   document.getElementById('catList').innerHTML = cats.map(function(cat, i) {
     return '<li class="item-row">'+
@@ -374,7 +415,7 @@ function renderCats() {
 function addCat() {
   var inp = document.getElementById('catInput');
   var v   = inp.value.trim();
-  if (!v || cats.includes(v)) { inp.focus(); return; }
+  if (!v||cats.includes(v)) { inp.focus(); return; }
   cats.push(v); inp.value='';
   renderCats(); saveSettings();
   showToast('Категория добавлена','success');
@@ -385,7 +426,6 @@ function removeCat(i) {
   showToast('Категория удалена','success');
 }
 
-// Стадии
 function renderStages() {
   document.getElementById('stageList').innerHTML = stages.map(function(st, i) {
     return '<li class="item-row">'+
@@ -400,8 +440,7 @@ function addStage() {
   var v   = inp.value.trim();
   if (!v) { inp.focus(); return; }
   if (stages.some(function(s){ return s.name===v; })) { showToast('Такая стадия уже есть','warn'); return; }
-  stages.push({ name:v, icon:'⚡' });
-  inp.value='';
+  stages.push({ name:v, icon:'⚡' }); inp.value='';
   renderStages(); saveSettings();
   showToast('Стадия добавлена','success');
 }
@@ -410,8 +449,6 @@ function removeStage(i) {
   stages.splice(i,1); renderStages(); saveSettings();
   showToast('Стадия удалена','success');
 }
-
-// Icon picker
 function renderIconPicker() {
   document.getElementById('emojiPicker').innerHTML = ICON_OPTS.map(function(e) {
     return '<button class="ep-btn" title="'+e+'" onclick="pickIcon(\''+e+'\')">'+e+'</button>';
@@ -420,23 +457,22 @@ function renderIconPicker() {
 function openIconPicker(idx) {
   editingStageIdx = idx;
   var wrap = document.getElementById('iconPickerWrap');
-  wrap.style.display = 'block';
-  // Подсвечиваем текущую
-  document.querySelectorAll('.ep-btn').forEach(function(btn) {
-    btn.classList.toggle('sel', btn.textContent === stages[idx].icon);
+  wrap.style.display='block';
+  document.querySelectorAll('.ep-btn').forEach(function(btn){
+    btn.classList.toggle('sel', btn.textContent===stages[idx].icon);
   });
   wrap.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 function pickIcon(emoji) {
-  if (editingStageIdx === null) return;
-  stages[editingStageIdx].icon = emoji;
+  if (editingStageIdx===null) return;
+  stages[editingStageIdx].icon=emoji;
   renderStages(); saveSettings();
   document.getElementById('iconPickerWrap').style.display='none';
   editingStageIdx=null;
   showToast('Иконка обновлена','success');
 }
 
-// ── MODALS ────────────────────────────────────────────
+// ── TABS ──────────────────────────────────────────────
 function showTab(name, btn) {
   document.querySelectorAll('.tab-a').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
@@ -446,6 +482,8 @@ function showTab(name, btn) {
   document.getElementById('tab-forum').style.display    = name==='forum'    ?'block':'none';
   if (name==='forum') loadAdminTopics();
 }
+
+// ── ROLE MODAL ────────────────────────────────────────
 function openRoleModal(uid, name, role) {
   selUid = uid;
   document.getElementById('roleModalName').textContent = 'Пользователь: '+name;
@@ -455,101 +493,141 @@ function openRoleModal(uid, name, role) {
 function closeModal() { document.getElementById('roleModal').classList.remove('open'); }
 async function applyRole() {
   var r = document.getElementById('newRoleSelect').value;
-  await db.collection('users').doc(selUid).update({ role:r });
-  closeModal(); showToast('Роль обновлена','success');
-  await loadUsers(); await loadStats();
+  try {
+    await api.patch('/users/'+selUid+'/role', { role: r });
+    closeModal(); showToast('Роль обновлена','success');
+    await loadUsers(); await loadStats();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
+
+// ── PASSWORD MODAL ────────────────────────────────────
 function openPwdModal(uid, email) {
-  selUid     = uid;
-  resetEmail = email;
-  document.getElementById('pwdEmail').textContent = email;
-  document.getElementById('pwdInput').value = '';
+  selUid=uid; resetEmail=email;
+  document.getElementById('pwdEmail').textContent=email;
+  document.getElementById('pwdInput').value='';
   document.getElementById('pwdModal').classList.add('open');
 }
 function closePwdModal() { document.getElementById('pwdModal').classList.remove('open'); }
-
 function generatePwd() {
-  var chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$%';
-  var pwd = '';
-  for (var i = 0; i < 12; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
-  document.getElementById('pwdInput').value = pwd;
+  var chars='abcdefghijkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$%';
+  var pwd='';
+  for(var i=0;i<12;i++) pwd+=chars[Math.floor(Math.random()*chars.length)];
+  document.getElementById('pwdInput').value=pwd;
 }
-
 function copyPwd() {
-  var val = document.getElementById('pwdInput').value;
+  var val=document.getElementById('pwdInput').value;
   if (!val) { showToast('Сначала введите или сгенерируйте пароль','warn'); return; }
-  navigator.clipboard.writeText(val).then(function(){
-    showToast('Пароль скопирован в буфер','success');
-  }).catch(function(){
-    showToast('Не удалось скопировать: ' + val, 'warn');
-  });
+  navigator.clipboard.writeText(val)
+    .then(function(){ showToast('Пароль скопирован','success'); })
+    .catch(function(){ showToast('Не удалось скопировать: '+val,'warn'); });
 }
-
 async function confirmSetPwd() {
-  var pwd = document.getElementById('pwdInput').value.trim();
-  if (!pwd || pwd.length < 6) { showToast('Пароль минимум 6 символов','error'); return; }
+  var pwd=document.getElementById('pwdInput').value.trim();
+  if (!pwd||pwd.length<6) { showToast('Пароль минимум 6 символов','error'); return; }
   try {
-    await api.patch('/users/' + selUid + '/password', { newPassword: pwd });
+    await api.patch('/users/'+selUid+'/password', { newPassword: pwd });
     closePwdModal();
-    showToast('Пароль установлен. Не забудьте сообщить пользователю.','success');
+    showToast('Пароль установлен','success');
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+async function confirmReset() {
+  showToast('Отправка письма не настроена (нет SMTP)','warn');
+}
+
+// ── CREATE USER MODAL ─────────────────────────────────
+function openCreateUser() {
+  document.getElementById('cuName').value='';
+  document.getElementById('cuEmail').value='';
+  document.getElementById('cuPwd').value='';
+  document.getElementById('cuRole').value='user';
+  document.getElementById('createUserModal').classList.add('open');
+}
+function closeCreateUser() { document.getElementById('createUserModal').classList.remove('open'); }
+function genCuPwd() {
+  var chars='abcdefghijkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$%';
+  var pwd='';
+  for(var i=0;i<12;i++) pwd+=chars[Math.floor(Math.random()*chars.length)];
+  document.getElementById('cuPwd').value=pwd;
+}
+function copyCuPwd() {
+  var val=document.getElementById('cuPwd').value;
+  if (!val) { showToast('Сначала введите пароль','warn'); return; }
+  navigator.clipboard.writeText(val)
+    .then(function(){ showToast('Пароль скопирован','success'); })
+    .catch(function(){ showToast('Не удалось скопировать: '+val,'warn'); });
+}
+async function doCreateUser() {
+  var name  = document.getElementById('cuName').value.trim();
+  var email = document.getElementById('cuEmail').value.trim();
+  var pwd   = document.getElementById('cuPwd').value.trim();
+  var role  = document.getElementById('cuRole').value;
+  if (!name||!email||!pwd) { showToast('Заполни все поля','error'); return; }
+  if (pwd.length<6) { showToast('Пароль минимум 6 символов','error'); return; }
+  try {
+    await api.post('/users/admin/create', { name, email, password: pwd, role });
+    closeCreateUser();
+    showToast('Аккаунт создан: '+email,'success');
+    await loadUsers(); await loadStats();
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
-async function confirmReset() {
+// ── ONBOARDING RESET ──────────────────────────────────
+async function resetOnboarding(uid, name) {
+  if (!confirm('Сбросить онбординг для «'+name+'»? При следующем входе ему снова покажется приветственный экран.')) return;
   try {
-    await auth.sendPasswordResetEmail(resetEmail);
-    showToast('Письмо для сброса отправлено','success');
+    await api.patch('/users/'+uid+'/reset-onboarding', {});
+    showToast('Онбординг сброшен для '+name,'success');
+    await loadUsers();
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
+
+// ── DELETE ────────────────────────────────────────────
 async function delUser(uid, name) {
-  if (!confirm('Удалить пользователя «'+name+'»?')) return;
-  await db.collection('users').doc(uid).delete();
-  showToast('Удалён','success');
-  await loadUsers(); await loadStats();
+  if (!confirm('Удалить пользователя «'+name+'»? Это действие необратимо.')) return;
+  try {
+    await api.delete('/users/'+uid);
+    showToast('Пользователь удалён','success');
+    await loadUsers(); await loadStats();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 async function delStartup(id, name) {
   if (!confirm('Удалить стартап «'+name+'»?')) return;
-  await db.collection('startups').doc(id).delete();
-  showToast('Удалён','success');
-  await loadStartupsAdmin(); await loadStats();
+  try {
+    await api.delete('/startups/'+id);
+    showToast('Стартап удалён','success');
+    await loadStartupsAdmin(); await loadStats();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
-// ── FORUM MODERATION ─────────────────────────────────
+// ── FORUM MODERATION ──────────────────────────────────
 var allAdminTopics = [];
-
 async function loadAdminTopics() {
   try {
-    var snap = await db.collection('forum_topics').orderBy('createdAt','desc').get();
-    allAdminTopics = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
-  } catch(e) {
-    var snap2 = await db.collection('forum_topics').get();
-    allAdminTopics = snap2.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
-    allAdminTopics.sort(function(a,b){ return ((b.createdAt&&b.createdAt.seconds)||0)-((a.createdAt&&a.createdAt.seconds)||0); });
-  }
-  renderAdminTopics(allAdminTopics);
+    var data = await api.get('/forum/topics?limit=200');
+    allAdminTopics = data.topics || [];
+    renderAdminTopics(allAdminTopics);
+  } catch(e) { document.getElementById('adminTopicList').innerHTML='<p style="color:var(--danger)">Ошибка загрузки</p>'; }
 }
-
 function filterAdminTopics() {
-  var q = document.getElementById('forumAdminSearch').value.toLowerCase();
-  renderAdminTopics(q ? allAdminTopics.filter(function(t){
-    return (t.title||'').toLowerCase().includes(q)||(t.authorName||'').toLowerCase().includes(q);
-  }) : allAdminTopics);
+  var q=document.getElementById('forumAdminSearch').value.toLowerCase();
+  renderAdminTopics(q?allAdminTopics.filter(function(t){
+    return (t.title||'').toLowerCase().includes(q)||(t.author_name||'').toLowerCase().includes(q);
+  }):allAdminTopics);
 }
-
 function renderAdminTopics(topics) {
-  var el = document.getElementById('adminTopicList');
+  var el=document.getElementById('adminTopicList');
   if (!topics.length) { el.innerHTML='<p style="color:var(--text2);font-size:14px">Нет тем</p>'; return; }
-  el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' +
+  var CAT_ICONS={'Общее':'💬','Стартапы':'🚀','Поиск команды':'👥','Инвестиции':'💰','Технологии':'🔬','Маркетинг':'📣','Вопросы':'❓'};
+  el.innerHTML='<div class="card" style="padding:0;overflow:hidden">'+
     topics.map(function(t) {
-      var CAT_ICONS = {'Общее':'💬','Стартапы':'🚀','Поиск команды':'👥','Инвестиции':'💰','Технологии':'🔬','Маркетинг':'📣','Вопросы':'❓'};
-      var icon = CAT_ICONS[t.category]||'💬';
-      var hidden = t.hidden ? ' style="opacity:.5"' : '';
-      return '<div class="user-row"'+hidden+'>'+
+      var icon=CAT_ICONS[t.category]||'💬';
+      var hiddenStyle=t.hidden?' style="opacity:.5"':'';
+      return '<div class="user-row"'+hiddenStyle+'>'+
         '<span style="font-size:20px">'+icon+'</span>'+
         '<div class="user-row__info">'+
           '<div class="user-row__name">'+esc(t.title||'')+(t.pinned?' 📌':'')+(t.hidden?' 🚫':'')+
-          ' <span style="font-size:12px;color:var(--text3)">('+( t.replyCount||0)+' отв.)</span></div>'+
-          '<div class="user-row__email">'+esc(t.authorName||'?')+' · '+esc(t.category||'')+' · '+formatDate(t.createdAt)+'</div>'+
+          ' <span style="font-size:12px;color:var(--text3)">('+( t.reply_count||0)+' отв.)</span></div>'+
+          '<div class="user-row__email">'+esc(t.author_name||'?')+' · '+esc(t.category||'')+' · '+formatDate(t.created_at)+'</div>'+
         '</div>'+
         '<div class="user-row__actions">'+
           '<a href="forum.html?topic='+t.id+'" class="btn btn--ghost btn--sm" target="_blank">👁</a>'+
@@ -558,44 +636,49 @@ function renderAdminTopics(topics) {
           '<button class="btn btn--danger btn--sm" data-action="deltopic" data-tid="'+t.id+'" data-name="'+esc(t.title||'')+'">✕ Удалить</button>'+
         '</div>'+
       '</div>';
-    }).join('') + '</div>';
+    }).join('')+'</div>';
 }
-
 function formatDate(ts) {
   if (!ts) return '';
-  var d = ts.toDate?ts.toDate():new Date(ts);
+  var d=new Date(ts);
   return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'});
 }
-
 async function pinTopic(tid, currentlyPinned) {
-  await db.collection('forum_topics').doc(tid).update({ pinned: !currentlyPinned });
-  showToast(!currentlyPinned?'Тема закреплена':'Тема откреплена','success');
-  loadAdminTopics();
+  try {
+    await api.patch('/forum/topics/'+tid, { pinned: !currentlyPinned });
+    showToast(!currentlyPinned?'Тема закреплена':'Тема откреплена','success');
+    loadAdminTopics();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 async function hideTopic(tid, currentlyHidden) {
-  await db.collection('forum_topics').doc(tid).update({ hidden: !currentlyHidden });
-  showToast(!currentlyHidden?'Тема скрыта':'Тема видна','success');
-  loadAdminTopics();
+  try {
+    await api.patch('/forum/topics/'+tid, { hidden: !currentlyHidden });
+    showToast(!currentlyHidden?'Тема скрыта':'Тема видна','success');
+    loadAdminTopics();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 async function delTopic(tid, name) {
   if (!confirm('Удалить тему «'+name+'»?')) return;
-  await db.collection('forum_topics').doc(tid).delete();
-  showToast('Тема удалена','success');
-  loadAdminTopics();
+  try {
+    await api.delete('/forum/topics/'+tid);
+    showToast('Тема удалена','success');
+    loadAdminTopics();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
-// Обновляем event delegation
+// ── EVENT DELEGATION ──────────────────────────────────
 document.addEventListener('click', function(e) {
-  var btn = e.target.closest('[data-action]');
+  var btn=e.target.closest('[data-action]');
   if (!btn) return;
-  var a = btn.getAttribute('data-action');
-  if (a==='pintopic')  pinTopic(btn.getAttribute('data-tid'),  btn.getAttribute('data-pinned')==='1');
+  var a=btn.getAttribute('data-action');
+  if (a==='pintopic')  pinTopic(btn.getAttribute('data-tid'), btn.getAttribute('data-pinned')==='1');
   if (a==='hidetopic') hideTopic(btn.getAttribute('data-tid'), btn.getAttribute('data-hidden')==='1');
-  if (a==='deltopic')  delTopic(btn.getAttribute('data-tid'),  btn.getAttribute('data-name'));
-  if (a==='role')   openRoleModal(btn.getAttribute('data-uid'), btn.getAttribute('data-name'), btn.getAttribute('data-role'));
-  if (a==='pwd')    openPwdModal(btn.getAttribute('data-uid'), btn.getAttribute('data-email'));
-  if (a==='delusr') delUser(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));
-  if (a==='delst')  delStartup(btn.getAttribute('data-sid'), btn.getAttribute('data-name'));
+  if (a==='deltopic')  delTopic(btn.getAttribute('data-tid'), btn.getAttribute('data-name'));
+  if (a==='role')      openRoleModal(btn.getAttribute('data-uid'), btn.getAttribute('data-name'), btn.getAttribute('data-role'));
+  if (a==='pwd')       openPwdModal(btn.getAttribute('data-uid'), btn.getAttribute('data-email'));
+  if (a==='resetob')   resetOnboarding(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));
+  if (a==='delusr')    delUser(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));
+  if (a==='delst')     delStartup(btn.getAttribute('data-sid'), btn.getAttribute('data-name'));
 });
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

@@ -30,8 +30,8 @@ router.post('/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
 
     await queryOne(
-      `INSERT INTO users (uid, email, password_hash, name, role, bio, skills, contacts, portfolio, avatar, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '', NOW())
+      `INSERT INTO users (uid, email, password_hash, name, role, bio, skills, contacts, portfolio, avatar, onboarding_done, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '', FALSE, NOW())
        RETURNING uid`,
       [uid, email.toLowerCase(), passwordHash, name, userRole, bio || '',
        JSON.stringify(skills || []), contacts || '', portfolio || '']
