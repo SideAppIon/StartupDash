@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { getUserGroupSettings } = require('./groups');
 
 const router = express.Router();
 
@@ -38,6 +39,31 @@ router.post('/conversations', requireAuth, async (req, res) => {
     const { other_uid } = req.body;
     if (!other_uid || other_uid === req.user.uid) {
       return res.status(400).json({ error: 'other_uid обязателен' });
+    }
+
+    // Проверяем ограничение коммуникации по группе
+    // Правило: если у инициатора стоит messaging_restriction=true,
+    // он может писать только участникам своей группы
+    // (если other_uid уже написал первым — existing диалог есть, блокировки нет)
+    const myGs = await getUserGroupSettings(req.user.uid);
+    if (myGs && myGs.messaging_restriction) {
+      const sameGroup = await queryOne(
+        'SELECT 1 FROM user_groups WHERE group_id=$1 AND user_uid=$2',
+        [myGs.group_id, other_uid]
+      );
+      if (!sameGroup) {
+        // Проверяем: может они уже общаются (other написал первым)
+        const existingCheck = await queryOne(
+          `SELECT c.* FROM conversations c
+           JOIN conversation_participants cp1 ON cp1.conv_id = c.id AND cp1.user_uid = $1
+           JOIN conversation_participants cp2 ON cp2.conv_id = c.id AND cp2.user_uid = $2
+           WHERE c.is_group = FALSE LIMIT 1`,
+          [req.user.uid, other_uid]
+        );
+        if (!existingCheck) {
+          return res.status(403).json({ error: 'Вы можете писать только участникам своей группы' });
+        }
+      }
     }
 
     // Ищем существующий диалог между двумя

@@ -120,12 +120,20 @@ const auth = {
 // HELPERS: совместимость с Firebase Auth callbacks
 // ─────────────────────────────────────────────────────────
 function requireAuth(redirectTo) {
+  const _check = () => {
+    if (!_currentUser) { window.location.href = redirectTo || 'login.html'; return; }
+    // Авто-редирект на онбординг если не пройден (кроме самой страницы онбординга)
+    const isOnboarding = window.location.pathname.includes('onboarding.html');
+    if (!isOnboarding && _currentUserData && _currentUserData.onboarding_done === false) {
+      window.location.href = 'onboarding.html';
+    }
+  };
   if (_authResolved) {
-    if (!_currentUser) window.location.href = redirectTo || 'login.html';
+    _check();
   } else {
     const unsub = auth.onAuthStateChanged(() => {
       unsub();
-      setTimeout(() => { if (!_currentUser) window.location.href = redirectTo || 'login.html'; }, 50);
+      setTimeout(_check, 50);
     });
   }
 }

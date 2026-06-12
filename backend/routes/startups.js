@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { queryOne, queryAll } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { getUserGroupSettings } = require('./groups');
 
 const router = express.Router();
 
@@ -16,6 +17,18 @@ router.get('/', optionalAuth, async (req, res) => {
     const isAdmin = req.user && req.user.role === 'admin';
     if (!isAdmin) {
       sql += ` AND privacy != 'closed'`;
+    }
+
+    // Ограничение видимости по группе
+    if (req.user && !isAdmin) {
+      const gs = await getUserGroupSettings(req.user.uid);
+      if (gs && gs.startup_visibility === 'group_only') {
+        // Показываем только стартапы участников той же группы
+        params.push(gs.group_id);
+        sql += ` AND owner_uid IN (
+          SELECT user_uid FROM user_groups WHERE group_id = $${params.length}
+        )`;
+      }
     }
 
     if (owner_uid) {

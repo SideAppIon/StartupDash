@@ -76,6 +76,7 @@
     <div class="tabs-admin">
       <button class="tab-a active" onclick="showTab('users',this)">👥 Пользователи</button>
       <button class="tab-a" onclick="showTab('startups',this)">🚀 Стартапы</button>
+      <button class="tab-a" onclick="showTab('groups',this)">🏷️ Группы</button>
       <button class="tab-a" onclick="showTab('settings',this)">⚙️ Настройки</button>
       <button class="tab-a" onclick="showTab('forum',this)">💬 Форум</button>
     </div>
@@ -88,6 +89,16 @@
         <button class="btn btn--primary btn--sm" onclick="openCreateUser()" style="white-space:nowrap;flex-shrink:0">+ Создать</button>
       </div>
       <div id="usersList"><div class="spinner"></div></div>
+    </div>
+
+    <!-- GROUPS -->
+    <div id="tab-groups" style="display:none">
+      <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center">
+        <h3 style="margin:0;font-family:var(--font-head);font-size:16px;font-weight:700;flex:1">Группы пользователей</h3>
+        <button class="btn btn--primary btn--sm" onclick="openCreateGroup()">+ Создать группу</button>
+      </div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:20px">Группы позволяют ограничить видимость стартапов и коммуникацию. Пользователи не знают о своей группе.</p>
+      <div id="groupsList"><div class="spinner"></div></div>
     </div>
 
     <!-- STARTUPS -->
@@ -209,6 +220,64 @@
   </div>
 </div>
 
+<!-- Create Group modal -->
+<div class="modal-overlay" id="createGroupModal">
+  <div class="modal">
+    <div class="modal__header">
+      <div class="modal__title">Создать группу</div>
+      <button class="modal__close" onclick="closeCreateGroup()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Название группы</label>
+      <input type="text" class="form-input" id="cgName" placeholder="Например: Когорта A, Группа 1..."/>
+    </div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center" onclick="doCreateGroup()">Создать</button>
+  </div>
+</div>
+
+<!-- Group Settings modal -->
+<div class="modal-overlay" id="groupSettingsModal">
+  <div class="modal" style="max-width:540px">
+    <div class="modal__header">
+      <div class="modal__title" id="gsTitle">Настройки группы</div>
+      <button class="modal__close" onclick="closeGroupSettings()">×</button>
+    </div>
+
+    <div style="display:grid;gap:16px;margin-bottom:20px">
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:16px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px">🚀 Видимость стартапов</div>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:8px">
+          <input type="radio" name="gsVisibility" id="gsVisAll" value="all" onchange="updateGroupSettings()"/>
+          <span style="font-size:13px"><strong>Все стартапы</strong> — видят весь каталог платформы</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="radio" name="gsVisibility" id="gsVisGroup" value="group_only" onchange="updateGroupSettings()"/>
+          <span style="font-size:13px"><strong>Только своя группа</strong> — видят стартапы участников своей группы</span>
+        </label>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:16px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px">💬 Коммуникация</div>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="gsMessaging" onchange="updateGroupSettings()" style="width:16px;height:16px;accent-color:var(--accent)"/>
+          <span style="font-size:13px"><strong>Ограничить исходящие сообщения</strong> — могут писать первыми только участникам своей группы. Если кто-то извне написал первым — могут ответить.</span>
+        </label>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:13px;font-weight:600">👥 Участники (<span id="gsMemberCount">0</span>)</span>
+        <div style="display:flex;gap:8px">
+          <select class="form-select" id="gsAddSelect" style="font-size:13px;padding:6px 10px;max-width:200px"></select>
+          <button class="btn btn--primary btn--sm" onclick="addGroupMember()">+ Добавить</button>
+        </div>
+      </div>
+      <div id="gsMemberList" style="max-height:200px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Create User modal -->
 <div class="modal-overlay" id="createUserModal">
   <div class="modal">
@@ -273,7 +342,7 @@ onAuthReady(async function(user, userData) {
   document.getElementById('navAvatar').src = userData && userData.avatar
     ? userData.avatar
     : 'https://ui-avatars.com/api/?background=181c24&color=ff4757&name=A';
-  await Promise.all([loadStats(), loadUsers(), loadStartupsAdmin(), loadSettings()]);
+  await Promise.all([loadStats(), loadUsers(), loadStartupsAdmin(), loadSettings(), loadGroups()]);
 });
 
 // ── STATS ─────────────────────────────────────────────
@@ -478,6 +547,7 @@ function showTab(name, btn) {
   btn.classList.add('active');
   document.getElementById('tab-users').style.display    = name==='users'    ?'block':'none';
   document.getElementById('tab-startups').style.display = name==='startups' ?'block':'none';
+  document.getElementById('tab-groups').style.display   = name==='groups'   ?'block':'none';
   document.getElementById('tab-settings').style.display = name==='settings' ?'block':'none';
   document.getElementById('tab-forum').style.display    = name==='forum'    ?'block':'none';
   if (name==='forum') loadAdminTopics();
@@ -682,6 +752,170 @@ document.addEventListener('click', function(e) {
 });
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── GROUPS ────────────────────────────────────────────
+var allGroups = [];
+var selGroupId = null;
+var selGroupMembers = [];
+
+async function loadGroups() {
+  try {
+    var data = await api.get('/groups');
+    allGroups = data.groups || [];
+    renderGroups(allGroups);
+  } catch(e) { document.getElementById('groupsList').innerHTML='<p style="color:var(--danger)">Ошибка загрузки</p>'; }
+}
+
+function renderGroups(groups) {
+  var el = document.getElementById('groupsList');
+  if (!groups.length) {
+    el.innerHTML = '<div class="card" style="padding:32px;text-align:center;color:var(--text2)">'+
+      '<div style="font-size:32px;margin-bottom:12px">🏷️</div>'+
+      '<div>Групп пока нет. Создайте первую группу.</div></div>';
+    return;
+  }
+  var VIS_LABELS = { all: '🌐 Все стартапы', group_only: '🔒 Только своя группа' };
+  el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' +
+    groups.map(function(g) {
+      var msgBadge = g.messaging_restriction
+        ? '<span class="badge badge--red" style="font-size:11px">💬 Огр. чат</span>'
+        : '<span class="badge badge--gray" style="font-size:11px">💬 Свободно</span>';
+      return '<div class="user-row">'+
+        '<div style="width:36px;height:36px;border-radius:10px;background:var(--accent-dim);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🏷️</div>'+
+        '<div class="user-row__info">'+
+          '<div class="user-row__name">'+esc(g.name)+'</div>'+
+          '<div class="user-row__email">'+esc(VIS_LABELS[g.startup_visibility]||g.startup_visibility)+' · '+g.member_count+' участн.</div>'+
+        '</div>'+
+        msgBadge+
+        '<div class="user-row__actions">'+
+          '<button class="btn btn--outline btn--sm" onclick="openGroupSettings(\''+g.id+'\')">⚙️ Настроить</button>'+
+          '<button class="btn btn--danger btn--sm" onclick="deleteGroup(\''+g.id+'\',\''+esc(g.name)+'\')">✕</button>'+
+        '</div>'+
+      '</div>';
+    }).join('') + '</div>';
+}
+
+// Create group
+function openCreateGroup() {
+  document.getElementById('cgName').value='';
+  document.getElementById('createGroupModal').classList.add('open');
+}
+function closeCreateGroup() { document.getElementById('createGroupModal').classList.remove('open'); }
+async function doCreateGroup() {
+  var name = document.getElementById('cgName').value.trim();
+  if (!name) { showToast('Введи название','error'); return; }
+  try {
+    await api.post('/groups', { name });
+    closeCreateGroup();
+    showToast('Группа создана','success');
+    loadGroups();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+async function deleteGroup(id, name) {
+  if (!confirm('Удалить группу «'+name+'»? Участники не будут удалены из системы.')) return;
+  try {
+    await api.delete('/groups/'+id);
+    showToast('Группа удалена','success');
+    loadGroups();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+// Group settings modal
+async function openGroupSettings(id) {
+  selGroupId = id;
+  var g = allGroups.find(function(x){ return x.id===id; });
+  if (!g) return;
+  document.getElementById('gsTitle').textContent = 'Группа: ' + g.name;
+  document.getElementById('gsVisAll').checked     = g.startup_visibility !== 'group_only';
+  document.getElementById('gsVisGroup').checked   = g.startup_visibility === 'group_only';
+  document.getElementById('gsMessaging').checked  = !!g.messaging_restriction;
+  document.getElementById('groupSettingsModal').classList.add('open');
+  await loadGroupMembers(id);
+}
+function closeGroupSettings() {
+  document.getElementById('groupSettingsModal').classList.remove('open');
+  selGroupId = null;
+}
+
+async function updateGroupSettings() {
+  if (!selGroupId) return;
+  var startup_visibility    = document.querySelector('input[name="gsVisibility"]:checked').value;
+  var messaging_restriction = document.getElementById('gsMessaging').checked;
+  try {
+    await api.patch('/groups/'+selGroupId, { startup_visibility, messaging_restriction });
+    // Обновляем локальный объект
+    var g = allGroups.find(function(x){ return x.id===selGroupId; });
+    if (g) { g.startup_visibility=startup_visibility; g.messaging_restriction=messaging_restriction; }
+    renderGroups(allGroups);
+    showToast('Настройки сохранены','success');
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+async function loadGroupMembers(groupId) {
+  try {
+    var data = await api.get('/groups/'+groupId+'/members');
+    selGroupMembers = data.members || [];
+    renderGroupMembers();
+    // Заполняем select для добавления
+    populateAddSelect();
+  } catch(e) {}
+}
+
+function renderGroupMembers() {
+  var el = document.getElementById('gsMemberList');
+  document.getElementById('gsMemberCount').textContent = selGroupMembers.length;
+  if (!selGroupMembers.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text2);padding:8px 0">Нет участников</div>';
+    return;
+  }
+  el.innerHTML = selGroupMembers.map(function(u) {
+    var av = u.avatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(u.name||'U');
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'+
+      '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:13px;font-weight:500">'+esc(u.name)+'</div>'+
+        '<div style="font-size:11px;color:var(--text2)">'+esc(u.email)+' · '+esc(ROLE_LABELS[u.role]||u.role)+'</div>'+
+      '</div>'+
+      '<button class="btn btn--danger btn--sm" onclick="removeGroupMember(\''+u.uid+'\')">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+function populateAddSelect() {
+  var sel = document.getElementById('gsAddSelect');
+  var memberUids = new Set(selGroupMembers.map(function(m){ return m.uid; }));
+  var available = allUsers.filter(function(u){ return !memberUids.has(u.uid); });
+  sel.innerHTML = '<option value="">— выбери пользователя —</option>' +
+    available.map(function(u){
+      return '<option value="'+esc(u.uid)+'">'+esc(u.name)+' ('+esc(ROLE_LABELS[u.role]||u.role)+')</option>';
+    }).join('');
+}
+
+async function addGroupMember() {
+  var uid = document.getElementById('gsAddSelect').value;
+  if (!uid || !selGroupId) { showToast('Выбери пользователя','warn'); return; }
+  try {
+    await api.post('/groups/'+selGroupId+'/members', { user_uid: uid });
+    showToast('Участник добавлен','success');
+    // Обновляем счётчик в списке
+    var g = allGroups.find(function(x){ return x.id===selGroupId; });
+    if (g) g.member_count = (g.member_count||0)+1;
+    renderGroups(allGroups);
+    await loadGroupMembers(selGroupId);
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+async function removeGroupMember(uid) {
+  if (!selGroupId) return;
+  try {
+    await api.delete('/groups/'+selGroupId+'/members/'+uid);
+    showToast('Участник удалён','success');
+    var g = allGroups.find(function(x){ return x.id===selGroupId; });
+    if (g) g.member_count = Math.max(0,(g.member_count||1)-1);
+    renderGroups(allGroups);
+    await loadGroupMembers(selGroupId);
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
 </script>
 </body>
 </html>
