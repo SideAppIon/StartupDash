@@ -1,9 +1,28 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { queryOne, queryAll } = require('../db');
+const { query, queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Ленивая миграция: добавляем колонку vacancy_id, если её ещё нет.
+// Автоматического раннера миграций нет, поэтому выполняем один раз за процесс.
+let schemaEnsured = false;
+async function ensureSchema() {
+  if (schemaEnsured) return;
+  try {
+    await query('ALTER TABLE invites ADD COLUMN IF NOT EXISTS vacancy_id TEXT');
+    // Расширяем CHECK по статусу: PATCH допускает 'removed', а старое ограничение — нет.
+    await query('ALTER TABLE invites DROP CONSTRAINT IF EXISTS invites_status_check');
+    await query(
+      `ALTER TABLE invites ADD CONSTRAINT invites_status_check
+         CHECK (status IN ('pending','accepted','rejected','removed'))`
+    );
+    schemaEnsured = true;
+  } catch (e) {
+    console.error('ensureSchema invites error:', e.message);
+  }
+}
 
 // GET /invites — получить приглашения с поддержкой любых фильтров
 router.get('/', requireAuth, async (req, res) => {
@@ -74,6 +93,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 // POST /invites — создать заявку (специалист → стартап) или приглашение (стартап → специалист)
 router.post('/', requireAuth, async (req, res) => {
   try {
+    await ensureSchema();
     const b = req.body;
     // Принимаем и snake_case и camelCase
     const startup_id    = b.startup_id    || b.startupId;
@@ -81,17 +101,32 @@ router.post('/', requireAuth, async (req, res) => {
     const startup_owner = b.startup_owner || b.startupOwner || '';
     const to_uid        = b.to_uid        || b.toUid        || null;
     const from_skills   = b.from_skills   || b.fromSkills   || [];
+    const vacancy_id    = b.vacancy_id    || b.vacancyId    || null;
     const { type, role, expert_area, message, applications } = b;
 
     if (!startup_id) return res.status(400).json({ error: 'startup_id обязателен' });
 
-    // Проверяем дубль (pending/accepted от того же from_uid в тот же стартап)
+    // Проверяем дубль (pending/accepted от того же from_uid).
+    // Для отклика на вакансию — дубль считаем по конкретной вакансии,
+    // для общей заявки — по стартапу (среди заявок без вакансии).
     if (!to_uid) { // это заявка от пользователя
-      const existing = await queryOne(
-        `SELECT id FROM invites WHERE from_uid=$1 AND startup_id=$2 AND status IN ('pending','accepted')`,
-        [req.user.uid, startup_id]
-      );
-      if (existing) return res.status(409).json({ error: 'Заявка уже отправлена' });
+      let existing;
+      if (vacancy_id) {
+        existing = await queryOne(
+          `SELECT id FROM invites WHERE from_uid=$1 AND startup_id=$2 AND vacancy_id=$3 AND status IN ('pending','accepted')`,
+          [req.user.uid, startup_id, vacancy_id]
+        );
+      } else {
+        existing = await queryOne(
+          `SELECT id FROM invites WHERE from_uid=$1 AND startup_id=$2 AND vacancy_id IS NULL AND status IN ('pending','accepted')`,
+          [req.user.uid, startup_id]
+        );
+      }
+      if (existing) {
+        return res.status(409).json({
+          error: vacancy_id ? 'Ты уже откликнулся на эту вакансию' : 'Заявка уже отправлена',
+        });
+      }
     }
 
     const id = uuidv4();
@@ -101,14 +136,14 @@ router.post('/', requireAuth, async (req, res) => {
       `INSERT INTO invites
          (id, from_uid, from_name, from_avatar, from_skills,
           to_uid, startup_id, startup_name, startup_owner,
-          type, role, expert_area, message, applications, status, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending',NOW())
+          type, role, expert_area, message, applications, vacancy_id, status, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'pending',NOW())
        RETURNING *`,
       [id,
        req.user.uid, user.name, user.avatar || '', JSON.stringify(from_skills || []),
        to_uid || null, startup_id, startup_name || '', startup_owner || '',
        type || 'specialist', role || 'Специалист', expert_area || '',
-       message || '', JSON.stringify(applications || [])]
+       message || '', JSON.stringify(applications || []), vacancy_id]
     );
 
     res.status(201).json({ invite: parseInvite(invite) });
@@ -204,6 +239,7 @@ function parseInvite(inv) {
     startupName: inv.startup_name,
     startupOwner: inv.startup_owner,
     expertArea: inv.expert_area,
+    vacancyId: inv.vacancy_id,
   };
 }
 

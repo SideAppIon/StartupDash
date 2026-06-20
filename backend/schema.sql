@@ -144,8 +144,9 @@ CREATE TABLE IF NOT EXISTS invites (
   expert_area    TEXT DEFAULT '',
   message        TEXT DEFAULT '',
   applications   TEXT DEFAULT '[]',   -- JSON array
+  vacancy_id     TEXT,                -- id вакансии, если отклик на конкретную вакансию
   status         TEXT DEFAULT 'pending'
-                   CHECK (status IN ('pending','accepted','rejected')),
+                   CHECK (status IN ('pending','accepted','rejected','removed')),
   created_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
