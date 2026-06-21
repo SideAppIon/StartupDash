@@ -422,7 +422,7 @@ function renderBlocks(){
       // Загрузка файлом
       var fileLabel=document.createElement('div');
       fileLabel.style.cssText='font-size:13px;color:var(--text2);margin-top:10px;margin-bottom:4px';
-      fileLabel.textContent='…или загрузи файлом (mp4, webm, mov, до ~3 МБ)';
+      fileLabel.textContent='…или загрузи файлом (mp4, webm, mov, до ~2 МБ)';
       var vFile=document.createElement('input');
       vFile.type='file';
       vFile.accept='video/mp4,video/webm,video/quicktime';
@@ -432,7 +432,7 @@ function renderBlocks(){
         vFile.addEventListener('change', async function(){
           var file=this.files[0];
           if (!file) return;
-          if (file.size > 3.2*1024*1024){ showToast('Видео слишком большое (макс. ~3 МБ). Для больших — ссылка ВК.','error'); this.value=''; return; }
+          if (file.size > 2.3*1024*1024){ showToast('Видео слишком большое (макс. ~2 МБ). Для больших — ссылка ВК.','error'); this.value=''; return; }
           try {
             var base64=await readFileAsBase64(file);
             var url=await uploadFile(base64, file.type, 'startups');

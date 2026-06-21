@@ -30,10 +30,11 @@ const VIDEO_TYPES = {
 const ALLOWED_TYPES = { ...IMAGE_TYPES, ...VIDEO_TYPES };
 
 // Лимиты по base64 (фактический файл ~ в 1.37 раза меньше).
-// Видео ограничено небольшим размером — запросы идут через API Gateway,
-// у которого есть свой предел на размер тела. Регулируется MAX_VIDEO_MB.
+// ВАЖНО: запросы идут через API Gateway с лимитом тела ~3.5 МБ.
+// base64 раздувает файл на ~35%, поэтому видео-файл должен быть ≲ 2.3 МБ,
+// иначе шлюз вернёт 413 ещё до функции (без CORS-заголовков → в браузере «CORS»).
 const MAX_IMAGE_B64 = 2.7 * 1024 * 1024;                                  // ~2 МБ файл
-const MAX_VIDEO_MB  = parseFloat(process.env.MAX_VIDEO_MB || '3');         // ~3 МБ файл по умолчанию
+const MAX_VIDEO_MB  = parseFloat(process.env.MAX_VIDEO_MB || '2.3');       // ~2.3 МБ файл (предел шлюза)
 const MAX_VIDEO_B64 = MAX_VIDEO_MB * 1.37 * 1024 * 1024;
 
 // POST /upload
