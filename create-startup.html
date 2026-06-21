@@ -401,19 +401,56 @@ function renderBlocks(){
       container.appendChild(wrap);
       return;
     } else if (b.type==='video'){
+      var vPrevId='vprev-'+b.id;
+      // Ссылка ВКонтакте
       inp=document.createElement('input');
       inp.type='url';
       inp.className='form-input';
       inp.placeholder='https://vk.com/video_ext.php?oid=...&id=...&hd=2';
       inp.value=b.content||'';
       inp.setAttribute('data-bid', b.id);
-      inp.addEventListener('input', function(){ updateBlock(this.getAttribute('data-bid'),'content',this.value); });
+      (function(bid, pid){
+        inp.addEventListener('input', function(){ updateBlock(bid,'content',this.value); });
+        inp.addEventListener('change', function(){
+          var norm=normalizeVkVideo(this.value);
+          this.value=norm; updateBlock(bid,'content',norm); previewBlockVideo(pid, norm);
+        });
+      })(b.id, vPrevId);
       var hint=document.createElement('div');
       hint.className='form-hint';
-      hint.textContent='Ссылка для встраивания: ВКонтакте → видео → Поделиться → Код для вставки → извлеки src из iframe';
+      hint.innerHTML='Ссылка для встраивания: ВКонтакте → видео → Поделиться → Код для вставки → <code>iframe</code> (скопируй ссылку из src). Можно вставить и весь код &lt;iframe&gt; или обычную ссылку — преобразуем сами.';
+      // Загрузка файлом
+      var fileLabel=document.createElement('div');
+      fileLabel.style.cssText='font-size:13px;color:var(--text2);margin-top:10px;margin-bottom:4px';
+      fileLabel.textContent='…или загрузи файлом (mp4, webm, mov, до ~3 МБ)';
+      var vFile=document.createElement('input');
+      vFile.type='file';
+      vFile.accept='video/mp4,video/webm,video/quicktime';
+      vFile.className='form-input';
+      vFile.style.padding='6px';
+      (function(bid, pid, urlInput){
+        vFile.addEventListener('change', async function(){
+          var file=this.files[0];
+          if (!file) return;
+          if (file.size > 3.2*1024*1024){ showToast('Видео слишком большое (макс. ~3 МБ). Для больших — ссылка ВК.','error'); this.value=''; return; }
+          try {
+            var base64=await readFileAsBase64(file);
+            var url=await uploadFile(base64, file.type, 'startups');
+            urlInput.value=''; updateBlock(bid,'content',url); previewBlockVideo(pid, url);
+            showToast('✓ Видео загружено','success');
+          } catch(e){ showToast('Ошибка загрузки: '+e.message,'error'); }
+        });
+      })(b.id, vPrevId, inp);
+      var vPrev=document.createElement('div');
+      vPrev.id=vPrevId;
+      vPrev.style.cssText='margin-top:10px';
       wrap.appendChild(inp);
       wrap.appendChild(hint);
+      wrap.appendChild(fileLabel);
+      wrap.appendChild(vFile);
+      wrap.appendChild(vPrev);
       container.appendChild(wrap);
+      if (b.content) previewBlockVideo(vPrevId, b.content);
       return;
     }
     wrap.appendChild(inp);
@@ -427,6 +464,33 @@ function previewBlockImg(previewId, url){
     img.src=url; img.className='img-preview-small show';
     img.onerror=function(){img.className='img-preview-small';};
   } else { img.className='img-preview-small'; }
+}
+
+// Нормализация ссылки на видео ВК → embed-ссылка (video_ext.php).
+function normalizeVkVideo(raw){
+  if(!raw) return '';
+  var s=String(raw).trim();
+  if(/storage\.yandexcloud\.net/i.test(s) || /\.(mp4|webm|mov)(\?|$)/i.test(s)) return s.replace(/^http:\/\//i,'https://');
+  var iframe=s.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
+  if(iframe) s=iframe[1].trim();
+  if(/^\/\//.test(s)) s='https:'+s;
+  if(/^www\./i.test(s)) s='https://'+s;
+  if(/video_ext\.php/i.test(s)) return s.replace(/^http:\/\//i,'https://');
+  var m=s.match(/video(-?\d+)_(\d+)/i);
+  if(m) return 'https://vk.com/video_ext.php?oid='+m[1]+'&id='+m[2]+'&hd=2';
+  return s;
+}
+
+function previewBlockVideo(previewId, url){
+  var el=document.getElementById(previewId);
+  if(!el) return;
+  if(!url || String(url).indexOf('https://')!==0){ el.innerHTML=''; return; }
+  if(/storage\.yandexcloud\.net/i.test(url) || /\.(mp4|webm|mov)(\?|$)/i.test(url)){
+    el.innerHTML='<video src="'+esc(url)+'" controls preload="metadata" style="width:100%;max-height:300px;border-radius:var(--radius);background:#000;display:block"></video>';
+  } else {
+    el.innerHTML='<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius)">'+
+      '<iframe src="'+esc(url)+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
+  }
 }
 
 renderBlocks(); // показываем пустое состояние

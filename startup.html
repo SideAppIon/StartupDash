@@ -324,6 +324,9 @@ onAuthReady(async function(user, userData) {
         } else if (b.type === 'image' && b.content) {
           return '<img src="' + esc(b.content) + '" style="width:100%;border-radius:var(--radius);margin-bottom:16px;display:block" onerror="this.style.display=&quot;none&quot;"/>';
         } else if (b.type === 'video' && b.content) {
+          if (/storage\.yandexcloud\.net/i.test(b.content) || /\.(mp4|webm|mov)(\?|$)/i.test(b.content)) {
+            return '<video src="' + esc(b.content) + '" controls preload="metadata" style="width:100%;max-height:360px;border-radius:var(--radius);margin-bottom:16px;background:#000;display:block"></video>';
+          }
           return '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-bottom:16px">' +
             '<iframe src="' + esc(b.content) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
         }
@@ -548,12 +551,17 @@ async function loadUpdates() {
         : '';
       // Картинка
       var imgUrl = u.imageUrl || u.image_url || '';
-      // Видео ВК — только безопасные https-ссылки
+      // Видео — только безопасные https-ссылки. Файл → <video>, VK → <iframe>
       var vidUrl = u.videoUrl || u.video_url || '';
-      var videoHtml = (vidUrl && String(vidUrl).indexOf('https://') === 0)
-        ? '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-top:12px">' +
-            '<iframe src="' + esc(vidUrl) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>'
-        : '';
+      var videoHtml = '';
+      if (vidUrl && String(vidUrl).indexOf('https://') === 0) {
+        if (/storage\.yandexcloud\.net/i.test(vidUrl) || /\.(mp4|webm|mov)(\?|$)/i.test(vidUrl)) {
+          videoHtml = '<video src="' + esc(vidUrl) + '" controls preload="metadata" style="width:100%;max-height:360px;border-radius:var(--radius);margin-top:12px;display:block;background:#000"></video>';
+        } else {
+          videoHtml = '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-top:12px">' +
+            '<iframe src="' + esc(vidUrl) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
+        }
+      }
       return '<div class="update-card">' +
         '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">' +
           '<div class="update-card__title">' + esc(u.title||'') + '</div>' +

@@ -76,18 +76,26 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">▶ Видео ВКонтакте <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
+        <label class="form-label">▶ Видео <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
+
+        <!-- Вариант 1: ссылка ВКонтакте -->
         <input type="url" class="form-input" id="videoInput"
           placeholder="https://vk.com/video_ext.php?oid=...&id=...&hd=2"
           oninput="previewVideo()"/>
         <div class="form-hint" style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.6">
-          Нужна <b>ссылка для встраивания</b> (embed-ссылка), а не адрес страницы из адресной строки.<br/>
-          В ВК: открой видео → <b>Поделиться</b> → <b>Экспортировать</b> (Код для вставки) → скопируй ссылку из <code>src="…"</code> (вида <code>https://vk.com/video_ext.php?oid=…&id=…</code>).<br/>
-          Можно вставить и весь код <code>&lt;iframe…&gt;</code> или обычную ссылку на видео — мы попробуем преобразовать сами.
+          Ссылка для встраивания: ВКонтакте → видео → Поделиться → Код для вставки → <code>iframe</code> (скопируй ссылку из <code>src="…"</code>, вида <code>https://vk.com/video_ext.php?oid=…&id=…</code>).<br/>
+          Можно вставить и весь код <code>&lt;iframe…&gt;</code> или обычную ссылку на видео — преобразуем сами.
         </div>
-        <div id="videoPreviewWrap" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-top:10px;display:none">
-          <iframe id="videoPreview" src="" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe>
+
+        <!-- Вариант 2: загрузка файлом -->
+        <div style="margin-top:12px">
+          <label class="form-label" style="font-size:13px">…или загрузи файлом (mp4, webm, mov, до ~3 МБ)</label>
+          <input type="file" accept="video/mp4,video/webm,video/quicktime" id="videoFileInput"
+            class="form-input" style="padding:6px" onchange="uploadUpdateVideo(this)"/>
+          <div id="videoUploadStatus" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
         </div>
+
+        <div id="videoPreviewWrap" style="margin-top:10px;display:none"></div>
       </div>
 
       <div id="formError" class="form-error" style="display:none;margin-bottom:12px"></div>
@@ -140,22 +148,61 @@ function normalizeVkVideo(raw) {
   return s;
 }
 
+// Прямой видеофайл (загруженный к нам) — рендерим <video>, иначе <iframe> (VK)
+function isFileVideo(url) {
+  return /storage\.yandexcloud\.net/i.test(url) || /\.(mp4|webm|mov)(\?|$)/i.test(url);
+}
+
 // HTML встроенного видео — только для безопасных https-ссылок
 function videoEmbed(url) {
   if (!url || String(url).indexOf('https://') !== 0) return '';
+  if (isFileVideo(url)) {
+    return '<video src="' + esc(url) + '" controls preload="metadata" ' +
+      'style="width:100%;max-height:360px;border-radius:var(--radius);margin-top:10px;display:block;background:#000"></video>';
+  }
   return '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-top:10px">' +
     '<iframe src="' + esc(url) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
 }
 
+// Текущее выбранное видео: приоритет у загруженного файла, иначе — ссылка ВК
+function currentVideoUrl() {
+  var file = document.getElementById('videoFileInput').getAttribute('data-url') || '';
+  if (file) return file;
+  return normalizeVkVideo(document.getElementById('videoInput').value);
+}
+
 function previewVideo() {
-  var url  = normalizeVkVideo(document.getElementById('videoInput').value);
+  var url  = currentVideoUrl();
   var wrap = document.getElementById('videoPreviewWrap');
-  var frame = document.getElementById('videoPreview');
   if (url && url.indexOf('https://') === 0) {
-    if (frame.src !== url) frame.src = url;
+    wrap.innerHTML = videoEmbed(url);
     wrap.style.display = 'block';
   } else {
-    frame.src = ''; wrap.style.display = 'none';
+    wrap.innerHTML = ''; wrap.style.display = 'none';
+  }
+}
+
+async function uploadUpdateVideo(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var status = document.getElementById('videoUploadStatus');
+  if (file.size > 3.2 * 1024 * 1024) {
+    status.textContent = 'Видео слишком большое (макс. ~3 МБ). Для больших видео используй ссылку ВКонтакте.';
+    input.value = ''; input.removeAttribute('data-url'); previewVideo(); return;
+  }
+  status.textContent = 'Загружаю видео...';
+  try {
+    var r = new FileReader();
+    var base64 = await new Promise(function(res, rej){ r.onload=function(e){res(e.target.result.split(',')[1]);}; r.onerror=rej; r.readAsDataURL(file); });
+    var result = await api.post('/upload', { data: base64, contentType: file.type, folder: 'updates' });
+    input.setAttribute('data-url', result.url);
+    // При загрузке файла очищаем поле ссылки, чтобы не конфликтовали
+    document.getElementById('videoInput').value = '';
+    status.textContent = '✓ Видео загружено';
+    previewVideo();
+  } catch(e) {
+    status.textContent = 'Ошибка: ' + e.message;
+    input.removeAttribute('data-url');
   }
 }
 
@@ -266,7 +313,7 @@ async function postUpdate() {
   var title = document.getElementById('titleInput').value.trim();
   var body  = document.getElementById('bodyInput').value.trim();
   var image = document.getElementById('imageInput').value.trim();
-  var video = normalizeVkVideo(document.getElementById('videoInput').value);
+  var video = currentVideoUrl();
   var type  = document.getElementById('typeSelect').value;
   var btn   = document.getElementById('submitBtn');
 

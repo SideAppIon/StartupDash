@@ -26,6 +26,11 @@ function normalizeVkVideo(raw) {
   if (!raw) return '';
   let s = String(raw).trim();
 
+  // Прямая ссылка на загруженный видеофайл — оставляем как есть
+  if (/storage\.yandexcloud\.net/i.test(s) || /\.(mp4|webm|mov)(\?|$)/i.test(s)) {
+    return s.replace(/^http:\/\//i, 'https://');
+  }
+
   // 1. Если вставили целиком код вставки <iframe src="...">
   const iframeMatch = s.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
   if (iframeMatch) s = iframeMatch[1].trim();
