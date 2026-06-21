@@ -548,6 +548,12 @@ async function loadUpdates() {
         : '';
       // Картинка
       var imgUrl = u.imageUrl || u.image_url || '';
+      // Видео ВК — только безопасные https-ссылки
+      var vidUrl = u.videoUrl || u.video_url || '';
+      var videoHtml = (vidUrl && String(vidUrl).indexOf('https://') === 0)
+        ? '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-top:12px">' +
+            '<iframe src="' + esc(vidUrl) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>'
+        : '';
       return '<div class="update-card">' +
         '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">' +
           '<div class="update-card__title">' + esc(u.title||'') + '</div>' +
@@ -556,6 +562,7 @@ async function loadUpdates() {
         '<div class="update-card__date">' + dateStr + '</div>' +
         '<div class="update-card__body">' + esc(text) + '</div>' +
         (imgUrl ? '<img src="' + esc(imgUrl) + '" style="width:100%;max-height:300px;object-fit:cover;border-radius:var(--radius);margin-top:12px;display:block" onerror="this.style.display=&quot;none&quot;"/>' : '') +
+        videoHtml +
       '</div>';
     }).join('');
   } catch(e) {

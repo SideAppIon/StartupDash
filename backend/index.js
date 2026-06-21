@@ -17,8 +17,22 @@ const groupsRoutes    = require('./routes/groups');
 const app = express();
 
 // ── CORS ──────────────────────────────────────────────────
+// ALLOWED_ORIGIN может содержать несколько origin через запятую.
+// '*' или пустое значение — разрешить любой origin.
+const allowedOrigins = (process.env.ALLOWED_ORIGIN || '*')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN || '*',
+  origin: (origin, callback) => {
+    // Запросы без origin (curl, серверные) — пропускаем
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));

@@ -68,6 +68,8 @@ CREATE TABLE IF NOT EXISTS startup_updates (
   title      TEXT DEFAULT '',
   content    TEXT NOT NULL DEFAULT '',
   type       TEXT DEFAULT 'text',
+  image_url  TEXT DEFAULT '',
+  video_url  TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

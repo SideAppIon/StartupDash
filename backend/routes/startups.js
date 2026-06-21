@@ -1,10 +1,54 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { queryOne, queryAll } = require('../db');
+const { query, queryOne, queryAll } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { getUserGroupSettings } = require('./groups');
 
 const router = express.Router();
+
+// Ленивая миграция колонок обновлений (автораннера миграций нет).
+let updatesSchemaEnsured = false;
+async function ensureUpdatesSchema() {
+  if (updatesSchemaEnsured) return;
+  try {
+    await query('ALTER TABLE startup_updates ADD COLUMN IF NOT EXISTS image_url TEXT');
+    await query('ALTER TABLE startup_updates ADD COLUMN IF NOT EXISTS video_url TEXT');
+    updatesSchemaEnsured = true;
+  } catch (e) {
+    console.error('ensureUpdatesSchema error:', e.message);
+  }
+}
+
+// Нормализация ссылки на видео ВКонтакте → URL для встраивания (video_ext.php).
+// Принимает: код <iframe src="...">, готовую ссылку video_ext.php,
+// либо обычную ссылку на страницу видео (vk.com/video-123_456, vkvideo.ru/...).
+function normalizeVkVideo(raw) {
+  if (!raw) return '';
+  let s = String(raw).trim();
+
+  // 1. Если вставили целиком код вставки <iframe src="...">
+  const iframeMatch = s.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
+  if (iframeMatch) s = iframeMatch[1].trim();
+
+  // Добавляем протокол, если ссылку скопировали без него
+  if (/^\/\//.test(s)) s = 'https:' + s;
+  if (/^www\./i.test(s)) s = 'https://' + s;
+
+  // 2. Уже готовая ссылка для встраивания
+  if (/video_ext\.php/i.test(s)) {
+    return s.replace(/^http:\/\//i, 'https://');
+  }
+
+  // 3. Обычная ссылка на страницу видео: vk.com/video-123_456, vkvideo.ru/video123_456,
+  //    либо ?z=video-123_456 — извлекаем oid и id
+  const m = s.match(/video(-?\d+)_(\d+)/i);
+  if (m) {
+    return `https://vk.com/video_ext.php?oid=${m[1]}&id=${m[2]}&hd=2`;
+  }
+
+  // Ничего не распознали — вернём как есть (фронтенд покажет только https-ссылки)
+  return s;
+}
 
 // GET /startups — каталог (публично, с фильтрами)
 router.get('/', optionalAuth, async (req, res) => {
@@ -316,6 +360,7 @@ router.get('/:id/updates', async (req, res) => {
 
 router.post('/:id/updates', requireAuth, async (req, res) => {
   try {
+    await ensureUpdatesSchema();
     const startup = await queryOne('SELECT owner_uid FROM startups WHERE id = $1', [req.params.id]);
     if (!startup) return res.status(404).json({ error: 'Стартап не найден' });
 
@@ -331,14 +376,15 @@ router.post('/:id/updates', requireAuth, async (req, res) => {
     const title   = req.body.title   || '';
     const type    = req.body.type    || 'text';
     const imageUrl = req.body.imageUrl || req.body.image_url || '';
+    const videoUrl = normalizeVkVideo(req.body.videoUrl || req.body.video_url || '');
 
     if (!content) return res.status(400).json({ error: 'Напиши содержание обновления' });
 
     const id = uuidv4();
     const update = await queryOne(
-      `INSERT INTO startup_updates (id, startup_id, author_uid, title, content, type, image_url, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *`,
-      [id, req.params.id, req.user.uid, title, content, type, imageUrl]
+      `INSERT INTO startup_updates (id, startup_id, author_uid, title, content, type, image_url, video_url, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *`,
+      [id, req.params.id, req.user.uid, title, content, type, imageUrl, videoUrl]
     );
     res.status(201).json({ update: _parseUpdate(update) });
   } catch (e) {
@@ -534,6 +580,7 @@ function _parseUpdate(u) {
     ...u,
     body:       u.content || u.body || '',   // фронтенд читает .body
     imageUrl:   u.image_url || '',
+    videoUrl:   u.video_url || '',
     authorUid:  u.author_uid,
     authorName: u.author_name,
     createdAt:  u.created_at,

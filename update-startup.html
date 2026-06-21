@@ -75,6 +75,21 @@
         <img id="imgPreview" class="img-preview" alt="Превью"/>
       </div>
 
+      <div class="form-group">
+        <label class="form-label">▶ Видео ВКонтакте <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
+        <input type="url" class="form-input" id="videoInput"
+          placeholder="https://vk.com/video_ext.php?oid=...&id=...&hd=2"
+          oninput="previewVideo()"/>
+        <div class="form-hint" style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.6">
+          Нужна <b>ссылка для встраивания</b> (embed-ссылка), а не адрес страницы из адресной строки.<br/>
+          В ВК: открой видео → <b>Поделиться</b> → <b>Экспортировать</b> (Код для вставки) → скопируй ссылку из <code>src="…"</code> (вида <code>https://vk.com/video_ext.php?oid=…&id=…</code>).<br/>
+          Можно вставить и весь код <code>&lt;iframe…&gt;</code> или обычную ссылку на видео — мы попробуем преобразовать сами.
+        </div>
+        <div id="videoPreviewWrap" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-top:10px;display:none">
+          <iframe id="videoPreview" src="" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe>
+        </div>
+      </div>
+
       <div id="formError" class="form-error" style="display:none;margin-bottom:12px"></div>
 
       <div style="display:flex;gap:12px;justify-content:flex-end">
@@ -108,6 +123,40 @@ function previewImage(url) {
     img.src = url; img.className = 'img-preview show';
     img.onerror = function(){ img.className = 'img-preview'; };
   } else { img.className = 'img-preview'; }
+}
+
+// Нормализация ссылки на видео ВК → ссылка для встраивания (video_ext.php).
+// Принимает код <iframe src="...">, готовую embed-ссылку или обычную ссылку на видео.
+function normalizeVkVideo(raw) {
+  if (!raw) return '';
+  var s = String(raw).trim();
+  var iframe = s.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
+  if (iframe) s = iframe[1].trim();
+  if (/^\/\//.test(s)) s = 'https:' + s;
+  if (/^www\./i.test(s)) s = 'https://' + s;
+  if (/video_ext\.php/i.test(s)) return s.replace(/^http:\/\//i, 'https://');
+  var m = s.match(/video(-?\d+)_(\d+)/i);
+  if (m) return 'https://vk.com/video_ext.php?oid=' + m[1] + '&id=' + m[2] + '&hd=2';
+  return s;
+}
+
+// HTML встроенного видео — только для безопасных https-ссылок
+function videoEmbed(url) {
+  if (!url || String(url).indexOf('https://') !== 0) return '';
+  return '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-top:10px">' +
+    '<iframe src="' + esc(url) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
+}
+
+function previewVideo() {
+  var url  = normalizeVkVideo(document.getElementById('videoInput').value);
+  var wrap = document.getElementById('videoPreviewWrap');
+  var frame = document.getElementById('videoPreview');
+  if (url && url.indexOf('https://') === 0) {
+    if (frame.src !== url) frame.src = url;
+    wrap.style.display = 'block';
+  } else {
+    frame.src = ''; wrap.style.display = 'none';
+  }
 }
 
 async function uploadUpdatePhoto(input) {
@@ -205,6 +254,7 @@ async function loadPrevUpdates() {
         (u.imageUrl || u.image_url
           ? '<img src="' + esc(u.imageUrl || u.image_url) + '" class="update-card__img" onerror="this.style.display=\'none\'"/>'
           : '') +
+        videoEmbed(u.videoUrl || u.video_url) +
       '</div>';
     }).join('');
   } catch(e) {
@@ -216,6 +266,7 @@ async function postUpdate() {
   var title = document.getElementById('titleInput').value.trim();
   var body  = document.getElementById('bodyInput').value.trim();
   var image = document.getElementById('imageInput').value.trim();
+  var video = normalizeVkVideo(document.getElementById('videoInput').value);
   var type  = document.getElementById('typeSelect').value;
   var btn   = document.getElementById('submitBtn');
 
@@ -235,6 +286,7 @@ async function postUpdate() {
       authorName: currentUserData ? currentUserData.name : '',
     };
     if (image && image.startsWith('http')) payload.imageUrl = image;
+    if (video && video.indexOf('https://') === 0) payload.videoUrl = video;
 
     await api.post('/startups/' + startupId + '/updates', payload);
 
