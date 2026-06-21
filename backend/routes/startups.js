@@ -397,6 +397,23 @@ router.post('/:id/updates', requireAuth, async (req, res) => {
   }
 });
 
+// Удалить обновление (владелец стартапа или админ)
+router.delete('/:id/updates/:updateId', requireAuth, async (req, res) => {
+  try {
+    await assertOwnerOrAdmin(req.params.id, req.user);
+    const existing = await queryOne(
+      'SELECT id FROM startup_updates WHERE id=$1 AND startup_id=$2',
+      [req.params.updateId, req.params.id]
+    );
+    if (!existing) return res.status(404).json({ error: 'Обновление не найдено' });
+    await queryOne('DELETE FROM startup_updates WHERE id=$1', [req.params.updateId]);
+    res.json({ ok: true });
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ error: e.message });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // ── Задачи (Roadmap/Kanban) ───────────────────────────────
 router.get('/:id/tasks', async (req, res) => {
   try {

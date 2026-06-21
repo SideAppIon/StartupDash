@@ -526,6 +526,9 @@ async function loadOwner() {
 // ── UPDATES ───────────────────────────────────────────
 async function loadUpdates() {
   var el = document.getElementById('updatesList');
+  // Владелец стартапа или администратор может удалять обновления
+  var canDelete = pageUser && startupData &&
+    (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'));
   try {
     var snap = await db.collection('startups').doc(startupId)
       .collection('updates').orderBy('createdAt','desc').get();
@@ -562,10 +565,13 @@ async function loadUpdates() {
             '<iframe src="' + esc(vidUrl) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
         }
       }
+      var delBtn = canDelete
+        ? '<button class="btn btn--danger btn--sm" style="flex-shrink:0" data-uid="' + esc(d.id) + '" onclick="deleteUpdate(this)">Удалить</button>'
+        : '';
       return '<div class="update-card">' +
         '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">' +
           '<div class="update-card__title">' + esc(u.title||'') + '</div>' +
-          typeBadge +
+          '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">' + typeBadge + delBtn + '</div>' +
         '</div>' +
         '<div class="update-card__date">' + dateStr + '</div>' +
         '<div class="update-card__body">' + esc(text) + '</div>' +
@@ -1128,6 +1134,16 @@ async function deleteVacancy(btn) {
     await db.collection('startups').doc(startupId).collection('vacancies').doc(vid).delete();
     showToast('Вакансия удалена', 'success');
     await loadVacancies(true, false);
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
+}
+
+async function deleteUpdate(btn) {
+  if (!confirm('Удалить это обновление?')) return;
+  var uid = btn.getAttribute('data-uid');
+  try {
+    await db.collection('startups').doc(startupId).collection('updates').doc(uid).delete();
+    showToast('Обновление удалено', 'success');
+    await loadUpdates();
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }
 
