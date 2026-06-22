@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Мои стартаперы — LaunchPad</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .s-row{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px;margin-bottom:16px;transition:border-color .2s}
+    .s-row:hover{border-color:var(--border2)}
+    .s-row__top{display:flex;gap:16px;align-items:flex-start}
+    .s-logo{width:60px;height:60px;border-radius:14px;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;overflow:hidden}
+    .s-logo img{width:100%;height:100%;object-fit:cover}
+    .s-name{font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:4px}
+    .s-tagline{font-size:13px;color:var(--text2)}
+    .s-rel{font-size:12px;color:var(--accent);font-weight:500;margin-top:6px}
+    /* Team member row */
+    .team-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);text-decoration:none;color:inherit}
+    .team-row:last-child{border-bottom:none}
+    .team-row:hover .team-row__name{color:var(--accent)}
+    .team-row__av{width:38px;height:38px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);object-fit:cover;flex-shrink:0}
+    .team-row__name{font-size:14px;font-weight:600;transition:color .15s}
+    .team-row__role{font-size:12px;color:var(--text3)}
+    .team-head{font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 4px}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="dashboard.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="startups.html">Стартапы</a>
+  <a href="feed.html">Лента</a>
+  <a href="forum.html">Форум</a>
+  <a href="members.html">Участники</a>
+  <div class="nav__user">
+    <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
+    <span class="nav__role" id="navRole"></span>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="goProfile()"/>
+    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="container--md">
+    <div class="section-header" style="margin-bottom:28px">
+      <div>
+        <h1 class="page-title">Мои стартаперы</h1>
+        <p class="page-subtitle">Стартапы, в которых ты участвуешь, и их команды</p>
+      </div>
+    </div>
+    <div id="content"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="api-config.js"></script>
+<script>
+requireAuth('login.html');
+
+onAuthReady(async function(user, userData) {
+  if (!user) return;
+  renderNav(userData);
+
+  var el = document.getElementById('content');
+  try {
+    var startups = await loadMyStartups(user.uid);
+
+    if (!startups.length) {
+      el.innerHTML = '<div class="empty-state">' +
+        '<div class="empty-state__icon">🧑‍🚀</div>' +
+        '<div class="empty-state__title">Пока нет стартапов</div>' +
+        '<p style="font-size:14px;margin-bottom:24px">Здесь появятся стартапы, в команде которых ты участвуешь — вместе с их основателями и участниками</p>' +
+        '<a href="startups.html" class="btn btn--primary btn--lg">Найти стартап</a>' +
+        '</div>';
+      return;
+    }
+
+    // Сортируем: новые сверху
+    startups.sort(function(a, b) {
+      return ((b.createdAt && b.createdAt.seconds) || 0) - ((a.createdAt && a.createdAt.seconds) || 0);
+    });
+
+    var html = '';
+    for (var i = 0; i < startups.length; i++) {
+      html += await buildFounderCard(startups[i], user.uid);
+    }
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div>' +
+      '<div class="empty-state__title">Ошибка загрузки</div><p>' + esc(e.message) + '</p>' +
+      '<button class="btn btn--outline" style="margin-top:16px" onclick="location.reload()">Повторить</button></div>';
+  }
+});
+
+// Стартапы, где участвует пользователь (владелец + принятые заявки)
+async function loadMyStartups(uid) {
+  var map = {}; // startupId -> startup
+
+  // 1. Стартапы, которыми владею
+  var ownSnap = await db.collection('startups').where('ownerUid', '==', uid).get();
+  ownSnap.docs.forEach(function(d) {
+    map[d.id] = Object.assign({ id: d.id, _relation: 'Владелец' }, d.data());
+  });
+
+  // 2. Стартапы, где участвую (принятые приглашения — мои заявки и приглашения мне)
+  var invDocs = [];
+  try {
+    var inv1 = await db.collection('invites')
+      .where('fromUid', '==', uid).where('status', '==', 'accepted').get();
+    invDocs = invDocs.concat(inv1.docs);
+  } catch (e) {}
+  try {
+    var inv2 = await db.collection('invites')
+      .where('toUid', '==', uid).where('status', '==', 'accepted').get();
+    invDocs = invDocs.concat(inv2.docs);
+  } catch (e) {}
+
+  for (var i = 0; i < invDocs.length; i++) {
+    var inv = invDocs[i].data();
+    if (!inv.startupId || map[inv.startupId]) continue;
+    try {
+      var sSnap = await db.collection('startups').doc(inv.startupId).get();
+      if (!sSnap.exists) continue;
+      var myRole = 'Участник';
+      if (inv.applications && inv.applications.length && inv.applications[0].role) myRole = inv.applications[0].role;
+      else if (inv.role && inv.role !== 'Специалист') myRole = inv.role;
+      map[inv.startupId] = Object.assign({ id: sSnap.id, _relation: myRole }, sSnap.data());
+    } catch (e) {}
+  }
+
+  return Object.keys(map).map(function(k) { return map[k]; });
+}
+
+// Участники конкретного стартапа: владелец + команда + принятые заявки
+async function loadParticipants(startup) {
+  var members = [];
+  var seen = {};
+
+  // Владелец
+  if (startup.ownerUid) {
+    seen[startup.ownerUid] = true;
+    try {
+      var oSnap = await db.collection('users').doc(startup.ownerUid).get();
+      if (oSnap.exists) {
+        members.push(Object.assign({ uid: startup.ownerUid, _role: 'Основатель', _isOwner: true }, oSnap.data()));
+      } else {
+        members.push({ uid: startup.ownerUid, name: startup.ownerName || 'Основатель', _role: 'Основатель', _isOwner: true });
+      }
+    } catch (e) {
+      members.push({ uid: startup.ownerUid, name: startup.ownerName || 'Основатель', _role: 'Основатель', _isOwner: true });
+    }
+  }
+
+  // Команда (subcollection team)
+  try {
+    var tSnap = await db.collection('startups').doc(startup.id).collection('team').get();
+    for (var i = 0; i < tSnap.docs.length; i++) {
+      var t = tSnap.docs[i].data();
+      var tUid = t.userUid || t.user_uid || t.uid || '';
+      if (!tUid || seen[tUid]) continue;
+      seen[tUid] = true;
+      try {
+        var uSnap = await db.collection('users').doc(tUid).get();
+        if (uSnap.exists) members.push(Object.assign({ uid: tUid, _role: t.role || 'Участник' }, uSnap.data()));
+      } catch (e) {}
+    }
+  } catch (e) {}
+
+  // Принятые заявки (исторические данные без team)
+  try {
+    var aSnap = await db.collection('invites')
+      .where('startupId', '==', startup.id).where('status', '==', 'accepted').get();
+    for (var j = 0; j < aSnap.docs.length; j++) {
+      var inv = aSnap.docs[j].data();
+      var mUid = (inv.type === 'from_startup' && inv.toUid) ? inv.toUid : inv.fromUid;
+      if (!mUid || seen[mUid]) continue;
+      seen[mUid] = true;
+      var r = 'Участник';
+      if (inv.applications && inv.applications.length && inv.applications[0].role) r = inv.applications[0].role;
+      else if (inv.role) r = inv.role;
+      try {
+        var iSnap = await db.collection('users').doc(mUid).get();
+        if (iSnap.exists) members.push(Object.assign({ uid: mUid, _role: r }, iSnap.data()));
+      } catch (e) {}
+    }
+  } catch (e) {}
+
+  return members;
+}
+
+async function buildFounderCard(s, uid) {
+  var logo = s.iconImage
+    ? '<img src="' + esc(s.iconImage) + '" onerror="this.style.display=&quot;none&quot;"/>'
+    : esc(s.emoji || '🚀');
+
+  var members = await loadParticipants(s);
+
+  var membersHtml = members.map(function(m) {
+    var av = m.avatar ||
+      'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(m.name || 'U');
+    var isMe = m.uid === uid;
+    var nameLabel = esc(m.name || 'Без имени') + (isMe ? ' <span style="color:var(--text3);font-weight:400">(вы)</span>' : '');
+    return '<a class="team-row" href="member.html?uid=' + esc(m.uid || '') + '">' +
+      '<img class="team-row__av" src="' + esc(av) + '"/>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="team-row__name">' + nameLabel + '</div>' +
+        '<div class="team-row__role">' + esc(m._role || 'Участник') + '</div>' +
+      '</div>' +
+    '</a>';
+  }).join('');
+
+  return '<div class="s-row">' +
+    '<div class="s-row__top">' +
+      '<div class="s-logo">' + logo + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="s-name">' + esc(s.name || '') + '</div>' +
+        '<div class="s-tagline">' + esc(s.tagline || '') + '</div>' +
+        '<div class="s-rel">' + esc(s._relation || 'Участник') + '</div>' +
+      '</div>' +
+      '<a href="startup.html?id=' + esc(s.id) + '" class="btn btn--primary btn--sm" style="flex-shrink:0">Открыть стартап →</a>' +
+    '</div>' +
+    '<div class="team-head">Стартаперы · ' + members.length + '</div>' +
+    membersHtml +
+  '</div>';
+}
+</script>
+</body>
+</html>
