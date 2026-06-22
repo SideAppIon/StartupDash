@@ -107,6 +107,7 @@
           document.getElementById('navUser').innerHTML = `
         <span class="nav__role nav__role--${userData.role}">${ROLE_LABELS[userData.role]}</span>
         <img class="nav__avatar" src="${userData.avatar||`https://ui-avatars.com/api/?background=181c24&color=00e676&name=${encodeURIComponent(userData.name)}`}" onclick="window.location='profile.html'"/>
+        <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
         <a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>
       `;
       document.querySelector('.nav__logo').href = 'dashboard.html';
