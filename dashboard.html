@@ -27,10 +27,16 @@
     .s-card__logo{width:48px;height:48px;border-radius:12px;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
     .s-card__name{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:3px}
     .s-card__tagline{font-size:13px;color:var(--text2)}
-    .inv-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+    .inv-card{background:var(--bg2);border:2px solid var(--border2);border-radius:var(--radius-lg);padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;transition:border-color .2s,box-shadow .2s}
+    .inv-card--expert{border-color:var(--expert);box-shadow:inset 4px 0 0 var(--expert)}
+    .inv-card--user{border-color:var(--info);box-shadow:inset 4px 0 0 var(--info)}
+    .inv-card--startup{border-color:var(--accent);box-shadow:inset 4px 0 0 var(--accent)}
+    .inv-card__link{flex:1;min-width:0;display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;cursor:pointer;border-radius:8px}
+    .inv-card__link:hover .inv-card__name{color:var(--accent)}
     .inv-card__info{flex:1;min-width:0}
-    .inv-card__name{font-size:14px;font-weight:500}
+    .inv-card__name{font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap;transition:color .15s}
     .inv-card__sub{font-size:12px;color:var(--text2)}
+    .inv-card__actions{display:flex;gap:6px;flex-shrink:0}
   </style>
 </head>
 <body>
@@ -134,6 +140,17 @@ async function renderStartup(el, uid) {
   var invSnap = await db.collection('invites').where('startupOwner','==',uid).get();
   var invites = invSnap.docs.filter(function(d){ return d.data().status==='pending' && d.data().type !== 'from_startup'; }).map(function(d){ return Object.assign({id:d.id},d.data()); });
 
+  // Подтягиваем глобальную роль заявителя (эксперт / специалист / стартапер)
+  for (var iv = 0; iv < invites.length; iv++) {
+    invites[iv]._fromRole = 'user';
+    try {
+      if (invites[iv].fromUid) {
+        var uDoc = await db.collection('users').doc(invites[iv].fromUid).get();
+        if (uDoc.exists) invites[iv]._fromRole = uDoc.data().role || 'user';
+      }
+    } catch(e) {}
+  }
+
   el.innerHTML =
     '<div class="stat-row">' +
       '<div class="stat-box"><div class="stat-box__num">'+startups.length+'</div><div class="stat-box__lbl">Мои стартапы</div></div>' +
@@ -160,9 +177,12 @@ async function renderStartup(el, uid) {
     (invites.length ?
       '<hr class="divider"><div class="section-header" style="margin-bottom:16px"><div class="section-title">Заявки в команду</div></div>' +
       invites.map(function(inv){
-        return '<div class="inv-card">' +
+        var role = inv._fromRole || 'user';
+        var roleBadge = '<span class="nav__role nav__role--'+role+'">'+(ROLE_LABELS[role]||role)+'</span>';
+        return '<div class="inv-card inv-card--'+role+'">' +
+          '<a class="inv-card__link" href="member.html?uid='+esc(inv.fromUid||'')+'" title="Открыть профиль">' +
           '<img src="'+(inv.fromAvatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U')+'" class="avatar avatar--sm"/>' +
-          '<div class="inv-card__info"><div class="inv-card__name">'+esc(inv.fromName||'')+'</div><div class="inv-card__sub">→ '+esc(inv.startupName||'')+'</div>' +
+          '<div class="inv-card__info"><div class="inv-card__name">'+esc(inv.fromName||'')+roleBadge+'</div><div class="inv-card__sub">→ '+esc(inv.startupName||'')+'</div>' +
           (inv.applications && inv.applications.length
             ? inv.applications.map(function(app){
                 var tl={specialist:'👤 Специалист',company:'🏢 Компания',freelance:'💻 Фрилансер',partner:'🤝 Партнёр'};
@@ -172,7 +192,8 @@ async function renderStartup(el, uid) {
               }).join('')
             : (inv.message?'<div style="font-size:12px;color:var(--text3);margin-top:2px">'+esc(inv.message)+'</div>':'')
           )+'</div>' +
-          '<div style="display:flex;gap:6px">' +
+          '</a>' +
+          '<div class="inv-card__actions">' +
             '<button class="btn btn--primary btn--sm" data-iid="'+inv.id+'" data-st="accepted" onclick="answer(this)">✓</button>' +
             '<button class="btn btn--outline btn--sm" data-iid="'+inv.id+'" data-st="rejected" onclick="answer(this)">✕</button>' +
           '</div></div>';
