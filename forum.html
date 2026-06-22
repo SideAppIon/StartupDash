@@ -169,6 +169,23 @@
   </div>
 </div>
 
+<!-- Report modal -->
+<div class="modal-overlay" id="reportModal">
+  <div class="modal">
+    <div class="modal__header">
+      <div class="modal__title">⚠️ Пожаловаться</div>
+      <button class="modal__close" onclick="closeReport()">×</button>
+    </div>
+    <p id="reportTarget" style="color:var(--text2);font-size:14px;margin-bottom:14px"></p>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Опишите причину жалобы *</label>
+      <textarea class="form-textarea" id="reportText" style="min-height:110px" placeholder="Что не так? Опишите нарушение..."></textarea>
+      <div id="reportErr" class="form-error" style="display:none;margin-top:8px"></div>
+    </div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="submitReport()">Отправить жалобу</button>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 <script src="api-config.js"></script>
 <script>
@@ -426,6 +443,13 @@ function renderPosts(posts) {
         'data-uid="'+esc(p.authorUid)+'" data-name="'+esc((p.authorName||'').replace(/"/g,''))+'" data-banned="'+(authorBanned?'1':'0')+'" '+
         'onclick="toggleBan(this)">'+(authorBanned?'✓ Разрешить общение':'🚫 Запретить общение')+'</button>'
       : '';
+    // Пожаловаться — для обычных пользователей (не на себя, не модераторам)
+    var canReport = pageUser && p.authorUid && p.authorUid !== pageUser.uid && !mod;
+    var reportBtn = canReport
+      ? '<button class="btn btn--ghost btn--sm" style="font-size:12px;color:var(--text3)" '+
+        'data-uid="'+esc(p.authorUid)+'" data-name="'+esc((p.authorName||'').replace(/"/g,''))+'" data-pid="'+esc(p.id||'')+'" '+
+        'onclick="openReport(this)">⚠️ Пожаловаться</button>'
+      : '';
     return '<div class="post-card'+(isOp?' op':'')+'">'+
       '<div class="post-card__header">'+
         '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
@@ -443,6 +467,7 @@ function renderPosts(posts) {
         '<span class="post-num">#'+(i+1)+'</span>'+
         (canDel && !isOp ? '<button class="btn btn--ghost btn--sm" data-pid="'+p.id+'" onclick="deletePost(this)">Удалить</button>' : '')+
         banBtn+
+        reportBtn+
         '<button class="btn btn--ghost btn--sm" data-author="'+esc((p.authorName||'').replace(/"/g,''))+'" onclick="quoteByEl(this)" style="font-size:12px">💬 Цитата</button>'+
       '</div>'+
     '</div>';
@@ -588,6 +613,43 @@ async function toggleBan(btn) {
     showToast(next ? 'Общение запрещено' : 'Общение разрешено', 'success');
     await loadTopic(currentTopicId);
   } catch(e) { showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
+}
+
+// ── ЖАЛОБА ────────────────────────────────────────────
+var reportCtx = null;
+function openReport(btn) {
+  reportCtx = {
+    uid:  btn.getAttribute('data-uid'),
+    name: btn.getAttribute('data-name') || 'пользователя',
+    pid:  btn.getAttribute('data-pid') || null
+  };
+  document.getElementById('reportTarget').innerHTML = 'Жалоба на пользователя <strong>'+esc(reportCtx.name)+'</strong>';
+  document.getElementById('reportText').value = '';
+  document.getElementById('reportErr').style.display = 'none';
+  document.getElementById('reportModal').classList.add('open');
+}
+function closeReport() { document.getElementById('reportModal').classList.remove('open'); }
+async function submitReport() {
+  if (!reportCtx) return;
+  var ta  = document.getElementById('reportText');
+  var err = document.getElementById('reportErr');
+  var text = ta ? ta.value.trim() : '';
+  if (!text) { err.textContent = 'Опишите причину жалобы'; err.style.display = 'block'; return; }
+  err.style.display = 'none';
+  try {
+    await api.post('/complaints', {
+      targetUid: reportCtx.uid,
+      text: text,
+      context: 'forum',
+      topicId: currentTopicId,
+      postId: reportCtx.pid
+    });
+    closeReport();
+    showToast('Жалоба отправлена модераторам','success');
+  } catch(e) {
+    err.textContent = 'Ошибка: '+(e.message||'не удалось отправить');
+    err.style.display = 'block';
+  }
 }
 
 // ── STATS ─────────────────────────────────────────────

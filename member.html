@@ -114,6 +114,23 @@
   </div>
 </div>
 
+<!-- Report modal -->
+<div class="modal-overlay" id="reportModal">
+  <div class="modal">
+    <div class="modal__header">
+      <div class="modal__title">⚠️ Пожаловаться</div>
+      <button class="modal__close" onclick="document.getElementById('reportModal').classList.remove('open')">×</button>
+    </div>
+    <p id="reportTarget" style="color:var(--text2);font-size:14px;margin-bottom:14px"></p>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Опишите причину жалобы *</label>
+      <textarea class="form-textarea" id="reportText" style="min-height:110px" placeholder="Что не так? Опишите нарушение..."></textarea>
+      <div id="reportErr" class="form-error" style="display:none;margin-top:8px"></div>
+    </div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="submitReport()">Отправить жалобу</button>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script src="api-config.js"></script>
@@ -232,6 +249,11 @@ function renderActions(user, userData, inviteStatus) {
   var btns = '';
   // Написать сообщение
   btns += '<button class="btn btn--outline btn--sm" onclick="window.location.href=\'messages.html?to=' + profileUid + '\'">💬 Написать</button>';
+  // Пожаловаться — для обычных пользователей (не модераторам/админам)
+  var viewerIsMod = userData && (userData.role === 'admin' || userData.role === 'moderator');
+  if (!viewerIsMod) {
+    btns += '<button class="btn btn--ghost btn--sm" style="color:var(--text3)" onclick="openReport()">⚠️ Пожаловаться</button>';
+  }
   // Пригласить в команду — только стартаперы
   if (userData && userData.role === 'startup') {
     if (inviteStatus === 'accepted') {
@@ -414,6 +436,31 @@ async function sendInviteFromStartup() {
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── ЖАЛОБА ────────────────────────────────────────────
+function openReport() {
+  if (!pageViewer) { window.location.href = 'login.html'; return; }
+  var name = (document.getElementById('memberName').textContent || 'пользователя').trim();
+  document.getElementById('reportTarget').innerHTML = 'Жалоба на пользователя <strong>'+esc(name)+'</strong>';
+  document.getElementById('reportText').value = '';
+  document.getElementById('reportErr').style.display = 'none';
+  document.getElementById('reportModal').classList.add('open');
+}
+async function submitReport() {
+  var ta  = document.getElementById('reportText');
+  var err = document.getElementById('reportErr');
+  var text = ta ? ta.value.trim() : '';
+  if (!text) { err.textContent = 'Опишите причину жалобы'; err.style.display = 'block'; return; }
+  err.style.display = 'none';
+  try {
+    await api.post('/complaints', { targetUid: profileUid, text: text, context: 'profile' });
+    document.getElementById('reportModal').classList.remove('open');
+    showToast('Жалоба отправлена модераторам','success');
+  } catch(e) {
+    err.textContent = 'Ошибка: '+(e.message||'не удалось отправить');
+    err.style.display = 'block';
+  }
 }
 </script>
 </body>

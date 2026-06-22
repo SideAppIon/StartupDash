@@ -189,6 +189,24 @@ CREATE TABLE IF NOT EXISTS messages (
 
 CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conv_id, created_at);
 
+-- ── Жалобы (модерация) ───────────────────────────────────
+CREATE TABLE IF NOT EXISTS complaints (
+  id           TEXT PRIMARY KEY,
+  reporter_uid TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  target_uid   TEXT REFERENCES users(uid) ON DELETE CASCADE,  -- на кого жалоба
+  context      TEXT DEFAULT '',          -- 'forum' | 'profile' | ...
+  topic_id     TEXT,                      -- если жалоба с форума
+  post_id      TEXT,                      -- конкретное сообщение (опц.)
+  text         TEXT NOT NULL DEFAULT '',  -- текст жалобы
+  status       TEXT NOT NULL DEFAULT 'open'
+                 CHECK (status IN ('open','resolved','dismissed')),
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  resolved_at  TIMESTAMPTZ,
+  resolved_by  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
+CREATE INDEX IF NOT EXISTS idx_complaints_target ON complaints(target_uid);
+
 -- ── Настройки платформы ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS platform_config (
   key        TEXT PRIMARY KEY,

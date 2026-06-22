@@ -13,6 +13,7 @@ const configRoutes   = require('./routes/config');
 const uploadRoutes    = require('./routes/upload');
 const teamChatRoutes  = require('./routes/team-chat');
 const groupsRoutes    = require('./routes/groups');
+const complaintsRoutes = require('./routes/complaints');
 
 const app = express();
 
@@ -83,6 +84,7 @@ app.use('/platform-config', configRoutes);
 app.use('/upload',          uploadRoutes);
 app.use('/team-chat',       teamChatRoutes);
 app.use('/groups',          groupsRoutes);
+app.use('/complaints',      complaintsRoutes);
 
 // ── 404 ───────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ error: `Маршрут ${req.method} ${req.path} не найден` }));
