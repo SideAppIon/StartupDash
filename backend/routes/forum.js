@@ -5,6 +5,15 @@ const { requireAuth, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Модератор или администратор
+const isModerator = (user) => user && (user.role === 'admin' || user.role === 'moderator');
+
+// Проверка запрета общения на форуме
+async function isForumBanned(uid) {
+  const row = await queryOne('SELECT forum_banned FROM users WHERE uid=$1', [uid]);
+  return !!(row && row.forum_banned);
+}
+
 // GET /forum — список тем
 router.get('/', optionalAuth, async (req, res) => {
   try {
@@ -37,6 +46,10 @@ router.post('/', requireAuth, async (req, res) => {
     const { title, content } = req.body;
     if (!title || !content) return res.status(400).json({ error: 'title и content обязательны' });
 
+    if (await isForumBanned(req.user.uid)) {
+      return res.status(403).json({ error: 'Вам запрещено общение на форуме. Доступен только просмотр.' });
+    }
+
     const id = uuidv4();
     const topic = await queryOne(
       `INSERT INTO forum_topics (id, author_uid, title, content, reply_count, views, created_at, last_at)
@@ -53,7 +66,8 @@ router.post('/', requireAuth, async (req, res) => {
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const topic = await queryOne(
-      `SELECT t.*, u.name AS author_name, u.avatar AS author_avatar
+      `SELECT t.*, u.name AS author_name, u.avatar AS author_avatar,
+              u.role AS author_role, u.forum_banned AS author_forum_banned
        FROM forum_topics t
        JOIN users u ON u.uid = t.author_uid
        WHERE t.id = $1`,
@@ -74,18 +88,21 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const topic = await queryOne('SELECT * FROM forum_topics WHERE id=$1', [req.params.id]);
     if (!topic) return res.status(404).json({ error: 'Тема не найдена' });
 
-    const isAdmin = req.user.role === 'admin';
+    const isMod = isModerator(req.user);   // admin или moderator
     const isAuthor = topic.author_uid === req.user.uid;
     const serviceFields = ['reply_count', 'last_at', 'last_author', 'views'];
     const keys = Object.keys(req.body);
     const onlyServiceFields = keys.every(k => serviceFields.includes(k));
 
-    if (!isAuthor && !isAdmin && !onlyServiceFields) {
+    if (!isAuthor && !isMod && !onlyServiceFields) {
       return res.status(403).json({ error: 'Нет доступа' });
     }
 
-    const allowed = isAdmin || isAuthor
+    // Модератор/админ модерирует (закреп/скрытие), автор редактирует свою тему
+    const allowed = isMod
       ? ['title', 'content', 'hidden', 'pinned', ...serviceFields]
+      : isAuthor
+      ? ['title', 'content', ...serviceFields]
       : serviceFields;
 
     const updates = []; const values = [];
@@ -103,10 +120,10 @@ router.patch('/:id', requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /forum/:id — только администратор
+// DELETE /forum/:id — администратор или модератор
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
+    if (!isModerator(req.user)) return res.status(403).json({ error: 'Только модератор или администратор' });
     await queryOne('DELETE FROM forum_posts WHERE topic_id=$1', [req.params.id]);
     await queryOne('DELETE FROM forum_topics WHERE id=$1', [req.params.id]);
     res.json({ ok: true });
@@ -119,7 +136,8 @@ router.delete('/:id', requireAuth, async (req, res) => {
 router.get('/:id/posts', optionalAuth, async (req, res) => {
   try {
     const posts = await queryAll(
-      `SELECT p.*, u.name AS author_name, u.avatar AS author_avatar, u.role AS author_role
+      `SELECT p.*, u.name AS author_name, u.avatar AS author_avatar, u.role AS author_role,
+              u.forum_banned AS author_forum_banned
        FROM forum_posts p
        JOIN users u ON u.uid = p.author_uid
        WHERE p.topic_id=$1
@@ -141,6 +159,10 @@ router.post('/:id/posts', requireAuth, async (req, res) => {
   try {
     const { content } = req.body;
     if (!content) return res.status(400).json({ error: 'content обязателен' });
+
+    if (await isForumBanned(req.user.uid)) {
+      return res.status(403).json({ error: 'Вам запрещено общение на форуме. Доступен только просмотр.' });
+    }
 
     const id = uuidv4();
     const post = await queryOne(
@@ -168,7 +190,7 @@ router.delete('/:id/posts/:postId', requireAuth, async (req, res) => {
     const post = await queryOne('SELECT author_uid FROM forum_posts WHERE id=$1', [req.params.postId]);
     if (!post) return res.status(404).json({ error: 'Пост не найден' });
 
-    const canDelete = post.author_uid === req.user.uid || req.user.role === 'admin';
+    const canDelete = post.author_uid === req.user.uid || isModerator(req.user);
     if (!canDelete) return res.status(403).json({ error: 'Нет доступа' });
 
     await queryOne('DELETE FROM forum_posts WHERE id=$1', [req.params.postId]);

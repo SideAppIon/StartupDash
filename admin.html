@@ -190,6 +190,7 @@
         <option value="user">Специалист</option>
         <option value="startup">Стартапер</option>
         <option value="expert">Эксперт</option>
+        <option value="moderator">Модератор (скрытая роль)</option>
         <option value="admin">Администратор</option>
       </select>
     </div>
@@ -310,6 +311,7 @@
         <option value="user">Специалист</option>
         <option value="startup">Стартапер</option>
         <option value="expert">Эксперт</option>
+        <option value="moderator">Модератор (скрытая роль)</option>
         <option value="admin">Администратор</option>
       </select>
     </div>
@@ -323,7 +325,7 @@
 <script>
 requireAuth('login.html');
 
-var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',user:'badge--blue',admin:'badge--red'};
+var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',user:'badge--blue',admin:'badge--red',moderator:'badge--orange'};
 var DEFAULT_CATS   = ['FinTech','EdTech','HealthTech','E-commerce','SaaS','AI / ML','Gaming','GreenTech','Marketplace','Другое'];
 var DEFAULT_STAGES = [
   {name:'Идея',icon:'💡'},{name:'MVP',icon:'⚡'},{name:'Бета',icon:'🔬'},

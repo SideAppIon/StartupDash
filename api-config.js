@@ -466,10 +466,11 @@ const db = {
 // UI ХЕЛПЕРЫ (те же что были в firebase-config.js)
 // ─────────────────────────────────────────────────────────
 var ROLE_LABELS = {
-  startup: 'Стартапер',
-  expert:  'Эксперт',
-  user:    'Специалист',
-  admin:   'Администратор',
+  startup:   'Стартапер',
+  expert:    'Эксперт',
+  user:      'Специалист',
+  admin:     'Администратор',
+  moderator: 'Модератор',
 };
 
 function renderNav(userData) {

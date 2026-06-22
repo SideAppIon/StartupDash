@@ -47,8 +47,8 @@
     <div class="filters-bar">
       <input type="text" class="search-inp" id="searchInput" placeholder="🔍 Поиск по имени или навыкам..." oninput="applyFilter()"/>
       <select class="role-filt" id="roleFilter" onchange="applyFilter()">
-        <option value="user" selected>Специалисты</option>
-        <option value="">Все роли</option>
+        <option value="" selected>Все люди</option>
+        <option value="user">Специалисты</option>
         <option value="startup">Стартаперы</option>
         <option value="expert">Эксперты</option>
       </select>
@@ -62,7 +62,7 @@
 
 <script src="api-config.js"></script>
 <script>
-  var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',user:'badge--blue',admin:'badge--red'};
+  var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',user:'badge--blue',admin:'badge--red',moderator:'badge--orange'};
   let allMembers = [];
 
   onAuthReady(async (user, userData) => {
@@ -77,8 +77,9 @@
     }
 
     const snap = await db.collection('users').get();
+    // Админов и модераторов (скрытая роль) не показываем в общем списке
     allMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(u => u.role !== 'admin');
+      .filter(u => u.role !== 'admin' && u.role !== 'moderator');
     applyFilter();
   });
 

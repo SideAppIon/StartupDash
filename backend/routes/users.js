@@ -2,17 +2,21 @@ const express = require('express');
 const bcrypt  = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { queryOne, queryAll } = require('../db');
-const { requireAuth, signToken } = require('../middleware/auth');
+const { requireAuth, optionalAuth, signToken } = require('../middleware/auth');
 
 const router = express.Router();
 
 // GET /users — список всех (публично); admin видит onboarding_done
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
     const { role, search } = req.query;
-    let sql = `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, created_at, onboarding_done
+    const isAdmin = req.user && req.user.role === 'admin';
+    let sql = `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, created_at, onboarding_done
                FROM users WHERE 1=1`;
     const params = [];
+
+    // Модераторы — скрытая роль: в общем списке их не показываем (видит только админ)
+    if (!isAdmin) sql += ` AND role <> 'moderator'`;
 
     if (role) {
       params.push(role);
@@ -35,7 +39,7 @@ router.get('/', async (req, res) => {
 router.get('/:uid', async (req, res) => {
   try {
     const user = await queryOne(
-      `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, created_at
+      `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, created_at
        FROM users WHERE uid = $1`,
       [req.params.uid]
     );
@@ -54,7 +58,7 @@ router.patch('/:uid', requireAuth, async (req, res) => {
     }
 
     const allowed = ['name', 'bio', 'skills', 'avatar', 'contacts', 'portfolio'];
-    if (req.user.role === 'admin') allowed.push('role', 'blocked');
+    if (req.user.role === 'admin') allowed.push('role', 'blocked', 'forum_banned');
     const updates = [];
     const values  = [];
 
@@ -113,11 +117,32 @@ router.patch('/:uid/role', requireAuth, async (req, res) => {
   try {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
     const { role } = req.body;
-    const valid = ['user', 'startup', 'expert', 'admin'];
+    const valid = ['user', 'startup', 'expert', 'admin', 'moderator'];
     if (!valid.includes(role)) return res.status(400).json({ error: 'Неверная роль' });
 
     await queryOne('UPDATE users SET role = $1 WHERE uid = $2', [role, req.params.uid]);
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// Модератор/админ: PATCH /users/:uid/forum-ban — запретить/разрешить общение на форуме
+router.patch('/:uid/forum-ban', requireAuth, async (req, res) => {
+  try {
+    const isMod = req.user.role === 'admin' || req.user.role === 'moderator';
+    if (!isMod) return res.status(403).json({ error: 'Только модератор или администратор' });
+
+    // Нельзя банить администраторов и модераторов
+    const target = await queryOne('SELECT role FROM users WHERE uid=$1', [req.params.uid]);
+    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (target.role === 'admin' || target.role === 'moderator') {
+      return res.status(403).json({ error: 'Нельзя ограничить администратора или модератора' });
+    }
+
+    const banned = req.body.banned === true || req.body.banned === 'true';
+    await queryOne('UPDATE users SET forum_banned=$1 WHERE uid=$2', [banned, req.params.uid]);
+    res.json({ ok: true, forum_banned: banned });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
@@ -143,7 +168,7 @@ router.post('/admin/create', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'email, password и name обязательны' });
     }
     if (password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
-    const validRoles = ['user', 'startup', 'expert', 'admin'];
+    const validRoles = ['user', 'startup', 'expert', 'admin', 'moderator'];
     const userRole = validRoles.includes(role) ? role : 'user';
 
     const existing = await queryOne('SELECT uid FROM users WHERE email=$1', [email.toLowerCase()]);

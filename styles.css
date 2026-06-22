@@ -89,6 +89,7 @@ body {
 .nav__role--expert { background: var(--expert-dim); color: var(--expert); }
 .nav__role--user     { background: rgba(61,142,245,.12); color: var(--info); }
 .nav__role--admin    { background: rgba(255,71,87,.12);  color: var(--danger); }
+.nav__role--moderator{ background: rgba(255,159,67,.12); color: #ff9f43; }
 
 /* ── LAYOUT ── */
 .page { padding-top: calc(var(--nav-h) + 40px); padding-bottom: 80px; }
@@ -172,6 +173,7 @@ body {
 .badge--blue   { background: rgba(61,142,245,.12); color: var(--info); }
 .badge--red    { background: rgba(255,71,87,.12); color: var(--danger); }
 .badge--gray   { background: var(--bg3); color: var(--text2); }
+.badge--orange { background: rgba(255,159,67,.12); color: #ff9f43; }
 
 /* ── DIVIDER ── */
 .divider {

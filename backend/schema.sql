@@ -14,12 +14,13 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL DEFAULT '',
   name          TEXT NOT NULL DEFAULT '',
   role          TEXT NOT NULL DEFAULT 'user'
-                  CHECK (role IN ('user','startup','expert','admin')),
+                  CHECK (role IN ('user','startup','expert','admin','moderator')),
   bio           TEXT DEFAULT '',
   skills        TEXT DEFAULT '[]',       -- JSON array
   avatar        TEXT DEFAULT '',
   contacts      TEXT DEFAULT '',
   portfolio     TEXT DEFAULT '',
+  forum_banned  BOOLEAN DEFAULT FALSE,   -- запрет общения на форуме (только чтение)
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ
 );
@@ -114,6 +115,7 @@ CREATE TABLE IF NOT EXISTS forum_topics (
   reply_count INTEGER DEFAULT 0,
   views       INTEGER DEFAULT 0,
   hidden      BOOLEAN DEFAULT FALSE,
+  pinned      BOOLEAN DEFAULT FALSE,
   last_at     TIMESTAMPTZ DEFAULT NOW(),
   last_author TEXT DEFAULT '',
   created_at  TIMESTAMPTZ DEFAULT NOW()
@@ -198,3 +200,15 @@ CREATE TABLE IF NOT EXISTS platform_config (
 INSERT INTO platform_config (key, value) VALUES
   ('platform', '{"categories":["FinTech","EdTech","HealthTech","E-commerce","SaaS","AI / ML","Gaming","GreenTech","Marketplace","Другое"],"stages":[{"name":"Идея","icon":"💡"},{"name":"MVP","icon":"⚡"},{"name":"Бета","icon":"🔬"},{"name":"Запущен","icon":"🚀"},{"name":"Масштабирование","icon":"📈"}],"feedLimit":25}')
 ON CONFLICT (key) DO NOTHING;
+
+-- ============================================================
+-- МИГРАЦИИ для уже существующих БД (идемпотентны)
+-- ============================================================
+-- Роль модератора (скрытая, назначается только из админки)
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check
+  CHECK (role IN ('user','startup','expert','admin','moderator'));
+-- Запрет общения на форуме (пользователь может только читать)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS forum_banned BOOLEAN DEFAULT FALSE;
+-- Закрепление тем форума
+ALTER TABLE forum_topics ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE;

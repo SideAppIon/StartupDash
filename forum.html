@@ -125,6 +125,7 @@
         <div class="topic-cat-badge" id="topicCat"></div>
         <h1 class="page-title" id="topicTitle" style="margin-bottom:8px"></h1>
         <div style="font-size:13px;color:var(--text2)" id="topicMeta"></div>
+        <div id="modBar" style="display:none;margin-top:14px;gap:8px;flex-wrap:wrap"></div>
       </div>
       <div style="margin-top:20px" id="postList"></div>
       <div id="replyArea"></div>
@@ -174,9 +175,19 @@
 var currentView    = 'list';
 var currentCat     = '';
 var currentTopicId = null;
+var currentTopic   = null;
 var allTopics      = [];
 var pageUser       = null;
 var pageUserData   = null;
+
+// Модератор или администратор
+function isMod() {
+  return pageUserData && (pageUserData.role === 'admin' || pageUserData.role === 'moderator');
+}
+// Запрещено ли текущему пользователю общение на форуме
+function isBanned() {
+  return pageUserData && (pageUserData.forum_banned === true || pageUserData.forumBanned === true);
+}
 
 var CAT_ICONS = {
   'Общее':'💬','Стартапы':'🚀','Поиск команды':'👥',
@@ -197,7 +208,8 @@ onAuthReady(async function(user, userData) {
       '<a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>'+
       '<a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>';
     document.querySelector('.nav__logo').href = 'dashboard.html';
-    document.getElementById('newTopicBtn').style.display = '';
+    // Забаненные на форуме не могут создавать темы
+    document.getElementById('newTopicBtn').style.display = isBanned() ? 'none' : '';
   }
 
   // Если открываем тему по URL
@@ -261,7 +273,7 @@ async function loadTopics() {
     var snap = await db.collection('forum_topics').orderBy('lastAt','desc').limit(50).get();
     allTopics = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
     // Строим табы только из видимых тем
-    var visibleForTabs = allTopics.filter(function(t){ return !(t.hidden) || (pageUserData && pageUserData.role==='admin'); });
+    var visibleForTabs = allTopics.filter(function(t){ return !(t.hidden) || isMod(); });
     buildCatTabs(visibleForTabs);
     renderTopics();
   } catch(e) {
@@ -280,9 +292,8 @@ async function loadTopics() {
 }
 
 function renderTopics() {
-  // Скрываем hidden темы для не-администраторов
-  var isAdmin = pageUserData && pageUserData.role === 'admin';
-  var visible = allTopics.filter(function(t){ return isAdmin || !t.hidden; });
+  // Скрываем hidden темы для всех, кроме модераторов/админов
+  var visible = allTopics.filter(function(t){ return isMod() || !t.hidden; });
   var filtered = currentCat ? visible.filter(function(t){ return t.category===currentCat; }) : visible;
   var el = document.getElementById('topicList');
   if (!filtered.length) {
@@ -345,8 +356,8 @@ async function loadTopic(topicId) {
     var tSnap = await db.collection('forum_topics').doc(topicId).get();
     if (!tSnap.exists) { showView('list'); return; }
     var t = Object.assign({id:tSnap.id}, tSnap.data());
-    // Скрытая тема — только для admin
-    if (t.hidden && !(pageUserData && pageUserData.role==='admin')) {
+    // Скрытая тема — только для модераторов/админов
+    if (t.hidden && !isMod()) {
       document.getElementById('postList').innerHTML =
         '<div class="empty-state"><div class="empty-state__icon">🚫</div>'+
         '<div class="empty-state__title">Тема скрыта</div>'+
@@ -355,12 +366,14 @@ async function loadTopic(topicId) {
       return;
     }
 
+    currentTopic = t;
     document.getElementById('topicCat').textContent = (CAT_ICONS[t.category]||'💬')+' '+t.category;
     document.getElementById('topicTitle').textContent = t.title||'';
     document.getElementById('topicMeta').innerHTML =
       'Автор: <strong>'+esc(t.authorName||'')+'</strong> · '+
       formatDate(t.createdAt)+' · '+
       '<span style="color:var(--text3)">'+(t.replyCount||0)+' ответов · '+(t.views||0)+' просмотров</span>';
+    renderModBar(t);
 
     // views обновляет бэкенд при GET /forum/:id/posts
 
@@ -372,14 +385,19 @@ async function loadTopic(topicId) {
     // OP всегда первый — контент из самой темы
     var opPost = {
       id:'op', authorUid:t.authorUid, authorName:t.authorName, authorAvatar:t.authorAvatar,
-      authorRole:t.authorRole, content:t.content||t.body, createdAt:t.createdAt, isOp:true
+      authorRole:t.authorRole, authorForumBanned:t.authorForumBanned,
+      content:t.content||t.body, createdAt:t.createdAt, isOp:true
     };
     posts = [opPost].concat(posts);
 
     renderPosts(posts);
 
     // Форма ответа
-    if (pageUser) {
+    if (pageUser && isBanned()) {
+      document.getElementById('replyArea').innerHTML =
+        '<div style="text-align:center;padding:20px;color:var(--danger);font-size:14px;background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.25);border-radius:var(--radius-lg)">'+
+        '🚫 Вам запрещено общение на форуме. Доступен только просмотр.</div>';
+    } else if (pageUser) {
       document.getElementById('replyArea').innerHTML = buildReplyBox();
     } else {
       document.getElementById('replyArea').innerHTML =
@@ -397,13 +415,24 @@ function renderPosts(posts) {
     var av = p.authorAvatar ||
       'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(p.authorName||'U');
     var isOp = p.isOp || i===0;
-    var canDel = pageUser && (pageUser.uid===p.authorUid || (pageUserData&&pageUserData.role==='admin'));
+    var mod = isMod();
+    var canDel = pageUser && (pageUser.uid===p.authorUid || mod);
+    // Бан доступен модератору: не на себя и не на других модераторов/админов
+    var authorBanned = p.authorForumBanned === true || p.authorForumBanned === 'true';
+    var canBan = mod && p.authorUid && p.authorUid !== (pageUser && pageUser.uid) &&
+                 p.authorRole !== 'admin' && p.authorRole !== 'moderator';
+    var banBtn = canBan
+      ? '<button class="btn btn--ghost btn--sm" style="color:'+(authorBanned?'var(--accent)':'var(--danger)')+'" '+
+        'data-uid="'+esc(p.authorUid)+'" data-name="'+esc((p.authorName||'').replace(/"/g,''))+'" data-banned="'+(authorBanned?'1':'0')+'" '+
+        'onclick="toggleBan(this)">'+(authorBanned?'✓ Разрешить общение':'🚫 Запретить общение')+'</button>'
+      : '';
     return '<div class="post-card'+(isOp?' op':'')+'">'+
       '<div class="post-card__header">'+
         '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
         '<div>'+
           '<div class="post-card__author">'+esc(p.authorName||'Аноним')+
             (isOp?'<span style="margin-left:6px;font-size:10px;background:var(--accent);color:#000;padding:1px 5px;border-radius:3px;font-weight:700">ТС</span>':'')+
+            (authorBanned?'<span class="badge badge--red" style="margin-left:6px;font-size:10px;padding:1px 6px">🚫 Бан</span>':'')+
           '</div>'+
           '<div class="post-card__role">'+(p.authorRole?esc(ROLE_LABELS[p.authorRole]||p.authorRole):'')+'</div>'+
         '</div>'+
@@ -413,6 +442,7 @@ function renderPosts(posts) {
       '<div class="post-card__footer">'+
         '<span class="post-num">#'+(i+1)+'</span>'+
         (canDel && !isOp ? '<button class="btn btn--ghost btn--sm" data-pid="'+p.id+'" onclick="deletePost(this)">Удалить</button>' : '')+
+        banBtn+
         '<button class="btn btn--ghost btn--sm" data-author="'+esc((p.authorName||'').replace(/"/g,''))+'" onclick="quoteByEl(this)" style="font-size:12px">💬 Цитата</button>'+
       '</div>'+
     '</div>';
@@ -444,6 +474,7 @@ function quotePost(authorName) {
 // ── CREATE TOPIC ──────────────────────────────────────
 async function createTopic() {
   if (!pageUser) { showToast('Войди чтобы создать тему','warn'); return; }
+  if (isBanned()) { showToast('Вам запрещено общение на форуме','error'); return; }
   var title = document.getElementById('newTopicTitle').value.trim();
   var body  = document.getElementById('newTopicBody').value.trim();
   var cat   = document.getElementById('newTopicCat').value;
@@ -469,6 +500,7 @@ async function createTopic() {
 // ── SEND REPLY ────────────────────────────────────────
 async function sendReply() {
   if (!pageUser || !currentTopicId) return;
+  if (isBanned()) { showToast('Вам запрещено общение на форуме','error'); return; }
   var ta  = document.getElementById('replyText');
   var err = document.getElementById('replyErr');
   var body = ta ? ta.value.trim() : '';
@@ -498,6 +530,64 @@ async function deletePost(btn) {
     showToast('Удалено','success');
     await loadTopic(currentTopicId);
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+// ── МОДЕРАЦИЯ (модератор / администратор) ─────────────
+function renderModBar(t) {
+  var bar = document.getElementById('modBar');
+  if (!bar) return;
+  if (!isMod()) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+  bar.style.display = 'flex';
+  bar.innerHTML =
+    '<button class="btn btn--outline btn--sm" onclick="togglePin()">'+(t.pinned?'📌 Открепить':'📌 Закрепить')+'</button>'+
+    '<button class="btn btn--outline btn--sm" onclick="toggleHide()">'+(t.hidden?'👁 Показать всем':'🙈 Скрыть тему')+'</button>'+
+    '<button class="btn btn--danger btn--sm" onclick="deleteTopic()">🗑 Удалить тему</button>';
+}
+
+async function togglePin() {
+  if (!currentTopic) return;
+  try {
+    await db.collection('forum_topics').doc(currentTopicId).update({ pinned: !currentTopic.pinned });
+    showToast(currentTopic.pinned ? 'Тема откреплена' : 'Тема закреплена', 'success');
+    await loadTopic(currentTopicId);
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+async function toggleHide() {
+  if (!currentTopic) return;
+  try {
+    await db.collection('forum_topics').doc(currentTopicId).update({ hidden: !currentTopic.hidden });
+    showToast(currentTopic.hidden ? 'Тема снова видна' : 'Тема скрыта', 'success');
+    await loadTopic(currentTopicId);
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+async function deleteTopic() {
+  if (!currentTopicId) return;
+  if (!confirm('Удалить тему вместе со всеми сообщениями? Действие необратимо.')) return;
+  try {
+    await db.collection('forum_topics').doc(currentTopicId).delete();
+    showToast('Тема удалена','success');
+    showView('list');
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+// Запрет / разрешение общения на форуме для пользователя
+async function toggleBan(btn) {
+  var uid    = btn.getAttribute('data-uid');
+  var name   = btn.getAttribute('data-name') || 'пользователю';
+  var banned = btn.getAttribute('data-banned') === '1';
+  var next   = !banned;
+  if (!uid) return;
+  var msg = next
+    ? 'Запретить «'+name+'» писать на форуме? Сможет только просматривать.'
+    : 'Снова разрешить «'+name+'» общение на форуме?';
+  if (!confirm(msg)) return;
+  try {
+    await api.patch('/users/'+uid+'/forum-ban', { banned: next });
+    showToast(next ? 'Общение запрещено' : 'Общение разрешено', 'success');
+    await loadTopic(currentTopicId);
+  } catch(e) { showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
 }
 
 // ── STATS ─────────────────────────────────────────────
