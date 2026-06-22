@@ -38,12 +38,15 @@
 </head>
 <body>
 <nav class="nav">
-  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="dashboard.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="startups.html">Стартапы</a>
+  <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
+  <a href="members.html">Участники</a>
   <div class="nav__user">
+    <a href="messages.html" style="font-size:20px;text-decoration:none">💬</a>
     <span class="nav__role" id="navRole"></span>
     <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="goProfile()"/>
-    <a href="dashboard.html" class="btn btn--ghost btn--sm">← Дашборд</a>
     <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
   </div>
 </nav>

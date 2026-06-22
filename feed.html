@@ -169,6 +169,7 @@ onAuthReady(async function(user, userData) {
       '<span class="nav__role nav__role--'+userData.role+'">' + (ROLE_LABELS[userData.role]||userData.role) + '</span>' +
       '<img class="nav__avatar" src="'+esc(av)+'" onclick="goProfile()"/>' +
       '<a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>';
+    document.querySelector('.nav__logo').href = 'dashboard.html';
   }
 
   // Загружаем лимит из настроек платформы

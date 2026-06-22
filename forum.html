@@ -195,6 +195,7 @@ onAuthReady(async function(user, userData) {
       '<span class="nav__role nav__role--'+userData.role+'">'+(ROLE_LABELS[userData.role]||userData.role)+'</span>'+
       '<img class="nav__avatar" src="'+esc(av)+'" data-href="profile.html" onclick="window.location.href=this.getAttribute(\"data-href\")"/>'+
       '<a href="dashboard.html" class="btn btn--ghost btn--sm">Дашборд</a>';
+    document.querySelector('.nav__logo').href = 'dashboard.html';
     document.getElementById('newTopicBtn').style.display = '';
   }
 
