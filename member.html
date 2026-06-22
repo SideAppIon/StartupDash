@@ -187,7 +187,7 @@ onAuthReady(async function(user, userData) {
   roleEl.textContent = ROLE_LABELS[profileData.role] || profileData.role || '';
   roleEl.className   = 'nav__role nav__role--' + (profileData.role||'user');
 
-  // Навыки счётчик
+  // Навыки счетчик
   var skills = safeArray(profileData.skills);
   document.getElementById('memberSkillCount').textContent = skills.length ? skills.length + ' навыков' : '';
 
@@ -374,7 +374,7 @@ async function openInviteModal() {
   var myStartups = await db.collection('startups').where('ownerUid','==',pageViewer.uid).get();
   if (myStartups.empty) { showToast('У тебя нет стартапов','warn'); return; }
 
-  // Находим стартапы куда человек уже приглашён (любой статус кроме rejected/removed)
+  // Находим стартапы куда человек уже приглашен (любой статус кроме rejected/removed)
   var existingInvites = await db.collection('invites')
     .where('toUid','==',profileUid).get();
   var alreadyIn = {};
@@ -413,7 +413,7 @@ async function sendInviteFromStartup() {
     var sSnap = await db.collection('startups').doc(startupId).get();
     if (!sSnap.exists) { showToast('Стартап не найден', 'error'); return; }
 
-    // Используем snake_case — именно это ждёт бэкенд
+    // Используем snake_case — именно это ждет бэкенд
     await api.post('/invites', {
       type:          'from_startup',
       to_uid:        toInviteUid,

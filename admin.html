@@ -157,7 +157,7 @@
         <!-- Стадии -->
         <div class="settings-card">
           <h3>📊 Стадии проекта</h3>
-          <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Нажми на иконку стадии чтобы изменить её</p>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Нажми на иконку стадии чтобы изменить ее</p>
           <ul class="item-list" id="stageList"></ul>
           <div class="add-row">
             <input type="text" id="stageInput" placeholder="Название стадии..." maxlength="40"
@@ -469,7 +469,7 @@ async function saveFeedLimit() {
   if (isNaN(val)||val<5||val>100) { showToast('Введи число от 5 до 100','error'); return; }
   try {
     await api.post('/platform-config', { feedLimit: val });
-    showToast('Лимит ленты сохранён: '+val,'success');
+    showToast('Лимит ленты сохранен: '+val,'success');
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
@@ -661,7 +661,7 @@ async function delUser(uid, name) {
   if (!confirm('Удалить пользователя «'+name+'»? Это действие необратимо.')) return;
   try {
     await api.delete('/users/'+uid);
-    showToast('Пользователь удалён','success');
+    showToast('Пользователь удален','success');
     await loadUsers(); await loadStats();
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
@@ -669,7 +669,7 @@ async function delStartup(id, name) {
   if (!confirm('Удалить стартап «'+name+'»?')) return;
   try {
     await api.delete('/startups/'+id);
-    showToast('Стартап удалён','success');
+    showToast('Стартап удален','success');
     await loadStartupsAdmin(); await loadStats();
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
@@ -902,7 +902,7 @@ async function addGroupMember() {
   try {
     await api.post('/groups/'+selGroupId+'/members', { user_uid: uid });
     showToast('Участник добавлен','success');
-    // Обновляем счётчик в списке
+    // Обновляем счетчик в списке
     var g = allGroups.find(function(x){ return x.id===selGroupId; });
     if (g) g.member_count = (g.member_count||0)+1;
     renderGroups(allGroups);
@@ -914,7 +914,7 @@ async function removeGroupMember(uid) {
   if (!selGroupId) return;
   try {
     await api.delete('/groups/'+selGroupId+'/members/'+uid);
-    showToast('Участник удалён','success');
+    showToast('Участник удален','success');
     var g = allGroups.find(function(x){ return x.id===selGroupId; });
     if (g) g.member_count = Math.max(0,(g.member_count||1)-1);
     renderGroups(allGroups);

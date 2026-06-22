@@ -198,7 +198,7 @@
     <div class="form-group" style="margin-bottom:0">
       <label class="form-label">Сообщение / предложение *</label>
       <textarea class="form-textarea" id="expertMsg" style="min-height:110px"
-        placeholder="Расскажи о своём опыте и чем можешь помочь проекту..."></textarea>
+        placeholder="Расскажи о своем опыте и чем можешь помочь проекту..."></textarea>
     </div>
     <button class="btn btn--expert" style="width:100%;justify-content:center;margin-top:16px" onclick="sendExpertApplication()">Отправить заявку</button>
     <div id="expertError" class="form-error" style="display:none;margin-top:10px"></div>
@@ -245,7 +245,7 @@
     <div class="form-group" style="margin-bottom:0">
       <label class="form-label">Сопроводительное письмо *</label>
       <textarea class="form-textarea" id="vacApplyMsg" style="min-height:140px"
-        placeholder="Расскажи о себе, своём опыте и почему хочешь присоединиться к этому проекту..."></textarea>
+        placeholder="Расскажи о себе, своем опыте и почему хочешь присоединиться к этому проекту..."></textarea>
     </div>
     <div id="vacApplyErr" class="form-error" style="display:none;margin-top:10px"></div>
     <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="sendVacApply()">Отправить заявку</button>
@@ -375,7 +375,7 @@ onAuthReady(async function(user, userData) {
       } catch(e) {}
       if (!isTeamMember) {
         try {
-          // Проверяем accepted invite (пользователь подавал заявку или был приглашён)
+          // Проверяем accepted invite (пользователь подавал заявку или был приглашен)
           var myInvSnap = await db.collection('invites')
             .where('startupId','==', startupId)
             .where('status','==','accepted').get();
@@ -412,7 +412,7 @@ onAuthReady(async function(user, userData) {
           .where('fromUid','==', user.uid)
           .where('startupId','==', startupId).get();
         if (!invSnap.empty) {
-          // берём последнюю заявку
+          // берем последнюю заявку
           userInviteStatus = invSnap.docs[invSnap.docs.length-1].data().status;
         }
       } catch(e) { /* игнорируем */ }
@@ -539,7 +539,7 @@ async function loadUpdates() {
       el.innerHTML = '<div class="empty-state" style="padding:40px 0">' +
         '<div class="empty-state__icon">📢</div>' +
         '<div class="empty-state__title">Нет обновлений</div>' +
-        '<p style="font-size:14px">Основатель ещё не публиковал новости</p></div>';
+        '<p style="font-size:14px">Основатель еще не публиковал новости</p></div>';
       return;
     }
 
@@ -965,7 +965,7 @@ async function removeFromTeam(btn) {
         await api.delete('/invites/' + invSnap.docs[j].id);
       }
     }
-    showToast(name + ' удалён из команды', 'success');
+    showToast(name + ' удален из команды', 'success');
     var _isOA = pageUser && startupData && (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'));
     await loadTeam(_isOA, false, {});
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
@@ -1002,7 +1002,7 @@ async function loadVacancies(isOwnerOrAdmin, isTeamMember) {
     if (snap.empty) {
       el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">📋</div>' +
         '<div class="empty-state__title">Вакансий пока нет</div>' +
-        '<p style="font-size:14px;color:var(--text2)">Основатель ещё не опубликовал открытые позиции</p></div>';
+        '<p style="font-size:14px;color:var(--text2)">Основатель еще не опубликовал открытые позиции</p></div>';
       return;
     }
     el.innerHTML = snap.docs.map(function(d) {
@@ -1107,7 +1107,7 @@ async function sendVacApply() {
   try {
     // Добавляем uid в список откликнувшихся через специальный эндпоинт
     await api.post('/startups/' + startupId + '/vacancies/' + vid + '/apply', {});
-    // Создаём invite с указанием роли (вакансии)
+    // Создаем invite с указанием роли (вакансии)
     await db.collection('invites').add({
       fromUid:      pageUser.uid,
       fromName:     pageUserData ? pageUserData.name : '',

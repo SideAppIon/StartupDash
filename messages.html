@@ -484,7 +484,7 @@ async function loadGroupMessages(startupId, convId) {
     el.scrollTop = el.scrollHeight;
   } catch(e) {
     if (e.code === 403 || (e.message && e.message.includes('403'))) {
-      // Нет доступа — исключён из стартапа
+      // Нет доступа — исключен из стартапа
       if (groupPollTimer) { clearInterval(groupPollTimer); groupPollTimer = null; }
       var el2 = document.getElementById('chatMessages');
       if (el2) el2.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;margin-top:60px;padding:0 24px">Вы больше не участник этого стартапа 🚫<br><br>Доступ к чату закрыт</div>';
@@ -558,7 +558,7 @@ async function ensureConv(otherUid) {
   return createConv(otherUid);
 }
 async function createConv(otherUid) {
-  // Бэкенд сам создаёт диалог и заполняет данные участников
+  // Бэкенд сам создает диалог и заполняет данные участников
   var data = await api.post('/messages/conversations', { other_uid: otherUid });
   var conv = data.conversation || data;
   // Добавляем в кэш чтобы сразу было доступно

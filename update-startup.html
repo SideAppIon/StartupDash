@@ -52,7 +52,7 @@
           <option value="Общее">📋 Общее</option>
           <option value="Milestone">🏆 Milestone</option>
           <option value="MVP">⚡ MVP</option>
-          <option value="Партнёрство">🤝 Партнёрство</option>
+          <option value="Партнерство">🤝 Партнерство</option>
           <option value="Финансирование">💰 Финансирование</option>
           <option value="Команда">👥 Команда</option>
           <option value="Запуск">🚀 Запуск</option>
@@ -327,7 +327,7 @@ async function postUpdate() {
   try {
     var payload = {
       title:      title,
-      content:    body,   // бэкенд ждёт 'content'
+      content:    body,   // бэкенд ждет 'content'
       type:       type,
       authorUid:  currentUser.uid,
       authorName: currentUserData ? currentUserData.name : '',

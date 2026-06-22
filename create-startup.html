@@ -70,7 +70,7 @@
             <img id="iconPreviewImg" style="width:100%;height:100%;object-fit:cover;display:none" alt=""/>
           </div>
           <div style="flex:1">
-            <label class="form-label" style="margin-bottom:6px">Или загрузи своё изображение</label>
+            <label class="form-label" style="margin-bottom:6px">Или загрузи свое изображение</label>
             <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" id="iconImageFile"
               class="form-input" style="padding:6px" onchange="uploadIconFile(this)"/>
             <input type="hidden" id="iconImage"/>
@@ -162,7 +162,7 @@
         <div class="privacy-opt" data-val="private" onclick="selectPrivacy(this)">
           <div class="privacy-opt__icon">🔒</div>
           <div class="privacy-opt__name">Частный</div>
-          <div class="privacy-opt__desc">В каталоге видна основная инфо. Детали — только приглашённым</div>
+          <div class="privacy-opt__desc">В каталоге видна основная инфо. Детали — только приглашенным</div>
         </div>
         <div class="privacy-opt" data-val="closed" onclick="selectPrivacy(this)">
           <div class="privacy-opt__icon">🔐</div>
@@ -598,7 +598,7 @@ async function save(){
       var ref=await db.collection('startups').add(data);
       id=ref.id;
     }
-    showToast('Стартап сохранён!','success');
+    showToast('Стартап сохранен!','success');
     setTimeout(function(){window.location.href='startup.html?id='+id;},800);
   } catch(e){
     showFormErr('Ошибка: '+e.message);

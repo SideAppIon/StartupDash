@@ -305,7 +305,7 @@ async function saveProfile() {
   try {
     await db.collection('users').doc(currentUser.uid).update(upd);
     Object.assign(uData, upd);
-    showToast('Профиль сохранён!','success');
+    showToast('Профиль сохранен!','success');
     // Обновляем отображение без перезагрузки
     document.getElementById('profileName').textContent = name;
     document.getElementById('viewBio').textContent = upd.bio||'Пока ничего не написано.';
@@ -380,7 +380,7 @@ async function doSaveAvatar() {
     document.getElementById('profileAvatar').src = url;
     document.getElementById('navAvatar').src = url;
     document.getElementById('avatarModal').classList.remove('open');
-    showToast('Аватар обновлён!', 'success');
+    showToast('Аватар обновлен!', 'success');
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); document.getElementById('avatarUploadStatus').textContent = ''; }
 }
 

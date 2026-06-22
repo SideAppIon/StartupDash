@@ -77,7 +77,8 @@ async function loadComplaints() {
   el.innerHTML = '<div class="spinner"></div>';
   try {
     var data = await api.get('/complaints');
-    allComplaints = data.complaints || [];
+    // API отдает snake_case — приводим к camelCase
+    allComplaints = (data.complaints || []).map(_toCamel);
     render();
   } catch(e) {
     el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div>' +
@@ -133,7 +134,7 @@ function buildCard(c) {
       : '<button class="btn btn--danger btn--sm" data-uid="'+esc(c.targetUid)+'" data-banned="0" onclick="toggleBan(this)">🚫 Запретить общение</button>';
   }
   if (c.status==='open') {
-    actions += '<button class="btn btn--ghost btn--sm" data-id="'+esc(c.id)+'" data-st="resolved" onclick="setStatus(this)">Пометить решённой</button>';
+    actions += '<button class="btn btn--ghost btn--sm" data-id="'+esc(c.id)+'" data-st="resolved" onclick="setStatus(this)">Пометить решенной</button>';
     actions += '<button class="btn btn--ghost btn--sm" data-id="'+esc(c.id)+'" data-st="dismissed" onclick="setStatus(this)">Отклонить</button>';
   } else {
     actions += '<button class="btn btn--ghost btn--sm" data-id="'+esc(c.id)+'" data-st="open" onclick="setStatus(this)">Вернуть в работу</button>';
@@ -178,7 +179,7 @@ async function setStatus(btn) {
   if (!id) return;
   try {
     await api.patch('/complaints/'+id, { status: st });
-    showToast('Статус обновлён','success');
+    showToast('Статус обновлен','success');
     await loadComplaints();
   } catch(e) { showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
 }

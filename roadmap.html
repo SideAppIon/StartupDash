@@ -315,7 +315,7 @@ function renderBoard(canEdit) {
     var el = document.getElementById('col-'+col);
     if (!tasks.length) { el.innerHTML = '<div class="empty-col">Нет задач</div>'; return; }
 
-    // Done — компактный вид если свёрнут
+    // Done — компактный вид если свернут
     if (col === 'done' && colCollapsed[col]) {
       el.innerHTML = tasks.map(function(t) {
         return '<div class="done-compact">' +

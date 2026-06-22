@@ -157,7 +157,7 @@
 var allUpdates   = [];   // все загруженные обновления
 var filteredUpdates = [];
 var activeFilter = '';
-var maxUpdates   = 25;   // задаётся администратором из _config
+var maxUpdates   = 25;   // задается администратором из _config
 
 onAuthReady(async function(user, userData) {
   // Nav
@@ -190,7 +190,7 @@ async function loadFeed() {
       .where('privacy', 'in', ['public', null])
       .get();
 
-    // Firestore не поддерживает OR с null — загружаем всё и фильтруем
+    // Firestore не поддерживает OR с null — загружаем все и фильтруем
     var allStartups = await db.collection('startups').get();
     var publicStartups = {};
     allStartups.docs.forEach(function(d) {
@@ -214,7 +214,7 @@ async function loadFeed() {
       try {
         var updSnap = await db.collectionGroup('updates')
           .orderBy('createdAt', 'desc')
-          .limit(maxUpdates * 2) // берём с запасом
+          .limit(maxUpdates * 2) // берем с запасом
           .get();
 
         updSnap.docs.forEach(function(d) {
@@ -249,7 +249,7 @@ async function loadFeed() {
       }
     }
 
-    // Сортируем по дате, берём maxUpdates
+    // Сортируем по дате, берем maxUpdates
     updates.sort(function(a, b) {
       var ta = a.createdAt && a.createdAt.seconds ? a.createdAt.seconds : 0;
       var tb = b.createdAt && b.createdAt.seconds ? b.createdAt.seconds : 0;
@@ -319,7 +319,7 @@ function renderEmpty() {
     '<div class="feed-empty">' +
     '<div class="feed-empty__icon">📰</div>' +
     '<div class="feed-empty__title">Нет обновлений</div>' +
-    '<p style="font-size:14px">' + (activeFilter ? 'Нет обновлений с типом «'+esc(activeFilter)+'»' : 'Стартапы ещё не публиковали новости') + '</p>' +
+    '<p style="font-size:14px">' + (activeFilter ? 'Нет обновлений с типом «'+esc(activeFilter)+'»' : 'Стартапы еще не публиковали новости') + '</p>' +
     '</div>';
 }
 

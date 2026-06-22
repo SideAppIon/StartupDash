@@ -141,10 +141,10 @@ onAuthReady(async function(user, userData) {
       return ((b.createdAt&&b.createdAt.seconds)||0) - ((a.createdAt&&a.createdAt.seconds)||0);
     });
 
-    // Стартапы где участвую (accepted invites — от своего имени или приглашённый)
+    // Стартапы где участвую (accepted invites — от своего имени или приглашенный)
     var participatingStartups = [];
     try {
-      // Запросы: сам подавал заявку (from_uid) + был приглашён стартапом (to_uid)
+      // Запросы: сам подавал заявку (from_uid) + был приглашен стартапом (to_uid)
       var invSnap1 = await db.collection('invites')
         .where('fromUid','==',user.uid).where('status','==','accepted').get();
       var invSnap2 = { docs: [] };
@@ -292,7 +292,7 @@ async function buildStartupCard(s, uid) {
 
   var pendHtml = pendingInvites.length ? pendingInvites.map(function(d){
     var inv=d.data();
-    var typeMap={specialist:'👤 Специалист',role:'🏷️ По роли',company:'🏢 Компания',freelance:'💻 Фрилансер',partner:'🤝 Партнёр'};
+    var typeMap={specialist:'👤 Специалист',role:'🏷️ По роли',company:'🏢 Компания',freelance:'💻 Фрилансер',partner:'🤝 Партнер'};
     var apps = inv.applications&&inv.applications.length ? inv.applications : null;
     var appsHtml = apps ? apps.map(function(app){
       return '<div style="background:var(--bg);border-radius:6px;padding:6px 10px;margin-bottom:4px">'+
@@ -484,7 +484,7 @@ async function removeMember(startupId, uid, src, docId) {
       // Для invite-участников: отклоняем заявку
       await api.patch('/invites/' + docId, { status: 'rejected' });
     }
-    showToast('Участник удалён', 'success');
+    showToast('Участник удален', 'success');
     setTimeout(function(){ location.reload(); }, 700);
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }
@@ -494,7 +494,7 @@ async function delStartup(id, name) {
   if (!confirm('Удалить стартап «'+name+'»?')) return;
   try {
     await db.collection('startups').doc(id).delete();
-    showToast('Стартап удалён','success');
+    showToast('Стартап удален','success');
     setTimeout(function(){ location.reload(); }, 700);
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }

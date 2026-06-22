@@ -152,7 +152,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Заголовок темы *</label>
-          <input type="text" class="form-input" id="newTopicTitle" placeholder="Кратко о чём тема..." maxlength="120"/>
+          <input type="text" class="form-input" id="newTopicTitle" placeholder="Кратко о чем тема..." maxlength="120"/>
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">Первое сообщение *</label>
@@ -319,7 +319,7 @@ function renderTopics() {
       '<p style="font-size:14px">Будь первым — создай тему!</p></div>';
     return;
   }
-  // Закреплённые вверху
+  // Закрепленные вверху
   var pinned = filtered.filter(function(t){ return t.pinned; });
   var rest   = filtered.filter(function(t){ return !t.pinned; });
   el.innerHTML = pinned.concat(rest).map(function(t) {
@@ -679,7 +679,7 @@ async function loadHotTopics() {
       '</div>';
     }).join('');
   } catch(e) {
-    // без индекса — просто берём последние
+    // без индекса — просто берем последние
     try {
       var snap2 = await db.collection('forum_topics').limit(5).get();
       document.getElementById('hotTopics').innerHTML = snap2.docs.map(function(d){
