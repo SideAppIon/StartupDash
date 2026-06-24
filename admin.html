@@ -678,7 +678,7 @@ async function delStartup(id, name) {
 var allAdminTopics = [];
 async function loadAdminTopics() {
   try {
-    var data = await api.get('/forum/topics?limit=200');
+    var data = await api.get('/forum');
     allAdminTopics = data.topics || [];
     renderAdminTopics(allAdminTopics);
   } catch(e) { document.getElementById('adminTopicList').innerHTML='<p style="color:var(--danger)">Ошибка загрузки</p>'; }
@@ -720,14 +720,14 @@ function formatDate(ts) {
 }
 async function pinTopic(tid, currentlyPinned) {
   try {
-    await api.patch('/forum/topics/'+tid, { pinned: !currentlyPinned });
+    await api.patch('/forum/'+tid, { pinned: !currentlyPinned });
     showToast(!currentlyPinned?'Тема закреплена':'Тема откреплена','success');
     loadAdminTopics();
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 async function hideTopic(tid, currentlyHidden) {
   try {
-    await api.patch('/forum/topics/'+tid, { hidden: !currentlyHidden });
+    await api.patch('/forum/'+tid, { hidden: !currentlyHidden });
     showToast(!currentlyHidden?'Тема скрыта':'Тема видна','success');
     loadAdminTopics();
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
@@ -735,7 +735,7 @@ async function hideTopic(tid, currentlyHidden) {
 async function delTopic(tid, name) {
   if (!confirm('Удалить тему «'+name+'»?')) return;
   try {
-    await api.delete('/forum/topics/'+tid);
+    await api.delete('/forum/'+tid);
     showToast('Тема удалена','success');
     loadAdminTopics();
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
