@@ -38,7 +38,15 @@ router.get('/', optionalAuth, async (req, res) => {
                WHERE 1=1`;
     const params = [];
 
-    if (!isAdmin) sql += ` AND (t.hidden IS NULL OR t.hidden = false)`;
+    // Скрытые темы не показываем — но автор видит свои (как теневой бан)
+    if (!isAdmin) {
+      if (req.user) {
+        params.push(req.user.uid);
+        sql += ` AND (t.hidden IS NULL OR t.hidden = false OR t.author_uid = $${params.length})`;
+      } else {
+        sql += ` AND (t.hidden IS NULL OR t.hidden = false)`;
+      }
+    }
     if (search) {
       params.push(`%${search}%`);
       sql += ` AND t.title ILIKE $${params.length}`;
@@ -87,7 +95,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
     );
     if (!topic) return res.status(404).json({ error: 'Тема не найдена' });
     const isAdmin = req.user && req.user.role === 'admin';
-    if (topic.hidden && !isAdmin) return res.status(404).json({ error: 'Тема не найдена' });
+    const isAuthor = req.user && req.user.uid === topic.author_uid;
+    if (topic.hidden && !isAdmin && !isAuthor) return res.status(404).json({ error: 'Тема не найдена' });
     res.json({ topic });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });

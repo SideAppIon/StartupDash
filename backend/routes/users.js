@@ -7,17 +7,40 @@ const { ensureModeratorSchema, isAdmin, moderatorCanActOn } = require('../lib/mo
 
 const router = express.Router();
 
+// Мягкое скрытие пользователя админом (не виден другим, но сам работает как обычно)
+let hiddenSchemaEnsured = false;
+async function ensureHiddenSchema() {
+  if (hiddenSchemaEnsured) return;
+  try {
+    await queryOne('ALTER TABLE users ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE');
+    hiddenSchemaEnsured = true;
+  } catch (e) {
+    console.error('ensureHiddenSchema (users) error:', e.message);
+  }
+}
+
 // GET /users — список всех (публично); admin видит onboarding_done
 router.get('/', optionalAuth, async (req, res) => {
   try {
+    await ensureHiddenSchema();
     const { role, search } = req.query;
     const isAdmin = req.user && req.user.role === 'admin';
-    let sql = `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, created_at, onboarding_done
+    let sql = `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, hidden, created_at, onboarding_done
                FROM users WHERE 1=1`;
     const params = [];
 
     // Модераторы — скрытая роль: в общем списке их не показываем (видит только админ)
     if (!isAdmin) sql += ` AND role <> 'moderator'`;
+
+    // Мягко скрытые админом — не показываем (сам пользователь видит себя)
+    if (!isAdmin) {
+      if (req.user) {
+        params.push(req.user.uid);
+        sql += ` AND (hidden IS NOT TRUE OR uid = $${params.length})`;
+      } else {
+        sql += ` AND hidden IS NOT TRUE`;
+      }
+    }
 
     if (role) {
       params.push(role);
@@ -37,14 +60,22 @@ router.get('/', optionalAuth, async (req, res) => {
 });
 
 // GET /users/:uid — профиль пользователя (публично)
-router.get('/:uid', async (req, res) => {
+router.get('/:uid', optionalAuth, async (req, res) => {
   try {
+    await ensureHiddenSchema();
     const user = await queryOne(
-      `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, created_at
+      `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, hidden, created_at
        FROM users WHERE uid = $1`,
       [req.params.uid]
     );
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    // Мягко скрытый — «не найден» для всех, кроме самого пользователя и админа
+    const viewerUid = req.user && req.user.uid;
+    const viewerRole = req.user && req.user.role;
+    if (user.hidden && viewerUid !== user.uid && viewerRole !== 'admin') {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
     res.json({ user: parseUser(user) });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -59,7 +90,7 @@ router.patch('/:uid', requireAuth, async (req, res) => {
     }
 
     const allowed = ['name', 'bio', 'skills', 'avatar', 'contacts', 'portfolio'];
-    if (req.user.role === 'admin') allowed.push('role', 'blocked', 'forum_banned');
+    if (req.user.role === 'admin') { allowed.push('role', 'blocked', 'forum_banned', 'hidden'); await ensureHiddenSchema(); }
     const updates = [];
     const values  = [];
 

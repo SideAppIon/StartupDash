@@ -407,15 +407,18 @@ function renderUsers(users) {
       var obBadge = u.onboarding_done
         ? '<span title="Онбординг пройден" style="font-size:12px;color:var(--success)">✅</span>'
         : '<span title="Онбординг не пройден" style="font-size:12px;color:var(--text3)">🔘</span>';
-      return '<div class="user-row">'+
+      var hidden = u.hidden === true || u.hidden === 'true';
+      var hiddenBadge = hidden ? '<span class="badge badge--gray" style="font-size:10px">🙈 Скрыт</span>' : '';
+      return '<div class="user-row"'+(hidden?' style="opacity:.55"':'')+'>'+
         '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
         '<div class="user-row__info">'+
-          '<div class="user-row__name">'+esc(u.name||'—')+' '+obBadge+'</div>'+
+          '<div class="user-row__name">'+esc(u.name||'—')+' '+obBadge+' '+hiddenBadge+'</div>'+
           '<div class="user-row__email">'+esc(u.email||'—')+'</div>'+
         '</div>'+
         '<span class="badge '+(ROLE_CLASSES[u.role]||'badge--gray')+'">'+esc(ROLE_LABELS[u.role]||u.role||'')+'</span>'+
         '<div class="user-row__actions">'+
           '<a href="member.html?uid='+esc(u.uid||'')+'" class="btn btn--ghost btn--sm">👁</a>'+
+          '<button class="btn btn--outline btn--sm" data-action="hideusr" data-uid="'+esc(u.uid||'')+'" data-hidden="'+(hidden?'1':'0')+'">'+(hidden?'👁 Показать':'🙈 Скрыть')+'</button>'+
           '<button class="btn btn--outline btn--sm" data-action="role" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'" data-role="'+esc(u.role||'')+'">Роль</button>'+
           '<button class="btn btn--ghost btn--sm" data-action="pwd" data-uid="'+esc(u.uid||'')+'" data-email="'+esc(u.email||'')+'">🔑</button>'+
           '<button class="btn btn--outline btn--sm" data-action="resetob" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'" title="Сбросить онбординг">🔄 Онбординг</button>'+
@@ -444,15 +447,18 @@ function renderStartups(list) {
     list.map(function(s) {
       var privBadge = s.privacy==='private'?'🔒 ':s.privacy==='closed'?'🔐 ':'';
       var ownerName = s.owner_name || s.ownerName || '?';
-      return '<div class="user-row">'+
+      var hidden = s.hidden === true || s.hidden === 'true';
+      var hiddenBadge = hidden ? ' <span class="badge badge--gray" style="font-size:10px">🙈 Скрыт</span>' : '';
+      return '<div class="user-row"'+(hidden?' style="opacity:.55"':'')+'>'+
         '<span style="font-size:24px">'+(s.emoji||'🚀')+'</span>'+
         '<div class="user-row__info">'+
-          '<div class="user-row__name">'+privBadge+esc(s.name||'')+'</div>'+
+          '<div class="user-row__name">'+privBadge+esc(s.name||'')+hiddenBadge+'</div>'+
           '<div class="user-row__email">'+esc(ownerName)+' · '+esc(s.category||'')+'</div>'+
         '</div>'+
         '<span class="badge badge--green">'+esc(s.stage||'Идея')+'</span>'+
         '<div class="user-row__actions">'+
           '<a href="startup.html?id='+s.id+'" class="btn btn--outline btn--sm" target="_blank">Открыть</a>'+
+          '<button class="btn btn--outline btn--sm" data-action="hidest" data-sid="'+s.id+'" data-hidden="'+(hidden?'1':'0')+'">'+(hidden?'👁 Показать':'🙈 Скрыть')+'</button>'+
           '<button class="btn btn--danger btn--sm" data-action="delst" data-sid="'+s.id+'" data-name="'+esc(s.name||'')+'">✕</button>'+
         '</div>'+
       '</div>';
@@ -774,7 +780,27 @@ document.addEventListener('click', function(e) {
   if (a==='resetob')   resetOnboarding(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));
   if (a==='delusr')    delUser(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));
   if (a==='delst')     delStartup(btn.getAttribute('data-sid'), btn.getAttribute('data-name'));
+  if (a==='hideusr')   toggleUserHidden(btn.getAttribute('data-uid'), btn.getAttribute('data-hidden')==='1');
+  if (a==='hidest')    toggleStartupHidden(btn.getAttribute('data-sid'), btn.getAttribute('data-hidden')==='1');
 });
+
+async function toggleUserHidden(uid, currentlyHidden) {
+  if (!uid) return;
+  try {
+    await api.patch('/users/'+uid, { hidden: !currentlyHidden });
+    showToast(!currentlyHidden ? 'Пользователь скрыт' : 'Пользователь снова виден', 'success');
+    await loadUsers();
+  } catch(e) { showToast('Ошибка: '+e.message, 'error'); }
+}
+
+async function toggleStartupHidden(sid, currentlyHidden) {
+  if (!sid) return;
+  try {
+    await api.patch('/startups/'+sid, { hidden: !currentlyHidden });
+    showToast(!currentlyHidden ? 'Стартап скрыт' : 'Стартап снова виден', 'success');
+    await loadStartupsAdmin();
+  } catch(e) { showToast('Ошибка: '+e.message, 'error'); }
+}
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 

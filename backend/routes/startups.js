@@ -19,6 +19,18 @@ async function ensureUpdatesSchema() {
   }
 }
 
+// Мягкое скрытие стартапа админом (не влияет на privacy; владелец видит свой)
+let hiddenSchemaEnsured = false;
+async function ensureHiddenSchema() {
+  if (hiddenSchemaEnsured) return;
+  try {
+    await query('ALTER TABLE startups ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE');
+    hiddenSchemaEnsured = true;
+  } catch (e) {
+    console.error('ensureHiddenSchema (startups) error:', e.message);
+  }
+}
+
 // Нормализация ссылки на видео ВКонтакте → URL для встраивания (video_ext.php).
 // Принимает: код <iframe src="...">, готовую ссылку video_ext.php,
 // либо обычную ссылку на страницу видео (vk.com/video-123_456, vkvideo.ru/...).
@@ -58,6 +70,7 @@ function normalizeVkVideo(raw) {
 // GET /startups — каталог (публично, с фильтрами)
 router.get('/', optionalAuth, async (req, res) => {
   try {
+    await ensureHiddenSchema();
     const { category, stage, search, owner_uid } = req.query;
     let sql = `SELECT * FROM startups WHERE 1=1`;
     const params = [];
@@ -66,6 +79,13 @@ router.get('/', optionalAuth, async (req, res) => {
     const isAdmin = req.user && req.user.role === 'admin';
     if (!isAdmin) {
       sql += ` AND privacy != 'closed'`;
+      // Мягко скрытые админом — не показываем (владелец видит свои)
+      if (req.user) {
+        params.push(req.user.uid);
+        sql += ` AND (hidden IS NOT TRUE OR owner_uid = $${params.length})`;
+      } else {
+        sql += ` AND hidden IS NOT TRUE`;
+      }
     }
 
     // Ограничение видимости по группе
@@ -113,13 +133,19 @@ router.get('/:id', optionalAuth, async (req, res) => {
     const startup = await queryOne('SELECT * FROM startups WHERE id = $1', [req.params.id]);
     if (!startup) return res.status(404).json({ error: 'Стартап не найден' });
 
+    const uid = req.user && req.user.uid;
+    const role = req.user && req.user.role;
+
     // Закрытый — только для владельца и админа
     if (startup.privacy === 'closed') {
-      const uid = req.user && req.user.uid;
-      const role = req.user && req.user.role;
       if (uid !== startup.owner_uid && role !== 'admin') {
         return res.status(403).json({ error: 'Доступ закрыт' });
       }
+    }
+
+    // Мягко скрытый админом — для всех «не найден», кроме владельца и админа
+    if (startup.hidden && uid !== startup.owner_uid && role !== 'admin') {
+      return res.status(404).json({ error: 'Стартап не найден' });
     }
 
     res.json({ startup: parseStartup(startup) });
@@ -185,6 +211,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const isOwner = startup.owner_uid === req.user.uid;
     const isAdmin = req.user.role === 'admin';
     if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Нет доступа' });
+    if (isAdmin) await ensureHiddenSchema();
 
     // Нормализуем тело — camelCase → snake_case
     const b2 = req.body;
@@ -202,9 +229,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
       tags:           b2.tags,
       content_blocks: b2.content_blocks ?? b2.contentBlocks,
     };
+    // Мягкое скрытие — только админ
+    if (isAdmin && b2.hidden !== undefined) normalized.hidden = b2.hidden;
 
     const allowed = ['name', 'tagline', 'stage', 'category', 'website', 'looking_for',
                      'cover_image', 'emoji', 'icon_image', 'tags', 'privacy', 'content_blocks'];
+    if (isAdmin) allowed.push('hidden');
     const updates = [];
     const values  = [];
 

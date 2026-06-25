@@ -231,10 +231,15 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS forum_banned BOOLEAN DEFAULT FALSE;
 -- Закрепление тем форума
 ALTER TABLE forum_topics ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE;
 
+-- Мягкое скрытие админом (теневой бан): не видно другим, владелец/автор видит своё
+ALTER TABLE startups ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE;
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE;
+
 -- Привязка модераторов к группам (модератор видит/модерирует только свои группы)
+-- group_id — UUID, как groups.id / user_groups.group_id (иначе JOIN'ы падают uuid=text)
 CREATE TABLE IF NOT EXISTS moderator_groups (
   moderator_uid TEXT NOT NULL,
-  group_id      TEXT NOT NULL,
+  group_id      UUID NOT NULL,
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (moderator_uid, group_id)
 );

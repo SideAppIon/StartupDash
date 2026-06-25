@@ -6,12 +6,23 @@ let ensured = false;
 async function ensureModeratorSchema() {
   if (ensured) return;
   try {
+    // group_id должен быть UUID — совпадать с типом groups.id / user_groups.group_id,
+    // иначе JOIN'ы в скоуп-запросах падают (uuid = text).
     await query(`CREATE TABLE IF NOT EXISTS moderator_groups (
       moderator_uid TEXT NOT NULL,
-      group_id      TEXT NOT NULL,
+      group_id      UUID NOT NULL,
       created_at    TIMESTAMPTZ DEFAULT NOW(),
       PRIMARY KEY (moderator_uid, group_id)
     )`);
+    // Чиним legacy-таблицы, где колонка была создана как TEXT
+    await query(`DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name='moderator_groups' AND column_name='group_id' AND data_type='text'
+      ) THEN
+        ALTER TABLE moderator_groups ALTER COLUMN group_id TYPE uuid USING group_id::uuid;
+      END IF;
+    END $$;`);
     ensured = true;
   } catch (e) {
     console.error('ensureModeratorSchema error:', e.message);
