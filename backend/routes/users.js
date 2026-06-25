@@ -3,6 +3,7 @@ const bcrypt  = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { queryOne, queryAll } = require('../db');
 const { requireAuth, optionalAuth, signToken } = require('../middleware/auth');
+const { ensureModeratorSchema, isAdmin, moderatorCanActOn } = require('../lib/moderation');
 
 const router = express.Router();
 
@@ -127,11 +128,12 @@ router.patch('/:uid/role', requireAuth, async (req, res) => {
   }
 });
 
-// Модератор/админ: PATCH /users/:uid/forum-ban — запретить/разрешить общение на форуме
+// Модератор/админ: PATCH /users/:uid/forum-ban — запретить/разрешить общение на форуме (мут)
 router.patch('/:uid/forum-ban', requireAuth, async (req, res) => {
   try {
     const isMod = req.user.role === 'admin' || req.user.role === 'moderator';
     if (!isMod) return res.status(403).json({ error: 'Только модератор или администратор' });
+    await ensureModeratorSchema();
 
     // Нельзя банить администраторов и модераторов
     const target = await queryOne('SELECT role FROM users WHERE uid=$1', [req.params.uid]);
@@ -139,10 +141,38 @@ router.patch('/:uid/forum-ban', requireAuth, async (req, res) => {
     if (target.role === 'admin' || target.role === 'moderator') {
       return res.status(403).json({ error: 'Нельзя ограничить администратора или модератора' });
     }
+    // Модератор может мутить только пользователей своей группы
+    if (!isAdmin(req.user) && !(await moderatorCanActOn(req.user.uid, req.params.uid))) {
+      return res.status(403).json({ error: 'Пользователь вне вашей группы' });
+    }
 
     const banned = req.body.banned === true || req.body.banned === 'true';
     await queryOne('UPDATE users SET forum_banned=$1 WHERE uid=$2', [banned, req.params.uid]);
     res.json({ ok: true, forum_banned: banned });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// Модератор/админ: PATCH /users/:uid/reset-avatar — сбросить аватар на дефолтный
+router.patch('/:uid/reset-avatar', requireAuth, async (req, res) => {
+  try {
+    const isMod = req.user.role === 'admin' || req.user.role === 'moderator';
+    if (!isMod) return res.status(403).json({ error: 'Только модератор или администратор' });
+    await ensureModeratorSchema();
+
+    const target = await queryOne('SELECT role FROM users WHERE uid=$1', [req.params.uid]);
+    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (target.role === 'admin' || target.role === 'moderator') {
+      return res.status(403).json({ error: 'Нельзя сбросить аватар администратора или модератора' });
+    }
+    // Модератор может сбрасывать аватар только пользователям своей группы
+    if (!isAdmin(req.user) && !(await moderatorCanActOn(req.user.uid, req.params.uid))) {
+      return res.status(403).json({ error: 'Пользователь вне вашей группы' });
+    }
+
+    await queryOne("UPDATE users SET avatar='' WHERE uid=$1", [req.params.uid]);
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }

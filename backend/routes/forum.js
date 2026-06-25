@@ -2,11 +2,23 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { queryOne, queryAll } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { ensureModeratorSchema, isAdmin, moderatorCanActOn } = require('../lib/moderation');
 
 const router = express.Router();
 
 // Модератор или администратор
 const isModerator = (user) => user && (user.role === 'admin' || user.role === 'moderator');
+
+// Может ли пользователь модерировать контент автора authorUid.
+// Админ — всегда; модератор — только если автор в его группе.
+async function canModerateAuthor(user, authorUid) {
+  if (isAdmin(user)) return true;
+  if (user && user.role === 'moderator') {
+    await ensureModeratorSchema();
+    return moderatorCanActOn(user.uid, authorUid);
+  }
+  return false;
+}
 
 // Проверка запрета общения на форуме
 async function isForumBanned(uid) {
@@ -88,7 +100,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const topic = await queryOne('SELECT * FROM forum_topics WHERE id=$1', [req.params.id]);
     if (!topic) return res.status(404).json({ error: 'Тема не найдена' });
 
-    const isMod = isModerator(req.user);   // admin или moderator
+    // Модератор может модерировать только темы авторов своей группы (админ — любые)
+    const isMod = await canModerateAuthor(req.user, topic.author_uid);
     const isAuthor = topic.author_uid === req.user.uid;
     const serviceFields = ['reply_count', 'last_at', 'last_author', 'views'];
     const keys = Object.keys(req.body);
@@ -120,10 +133,15 @@ router.patch('/:id', requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /forum/:id — администратор или модератор
+// DELETE /forum/:id — администратор или модератор (модератор — только своя группа)
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
     if (!isModerator(req.user)) return res.status(403).json({ error: 'Только модератор или администратор' });
+    const topic = await queryOne('SELECT author_uid FROM forum_topics WHERE id=$1', [req.params.id]);
+    if (!topic) return res.status(404).json({ error: 'Тема не найдена' });
+    if (!(await canModerateAuthor(req.user, topic.author_uid))) {
+      return res.status(403).json({ error: 'Тема вне вашей группы' });
+    }
     await queryOne('DELETE FROM forum_posts WHERE topic_id=$1', [req.params.id]);
     await queryOne('DELETE FROM forum_topics WHERE id=$1', [req.params.id]);
     res.json({ ok: true });
@@ -190,7 +208,9 @@ router.delete('/:id/posts/:postId', requireAuth, async (req, res) => {
     const post = await queryOne('SELECT author_uid FROM forum_posts WHERE id=$1', [req.params.postId]);
     if (!post) return res.status(404).json({ error: 'Пост не найден' });
 
-    const canDelete = post.author_uid === req.user.uid || isModerator(req.user);
+    // Автор удаляет свой пост; модератор — только посты авторов своей группы (админ — любые)
+    const canDelete = post.author_uid === req.user.uid
+      || (await canModerateAuthor(req.user, post.author_uid));
     if (!canDelete) return res.status(403).json({ error: 'Нет доступа' });
 
     await queryOne('DELETE FROM forum_posts WHERE id=$1', [req.params.postId]);

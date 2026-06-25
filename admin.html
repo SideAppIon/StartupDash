@@ -279,6 +279,18 @@
       </div>
       <div id="gsMemberList" style="max-height:200px;overflow-y:auto"></div>
     </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:600">🛡️ Модераторы группы (<span id="gsModCount">0</span>)</span>
+        <div style="display:flex;gap:8px">
+          <select class="form-select" id="gsAddModSelect" style="font-size:13px;padding:6px 10px;max-width:200px"></select>
+          <button class="btn btn--primary btn--sm" onclick="addGroupModerator()">+ Назначить</button>
+        </div>
+      </div>
+      <div class="form-hint" style="margin-bottom:10px">Модератор видит жалобы и модерирует только пользователей этой группы. Доступны только пользователи с ролью «модератор».</div>
+      <div id="gsModList" style="max-height:200px;overflow-y:auto"></div>
+    </div>
   </div>
 </div>
 
@@ -762,6 +774,7 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 var allGroups = [];
 var selGroupId = null;
 var selGroupMembers = [];
+var selGroupModerators = [];
 
 async function loadGroups() {
   try {
@@ -836,6 +849,7 @@ async function openGroupSettings(id) {
   document.getElementById('gsMessaging').checked  = !!g.messaging_restriction;
   document.getElementById('groupSettingsModal').classList.add('open');
   await loadGroupMembers(id);
+  await loadGroupModerators(id);
 }
 function closeGroupSettings() {
   document.getElementById('groupSettingsModal').classList.remove('open');
@@ -919,6 +933,70 @@ async function removeGroupMember(uid) {
     if (g) g.member_count = Math.max(0,(g.member_count||1)-1);
     renderGroups(allGroups);
     await loadGroupMembers(selGroupId);
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+// ── Модераторы группы ──────────────────────────────────────
+async function loadGroupModerators(groupId) {
+  try {
+    var data = await api.get('/groups/'+groupId+'/moderators');
+    selGroupModerators = data.moderators || [];
+    renderGroupModerators();
+    populateAddModSelect();
+  } catch(e) {}
+}
+
+function renderGroupModerators() {
+  var el = document.getElementById('gsModList');
+  document.getElementById('gsModCount').textContent = selGroupModerators.length;
+  if (!selGroupModerators.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text2);padding:8px 0">Модераторы не назначены</div>';
+    return;
+  }
+  el.innerHTML = selGroupModerators.map(function(u) {
+    var av = u.avatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(u.name||'U');
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'+
+      '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:13px;font-weight:500">'+esc(u.name)+' 🛡️</div>'+
+        '<div style="font-size:11px;color:var(--text2)">'+esc(u.email)+'</div>'+
+      '</div>'+
+      '<button class="btn btn--danger btn--sm" onclick="removeGroupModerator(\''+u.uid+'\')">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+function populateAddModSelect() {
+  var sel = document.getElementById('gsAddModSelect');
+  var modUids = new Set(selGroupModerators.map(function(m){ return m.uid; }));
+  // Только пользователи с ролью moderator, ещё не закреплённые за этой группой
+  var available = allUsers.filter(function(u){ return u.role==='moderator' && !modUids.has(u.uid); });
+  if (!available.length) {
+    sel.innerHTML = '<option value="">— нет свободных модераторов —</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">— выбери модератора —</option>' +
+    available.map(function(u){
+      return '<option value="'+esc(u.uid)+'">'+esc(u.name)+'</option>';
+    }).join('');
+}
+
+async function addGroupModerator() {
+  var uid = document.getElementById('gsAddModSelect').value;
+  if (!uid || !selGroupId) { showToast('Выбери модератора','warn'); return; }
+  try {
+    await api.post('/groups/'+selGroupId+'/moderators', { user_uid: uid });
+    showToast('Модератор назначен','success');
+    await loadGroupModerators(selGroupId);
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+async function removeGroupModerator(uid) {
+  if (!selGroupId) return;
+  try {
+    await api.delete('/groups/'+selGroupId+'/moderators/'+uid);
+    showToast('Модератор снят с группы','success');
+    await loadGroupModerators(selGroupId);
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 </script>

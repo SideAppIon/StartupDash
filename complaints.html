@@ -131,7 +131,8 @@ function buildCard(c) {
   if (c.targetUid && !targetIsMod) {
     actions += banned
       ? '<button class="btn btn--outline btn--sm" style="color:var(--accent)" data-uid="'+esc(c.targetUid)+'" data-banned="1" onclick="toggleBan(this)">✓ Разрешить общение</button>'
-      : '<button class="btn btn--danger btn--sm" data-uid="'+esc(c.targetUid)+'" data-banned="0" onclick="toggleBan(this)">🚫 Запретить общение</button>';
+      : '<button class="btn btn--danger btn--sm" data-uid="'+esc(c.targetUid)+'" data-banned="0" onclick="toggleBan(this)">🔇 Замутить</button>';
+    actions += '<button class="btn btn--outline btn--sm" data-uid="'+esc(c.targetUid)+'" onclick="resetAvatar(this)">🖼 Сбросить аватар</button>';
   }
   if (c.status==='open') {
     actions += '<button class="btn btn--ghost btn--sm" data-id="'+esc(c.id)+'" data-st="resolved" onclick="setStatus(this)">Пометить решенной</button>';
@@ -169,6 +170,17 @@ async function toggleBan(btn) {
   try {
     await api.patch('/users/'+uid+'/forum-ban', { banned: next });
     showToast(next ? 'Общение запрещено' : 'Общение разрешено', 'success');
+    await loadComplaints();
+  } catch(e) { showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
+}
+
+async function resetAvatar(btn) {
+  var uid = btn.getAttribute('data-uid');
+  if (!uid) return;
+  if (!confirm('Сбросить аватар этого пользователя на дефолтный?')) return;
+  try {
+    await api.patch('/users/'+uid+'/reset-avatar', {});
+    showToast('Аватар сброшен','success');
     await loadComplaints();
   } catch(e) { showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
 }

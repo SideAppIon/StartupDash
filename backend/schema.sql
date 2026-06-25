@@ -230,3 +230,11 @@ ALTER TABLE users ADD CONSTRAINT users_role_check
 ALTER TABLE users ADD COLUMN IF NOT EXISTS forum_banned BOOLEAN DEFAULT FALSE;
 -- Закрепление тем форума
 ALTER TABLE forum_topics ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE;
+
+-- Привязка модераторов к группам (модератор видит/модерирует только свои группы)
+CREATE TABLE IF NOT EXISTS moderator_groups (
+  moderator_uid TEXT NOT NULL,
+  group_id      TEXT NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (moderator_uid, group_id)
+);

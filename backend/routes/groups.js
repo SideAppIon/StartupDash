@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { ensureModeratorSchema } = require('../lib/moderation');
 
 const router = express.Router();
 
@@ -115,6 +116,60 @@ router.delete('/:id/members/:uid', requireAuth, requireAdmin, async (req, res) =
   try {
     await queryOne(
       'DELETE FROM user_groups WHERE group_id=$1 AND user_uid=$2',
+      [req.params.id, req.params.uid]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ── Модераторы группы ─────────────────────────────────────
+// GET /groups/:id/moderators — модераторы, закреплённые за группой
+router.get('/:id/moderators', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await ensureModeratorSchema();
+    const mods = await queryAll(
+      `SELECT u.uid, u.name, u.email, u.role, u.avatar
+       FROM moderator_groups mg
+       JOIN users u ON u.uid = mg.moderator_uid
+       WHERE mg.group_id = $1
+       ORDER BY u.name`,
+      [req.params.id]
+    );
+    res.json({ moderators: mods });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// POST /groups/:id/moderators — закрепить модератора за группой
+router.post('/:id/moderators', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await ensureModeratorSchema();
+    const { user_uid } = req.body;
+    if (!user_uid) return res.status(400).json({ error: 'user_uid обязателен' });
+    const user = await queryOne('SELECT role FROM users WHERE uid=$1', [user_uid]);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (user.role !== 'moderator') {
+      return res.status(400).json({ error: 'Назначить можно только пользователя с ролью «модератор»' });
+    }
+    await queryOne(
+      'INSERT INTO moderator_groups (moderator_uid, group_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+      [user_uid, req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// DELETE /groups/:id/moderators/:uid — снять модератора с группы
+router.delete('/:id/moderators/:uid', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await ensureModeratorSchema();
+    await queryOne(
+      'DELETE FROM moderator_groups WHERE group_id=$1 AND moderator_uid=$2',
       [req.params.id, req.params.uid]
     );
     res.json({ ok: true });
