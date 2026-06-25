@@ -20,6 +20,14 @@
     .tab-a:hover:not(.active){color:var(--text)}
     .search-bar{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:14px;padding:10px 16px;outline:none;width:100%;margin-bottom:16px;transition:border-color .2s}
     .search-bar:focus{border-color:var(--danger)}
+    .picker{position:relative;flex:1}
+    .picker__input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px;padding:7px 12px;outline:none;transition:border-color .2s}
+    .picker__input:focus{border-color:var(--accent)}
+    .picker__menu{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:50;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:240px;overflow-y:auto}
+    .picker__item{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border)}
+    .picker__item:hover{background:var(--bg3)}
+    .picker__item:last-child{border-bottom:none}
+    .picker__empty{padding:12px;font-size:13px;color:var(--text3);text-align:center}
     .user-row{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
     .user-row:last-child{border-bottom:none}
     .user-row__info{flex:1;min-width:0}
@@ -270,25 +278,25 @@
     </div>
 
     <div style="border-top:1px solid var(--border);padding-top:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <span style="font-size:13px;font-weight:600">👥 Участники (<span id="gsMemberCount">0</span>)</span>
-        <div style="display:flex;gap:8px">
-          <select class="form-select" id="gsAddSelect" style="font-size:13px;padding:6px 10px;max-width:200px"></select>
-          <button class="btn btn--primary btn--sm" onclick="addGroupMember()">+ Добавить</button>
-        </div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px">👥 Участники (<span id="gsMemberCount">0</span>)</div>
+      <div class="picker" style="margin-bottom:12px">
+        <input type="text" class="picker__input" id="gsMemberSearch" autocomplete="off"
+          placeholder="🔍 Найти пользователя по имени или email…"
+          oninput="filterMemberPicker()" onfocus="filterMemberPicker()" onblur="hidePicker('gsMemberMenu')"/>
+        <div class="picker__menu" id="gsMemberMenu" style="display:none"></div>
       </div>
       <div id="gsMemberList" style="max-height:200px;overflow-y:auto"></div>
     </div>
 
     <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:13px;font-weight:600">🛡️ Модераторы группы (<span id="gsModCount">0</span>)</span>
-        <div style="display:flex;gap:8px">
-          <select class="form-select" id="gsAddModSelect" style="font-size:13px;padding:6px 10px;max-width:200px"></select>
-          <button class="btn btn--primary btn--sm" onclick="addGroupModerator()">+ Назначить</button>
-        </div>
-      </div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">🛡️ Модераторы группы (<span id="gsModCount">0</span>)</div>
       <div class="form-hint" style="margin-bottom:10px">Модератор видит жалобы и модерирует только пользователей этой группы. Доступны только пользователи с ролью «модератор».</div>
+      <div class="picker" style="margin-bottom:12px">
+        <input type="text" class="picker__input" id="gsModSearch" autocomplete="off"
+          placeholder="🔍 Найти модератора…"
+          oninput="filterModPicker()" onfocus="filterModPicker()" onblur="hidePicker('gsModMenu')"/>
+        <div class="picker__menu" id="gsModMenu" style="display:none"></div>
+      </div>
       <div id="gsModList" style="max-height:200px;overflow-y:auto"></div>
     </div>
   </div>
@@ -875,8 +883,6 @@ async function loadGroupMembers(groupId) {
     var data = await api.get('/groups/'+groupId+'/members');
     selGroupMembers = data.members || [];
     renderGroupMembers();
-    // Заполняем select для добавления
-    populateAddSelect();
   } catch(e) {}
 }
 
@@ -900,23 +906,49 @@ function renderGroupMembers() {
   }).join('');
 }
 
-function populateAddSelect() {
-  var sel = document.getElementById('gsAddSelect');
-  var memberUids = new Set(selGroupMembers.map(function(m){ return m.uid; }));
-  var available = allUsers.filter(function(u){ return !memberUids.has(u.uid); });
-  sel.innerHTML = '<option value="">— выбери пользователя —</option>' +
-    available.map(function(u){
-      return '<option value="'+esc(u.uid)+'">'+esc(u.name)+' ('+esc(ROLE_LABELS[u.role]||u.role)+')</option>';
-    }).join('');
+// ── Поиск-пикер пользователей ──────────────────────────────
+function pickerItemHtml(u, pickFn) {
+  var av = u.avatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(u.name||'U');
+  // onmousedown срабатывает до blur инпута — клик успевает отработать
+  return '<div class="picker__item" onmousedown="'+pickFn+'(\''+esc(u.uid)+'\')">'+
+    '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
+    '<div style="flex:1;min-width:0">'+
+      '<div style="font-size:13px;font-weight:500">'+esc(u.name||'—')+'</div>'+
+      '<div style="font-size:11px;color:var(--text2)">'+esc(u.email||'')+' · '+esc(ROLE_LABELS[u.role]||u.role)+'</div>'+
+    '</div>'+
+  '</div>';
+}
+function renderPickerMenu(menuId, items, pickFn) {
+  var menu = document.getElementById(menuId);
+  if (!items.length) {
+    menu.innerHTML = '<div class="picker__empty">Ничего не найдено</div>';
+  } else {
+    menu.innerHTML = items.slice(0, 30).map(function(u){ return pickerItemHtml(u, pickFn); }).join('');
+  }
+  menu.style.display = 'block';
+}
+function hidePicker(menuId) {
+  // небольшая задержка, чтобы успел отработать onmousedown по пункту
+  setTimeout(function(){ var m=document.getElementById(menuId); if(m) m.style.display='none'; }, 150);
 }
 
-async function addGroupMember() {
-  var uid = document.getElementById('gsAddSelect').value;
-  if (!uid || !selGroupId) { showToast('Выбери пользователя','warn'); return; }
+function filterMemberPicker() {
+  var q = (document.getElementById('gsMemberSearch').value||'').trim().toLowerCase();
+  var memberUids = new Set(selGroupMembers.map(function(m){ return m.uid; }));
+  var available = allUsers.filter(function(u){ return !memberUids.has(u.uid); });
+  if (q) available = available.filter(function(u){
+    return (u.name||'').toLowerCase().indexOf(q)!==-1 || (u.email||'').toLowerCase().indexOf(q)!==-1;
+  });
+  renderPickerMenu('gsMemberMenu', available, 'pickGroupMember');
+}
+
+async function pickGroupMember(uid) {
+  if (!uid || !selGroupId) return;
+  document.getElementById('gsMemberMenu').style.display='none';
+  document.getElementById('gsMemberSearch').value='';
   try {
     await api.post('/groups/'+selGroupId+'/members', { user_uid: uid });
     showToast('Участник добавлен','success');
-    // Обновляем счетчик в списке
     var g = allGroups.find(function(x){ return x.id===selGroupId; });
     if (g) g.member_count = (g.member_count||0)+1;
     renderGroups(allGroups);
@@ -942,7 +974,6 @@ async function loadGroupModerators(groupId) {
     var data = await api.get('/groups/'+groupId+'/moderators');
     selGroupModerators = data.moderators || [];
     renderGroupModerators();
-    populateAddModSelect();
   } catch(e) {}
 }
 
@@ -966,24 +997,21 @@ function renderGroupModerators() {
   }).join('');
 }
 
-function populateAddModSelect() {
-  var sel = document.getElementById('gsAddModSelect');
+function filterModPicker() {
+  var q = (document.getElementById('gsModSearch').value||'').trim().toLowerCase();
   var modUids = new Set(selGroupModerators.map(function(m){ return m.uid; }));
   // Только пользователи с ролью moderator, ещё не закреплённые за этой группой
   var available = allUsers.filter(function(u){ return u.role==='moderator' && !modUids.has(u.uid); });
-  if (!available.length) {
-    sel.innerHTML = '<option value="">— нет свободных модераторов —</option>';
-    return;
-  }
-  sel.innerHTML = '<option value="">— выбери модератора —</option>' +
-    available.map(function(u){
-      return '<option value="'+esc(u.uid)+'">'+esc(u.name)+'</option>';
-    }).join('');
+  if (q) available = available.filter(function(u){
+    return (u.name||'').toLowerCase().indexOf(q)!==-1 || (u.email||'').toLowerCase().indexOf(q)!==-1;
+  });
+  renderPickerMenu('gsModMenu', available, 'pickGroupModerator');
 }
 
-async function addGroupModerator() {
-  var uid = document.getElementById('gsAddModSelect').value;
-  if (!uid || !selGroupId) { showToast('Выбери модератора','warn'); return; }
+async function pickGroupModerator(uid) {
+  if (!uid || !selGroupId) return;
+  document.getElementById('gsModMenu').style.display='none';
+  document.getElementById('gsModSearch').value='';
   try {
     await api.post('/groups/'+selGroupId+'/moderators', { user_uid: uid });
     showToast('Модератор назначен','success');
