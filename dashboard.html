@@ -336,7 +336,10 @@ async function renderUser(el, uid) {
 async function renderAdmin(el) {
   var u = await db.collection('users').get();
   var s = await db.collection('startups').get();
-  el.innerHTML = '<div class="stat-row"><div class="stat-box"><div class="stat-box__num">'+u.size+'</div><div class="stat-box__lbl">Пользователей</div></div><div class="stat-box"><div class="stat-box__num">'+s.size+'</div><div class="stat-box__lbl">Стартапов</div></div><div class="stat-box"><div class="stat-box__num">'+(u.docs.filter(function(d){return d.data().role==='expert';}).length)+'</div><div class="stat-box__lbl">Экспертов</div></div></div>' +
+  // Скрытые админом не учитываем в статистике
+  var users    = u.docs.map(function(d){return d.data();}).filter(function(x){return !(x.hidden===true||x.hidden==='true');});
+  var startups = s.docs.map(function(d){return d.data();}).filter(function(x){return !(x.hidden===true||x.hidden==='true');});
+  el.innerHTML = '<div class="stat-row"><div class="stat-box"><div class="stat-box__num">'+users.length+'</div><div class="stat-box__lbl">Пользователей</div></div><div class="stat-box"><div class="stat-box__num">'+startups.length+'</div><div class="stat-box__lbl">Стартапов</div></div><div class="stat-box"><div class="stat-box__num">'+(users.filter(function(x){return x.role==='expert';}).length)+'</div><div class="stat-box__lbl">Экспертов</div></div></div>' +
     '<div class="grid-2"><a href="admin.html" class="card card--clickable" style="text-decoration:none"><div style="font-size:32px;margin-bottom:12px">👥</div><div class="section-title" style="font-size:18px">Пользователи</div><p style="font-size:14px;color:var(--text2);margin-top:6px">Роли, блокировка, сброс паролей</p></a><a href="startups.html" class="card card--clickable" style="text-decoration:none"><div style="font-size:32px;margin-bottom:12px">🚀</div><div class="section-title" style="font-size:18px">Стартапы</div><p style="font-size:14px;color:var(--text2);margin-top:6px">Просмотр и удаление</p></a></div>';
 }
 

@@ -377,8 +377,9 @@ async function loadStats() {
       api.get('/users'),
       api.get('/startups')
     ]);
-    var users    = ud.users    || [];
-    var startups = sd.startups || [];
+    // Скрытые админом не учитываем в статистике
+    var users    = (ud.users    || []).filter(function(u){ return !(u.hidden===true||u.hidden==='true'); });
+    var startups = (sd.startups || []).filter(function(s){ return !(s.hidden===true||s.hidden==='true'); });
     document.getElementById('statUsers').textContent    = users.length;
     document.getElementById('statStartups').textContent = startups.length;
     document.getElementById('statExperts').textContent  = users.filter(function(u){return u.role==='expert';}).length;

@@ -195,8 +195,8 @@ async function loadFeed() {
     var publicStartups = {};
     allStartups.docs.forEach(function(d) {
       var s = d.data();
-      // Только открытые стартапы
-      if (!s.privacy || s.privacy === 'public') {
+      // Только открытые и не скрытые админом стартапы
+      if ((!s.privacy || s.privacy === 'public') && !s.hidden) {
         publicStartups[d.id] = s;
       }
     });
@@ -343,7 +343,7 @@ async function loadTrending() {
     var allPublic = await db.collection('startups').get();
     var publicList = allPublic.docs
       .map(function(d) { return Object.assign({id:d.id}, d.data()); })
-      .filter(function(s) { return !s.privacy || s.privacy === 'public'; });
+      .filter(function(s) { return (!s.privacy || s.privacy === 'public') && !s.hidden; });
 
     // Считаем по lastUpdate / используем порядок как есть
     var byUpdates = {};
