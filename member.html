@@ -284,9 +284,10 @@ async function loadMemberStartups(user, userData) {
       }
 
       var isClickable = viewerIsAdmin || (!s.privacy || s.privacy === 'public');
-      var logo = s.iconImage
+      var logoInner = s.iconImage
         ? '<img src="' + esc(s.iconImage) + '" style="width:36px;height:36px;border-radius:8px;object-fit:cover" onerror="this.style.display=&quot;none&quot;"/>'
-        : '<span style="font-size:26px">' + esc(s.emoji||'🚀') + '</span>';
+        : '<span style="font-size:24px;line-height:1">' + esc(s.emoji||'🚀') + '</span>';
+      var logo = '<div style="width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center">' + logoInner + '</div>';
       var privBadge = s.privacy === 'private'
         ? ' <span class="badge badge--gray" style="font-size:10px">🔒</span>'
         : s.privacy === 'closed'
@@ -343,9 +344,13 @@ async function loadTeamOf() {
         var sSnap = await db.collection('startups').doc(sid).get();
         if (sSnap.exists) {
           var s = sSnap.data();
-          var logo = s.iconImage
+          // Собственные стартапы человека не показываем здесь — он их основатель,
+          // они уже отображаются в разделе «Проекты»
+          if ((s.ownerUid || s.owner_uid) === profileUid) continue;
+          var logoInner = s.iconImage
             ? '<img src="'+esc(s.iconImage)+'" style="width:28px;height:28px;border-radius:6px;object-fit:cover"/>'
-            : '<span style="font-size:20px">'+(s.emoji||'🚀')+'</span>';
+            : '<span style="font-size:18px;line-height:1">'+(s.emoji||'🚀')+'</span>';
+          var logo = '<div style="width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+logoInner+'</div>';
           items += '<a href="startup.html?id='+esc(sid)+'" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px">'+
             logo+
             '<div><div style="font-size:14px;font-weight:500">'+esc(s.name||'')+'</div>'+
