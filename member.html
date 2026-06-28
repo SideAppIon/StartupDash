@@ -87,7 +87,7 @@
           <div id="memberContacts"></div>
         </div>
         <div id="teamOfCard" style="display:none" class="card">
-          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Участник в</h3>
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Участвует в</h3>
           <div id="teamOfList"></div>
         </div>
       </div>
@@ -319,12 +319,35 @@ async function loadTeamOf() {
   try {
     var items = '';
     var shownStartups = {};
+    var viewerIsAdmin = pageViewerData && pageViewerData.role === 'admin';
+    var viewerIsSelf  = pageViewer && pageViewer.uid === profileUid;
 
-    // Инвайты где профиль = from_uid (пользователь сам подавал заявку)
+    function teamRowHtml(sid, s, roleLabel) {
+      var logoInner = s.iconImage
+        ? '<img src="'+esc(s.iconImage)+'" style="width:28px;height:28px;border-radius:6px;object-fit:cover"/>'
+        : '<span style="font-size:18px;line-height:1">'+(s.emoji||'🚀')+'</span>';
+      var logo = '<div style="width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+logoInner+'</div>';
+      return '<a href="startup.html?id='+esc(sid)+'" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px">'+
+        logo+
+        '<div><div style="font-size:14px;font-weight:500">'+esc(s.name||'')+'</div>'+
+        '<div style="font-size:12px;color:var(--accent);font-weight:500">'+esc(roleLabel)+'</div></div>'+
+      '</a>';
+    }
+
+    // 1. Собственные стартапы — роль «Основатель»
+    try {
+      var ownSnap = await db.collection('startups').where('ownerUid','==',profileUid).get();
+      ownSnap.docs.forEach(function(d) {
+        var s = d.data();
+        if (s.privacy === 'closed' && !viewerIsAdmin && !viewerIsSelf) return;
+        shownStartups[d.id] = true;
+        items += teamRowHtml(d.id, s, 'Основатель');
+      });
+    } catch(eo) {}
+
+    // 2. Участие по инвайтам — роль из инвайта
     var invData = await api.get('/invites?from_uid=' + profileUid + '&status=accepted');
     var invites = invData.invites || [];
-
-    // Также инвайты where to_uid = profileUid (стартап пригласил пользователя)
     try {
       var inv2Data = await api.get('/invites?to_uid=' + profileUid + '&status=accepted');
       var inv2 = (inv2Data.invites || []).filter(function(i){ return i.type === 'from_startup'; });
@@ -343,21 +366,12 @@ async function loadTeamOf() {
       try {
         var sSnap = await db.collection('startups').doc(sid).get();
         if (sSnap.exists) {
-          var s = sSnap.data();
-          // Собственные стартапы человека не показываем здесь — он их основатель,
-          // они уже отображаются в разделе «Проекты»
-          if ((s.ownerUid || s.owner_uid) === profileUid) continue;
-          var logoInner = s.iconImage
-            ? '<img src="'+esc(s.iconImage)+'" style="width:28px;height:28px;border-radius:6px;object-fit:cover"/>'
-            : '<span style="font-size:18px;line-height:1">'+(s.emoji||'🚀')+'</span>';
-          var logo = '<div style="width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+logoInner+'</div>';
-          items += '<a href="startup.html?id='+esc(sid)+'" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;margin-bottom:10px">'+
-            logo+
-            '<div><div style="font-size:14px;font-weight:500">'+esc(s.name||'')+'</div>'+
-            '<div style="font-size:12px;color:var(--accent);font-weight:500">'+esc(invRole)+'</div></div>'+
-          '</a>';
+          var s2 = sSnap.data();
+          // Если вдруг это его же стартап — роль «Основатель»
+          var roleLabel = ((s2.ownerUid || s2.owner_uid) === profileUid) ? 'Основатель' : invRole;
+          items += teamRowHtml(sid, s2, roleLabel);
         }
-      } catch(e2) {}
+      } catch(e3) {}
     }
 
     if (items) {
