@@ -18,7 +18,8 @@
     .contact-link{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px;text-decoration:none;color:inherit;word-break:break-all}
     .contact-link:last-child{border-bottom:none}
     .contact-link:hover{color:var(--accent)}
-    .startup-item{display:flex;gap:12px;align-items:center;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;transition:border-color .2s}
+    .startup-item{display:flex;gap:12px;align-items:center;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;transition:border-color .2s}
+    .startup-item:last-child{margin-bottom:0}
     .startup-item--link{text-decoration:none;color:inherit;cursor:pointer}
     .startup-item--link:hover{border-color:var(--accent)}
     .startup-item--muted{opacity:.7;cursor:default}
@@ -74,8 +75,8 @@
           <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Портфолио</h3>
           <div id="memberPortfolio"></div>
         </div>
-        <div id="startupsSection" style="display:none">
-          <h3 class="section-title" style="margin-bottom:14px">Проекты</h3>
+        <div id="startupsSection" class="card" style="display:none;margin-bottom:20px">
+          <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Проекты</h3>
           <div id="memberStartups"></div>
         </div>
       </div>
