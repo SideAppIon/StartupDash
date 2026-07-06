@@ -56,6 +56,7 @@
           <span id="memberSkillCount" style="font-size:13px;color:var(--text2)"></span>
           <span id="memberJoined" style="font-size:13px;color:var(--text2)"></span>
         </div>
+        <div id="memberExpertStatus" style="display:none;margin-top:12px"></div>
       </div>
       <div id="profileActions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
     </div>
@@ -187,6 +188,20 @@ onAuthReady(async function(user, userData) {
   var roleEl = document.getElementById('memberRole');
   roleEl.textContent = ROLE_LABELS[profileData.role] || profileData.role || '';
   roleEl.className   = 'nav__role nav__role--' + (profileData.role||'user');
+
+  // Статус эксперта (только для роли «эксперт») — read-only
+  if (profileData.role === 'expert') {
+    var eStatus = profileData.expertStatus || profileData.expert_status || 'available';
+    var eBusy   = eStatus === 'busy';
+    var eColor  = eBusy ? 'var(--danger)' : 'var(--accent)';
+    var eBg     = eBusy ? 'rgba(255,77,79,.10)' : 'rgba(0,230,118,.10)';
+    var eLabel  = eBusy ? 'Занят' : 'Готов помочь';
+    var eBox = document.getElementById('memberExpertStatus');
+    eBox.innerHTML = '<span style="display:inline-flex;align-items:center;gap:9px;padding:8px 16px;'+
+      'border:1.5px solid '+eColor+';border-radius:999px;font-size:13px;font-weight:600;color:'+eColor+';background:'+eBg+'">'+
+      '<span style="width:9px;height:9px;border-radius:50%;background:'+eColor+';display:inline-block"></span>'+eLabel+'</span>';
+    eBox.style.display = 'block';
+  }
 
   // Навыки счетчик
   var skills = safeArray(profileData.skills);

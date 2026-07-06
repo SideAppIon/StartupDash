@@ -1,0 +1,52 @@
+<svg width="680" height="405" viewBox="0 0 680 405" role="img" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <title>Архитектура сервиса LaunchPad (светлая)</title>
+  <desc>Пользователь обращается к веб-приложению LaunchPad, оно ходит через API Gateway в serverless backend, который хранит данные в PostgreSQL и медиафайлы в Object Storage.</desc>
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#12a150"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="680" height="405" fill="#ffffff"/>
+
+  <line x1="340" y1="90"  x2="340" y2="106" stroke="#12a150" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="340" y1="160" x2="340" y2="176" stroke="#12a150" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="340" y1="228" x2="340" y2="244" stroke="#12a150" stroke-width="1.5" marker-end="url(#ar)"/>
+  <path d="M340,298 L235,314" fill="none" stroke="#12a150" stroke-width="1.5" marker-end="url(#ar)"/>
+  <path d="M340,298 L445,314" fill="none" stroke="#12a150" stroke-width="1.5" marker-end="url(#ar)"/>
+
+  <g>
+    <rect x="200" y="40" width="280" height="50" rx="10" fill="#f3f6f8" stroke="#d3d9df"/>
+    <text x="340" y="66" text-anchor="middle" font-size="14" font-weight="600" fill="#1a1d22">Пользователь</text>
+    <text x="340" y="82" text-anchor="middle" font-size="12" fill="#586069">браузер или телефон</text>
+  </g>
+
+  <g>
+    <rect x="200" y="108" width="280" height="52" rx="10" fill="#f3f6f8" stroke="#d3d9df"/>
+    <text x="340" y="132" text-anchor="middle" font-size="14" font-weight="600" fill="#1a1d22">LaunchPad</text>
+    <text x="340" y="149" text-anchor="middle" font-size="12" fill="#586069">веб-приложение, статический фронтенд</text>
+  </g>
+
+  <g>
+    <rect x="200" y="178" width="280" height="50" rx="10" fill="#f3f6f8" stroke="#d3d9df"/>
+    <text x="340" y="202" text-anchor="middle" font-size="14" font-weight="600" fill="#1a1d22">API Gateway</text>
+    <text x="340" y="218" text-anchor="middle" font-size="12" fill="#586069">Yandex Cloud</text>
+  </g>
+
+  <g>
+    <rect x="200" y="246" width="280" height="52" rx="10" fill="#f3f6f8" stroke="#d3d9df"/>
+    <text x="340" y="270" text-anchor="middle" font-size="14" font-weight="600" fill="#1a1d22">Backend API</text>
+    <text x="340" y="287" text-anchor="middle" font-size="12" fill="#586069">serverless, Node.js, JWT-авторизация</text>
+  </g>
+
+  <g>
+    <rect x="140" y="314" width="190" height="56" rx="10" fill="#f3f6f8" stroke="#d3d9df"/>
+    <text x="235" y="338" text-anchor="middle" font-size="14" font-weight="600" fill="#1a1d22">PostgreSQL</text>
+    <text x="235" y="355" text-anchor="middle" font-size="12" fill="#586069">профили, стартапы, форум</text>
+  </g>
+  <g>
+    <rect x="350" y="314" width="190" height="56" rx="10" fill="#f3f6f8" stroke="#d3d9df"/>
+    <text x="445" y="338" text-anchor="middle" font-size="14" font-weight="600" fill="#1a1d22">Object Storage</text>
+    <text x="445" y="355" text-anchor="middle" font-size="12" fill="#586069">фото и видео</text>
+  </g>
+</svg>

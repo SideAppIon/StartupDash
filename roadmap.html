@@ -117,6 +117,7 @@
           </div>
           <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
         </div>
+        <button class="btn btn--outline btn--sm" style="flex-shrink:0" onclick="shareRoadmap()">🔗 Поделиться</button>
       </div>
     </div>
   </div>
@@ -190,6 +191,22 @@ var colCollapsed = { backlog:false, todo:false, doing:false, done:false };
 var formCol     = null;
 
 if (!startupId) window.location.href = 'startups.html';
+
+// Поделиться ссылкой на дорожную карту
+async function shareRoadmap() {
+  var url = window.location.href;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('🔗 Ссылка скопирована', 'success');
+  } catch(e) {
+    var ta = document.createElement('textarea');
+    ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { document.execCommand('copy'); showToast('🔗 Ссылка скопирована', 'success'); }
+    catch(e2) { showToast('Скопируй ссылку из адресной строки', 'warn'); }
+    document.body.removeChild(ta);
+  }
+}
 
 var COLS = { backlog:'Backlog', todo:'To Do', doing:'In Progress', done:'Done' };
 var PRIORITY = { high:{label:'🔴 Высокий',cls:'priority-high',badge:'badge--red'}, med:{label:'🟡 Средний',cls:'priority-med',badge:'badge--warn'}, low:{label:'🔵 Низкий',cls:'priority-low',badge:'badge--blue'} };

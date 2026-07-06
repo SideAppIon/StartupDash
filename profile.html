@@ -56,6 +56,7 @@
           <span class="nav__role" id="profileRole"></span>
           <span style="font-size:13px;color:var(--text2)" id="profileEmail"></span>
         </div>
+        <div id="expertStatusBox" style="display:none;margin-top:12px"></div>
       </div>
       <button class="btn btn--outline" onclick="toggleEdit()" id="editBtn">✏️ Редактировать</button>
     </div>
@@ -201,6 +202,9 @@ onAuthReady(async function(user, userData) {
   pr.textContent = ROLE_LABELS[userData.role]||userData.role;
   pr.className   = 'nav__role nav__role--'+userData.role;
 
+  // Статус эксперта — быстрый переключатель (только для роли «эксперт»)
+  renderExpertStatus(userData.expertStatus || userData.expert_status || 'available');
+
   document.getElementById('viewBio').textContent =
     userData.bio || 'Пока ничего не написано.';
 
@@ -256,6 +260,39 @@ onAuthReady(async function(user, userData) {
   document.getElementById('loadingState').style.display = 'none';
   document.getElementById('pageContent').style.display  = 'block';
 });
+
+// ── Статус эксперта ───────────────────────────────────
+function expertStatusPillHtml(status) {
+  var busy  = status === 'busy';
+  var color = busy ? 'var(--danger)' : 'var(--accent)';
+  var bg    = busy ? 'rgba(255,77,79,.10)' : 'rgba(0,230,118,.10)';
+  var label = busy ? 'Занят' : 'Готов помочь';
+  return '<span onclick="toggleExpertStatus()" title="Нажми, чтобы переключить статус" '+
+    'style="display:inline-flex;align-items:center;gap:9px;padding:8px 16px;border:1.5px solid '+color+';'+
+    'border-radius:999px;font-size:13px;font-weight:600;color:'+color+';background:'+bg+';cursor:pointer">'+
+    '<span style="width:9px;height:9px;border-radius:50%;background:'+color+';display:inline-block"></span>'+
+    label+'<span style="opacity:.55;font-weight:400;margin-left:2px">· сменить</span></span>';
+}
+function renderExpertStatus(status) {
+  var box = document.getElementById('expertStatusBox');
+  if (!uData || uData.role !== 'expert') { box.style.display = 'none'; return; }
+  uData.expertStatus = status;
+  box.innerHTML = expertStatusPillHtml(status);
+  box.style.display = 'block';
+}
+async function toggleExpertStatus() {
+  var cur  = uData.expertStatus || uData.expert_status || 'available';
+  var next = cur === 'busy' ? 'available' : 'busy';
+  renderExpertStatus(next);
+  try {
+    await db.collection('users').doc(currentUser.uid).update({ expert_status: next });
+    uData.expert_status = next;
+    showToast(next === 'busy' ? 'Статус: Занят' : 'Статус: Готов помочь', 'success');
+  } catch(e) {
+    renderExpertStatus(cur);
+    showToast('Ошибка: ' + (e.message||'не удалось'), 'error');
+  }
+}
 
 function toggleEdit() {
   var editing = document.getElementById('editMode').style.display !== 'none';
