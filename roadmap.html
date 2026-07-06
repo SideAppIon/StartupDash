@@ -89,7 +89,6 @@
   <a href="members.html">Участники</a>
   <div class="nav__user">
     <a id="backBtn" href="startups.html" class="btn btn--ghost btn--sm">← К стартапу</a>
-    <button class="btn btn--ghost btn--sm" onclick="shareRoadmap()">🔗 Поделиться</button>
     <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
     <span class="nav__role" id="navRole"></span>
     <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="goProfile()"/>
@@ -105,6 +104,9 @@
 <div id="pageContent" style="display:none">
   <div class="roadmap-header">
     <div class="container">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn btn--outline btn--sm" onclick="shareRoadmap()">🔗 Поделиться</button>
+      </div>
       <div style="display:flex;align-items:flex-start;gap:16px">
         <div style="font-size:44px" id="rmEmoji">🚀</div>
         <div style="flex:1">
