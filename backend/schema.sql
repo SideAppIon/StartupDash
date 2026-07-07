@@ -238,6 +238,9 @@ ALTER TABLE users    ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE;
 -- Статус эксперта: 'available' (готов помочь, по умолчанию) | 'busy' (занят)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS expert_status TEXT DEFAULT 'available';
 
+-- Вложения-документы стартапа (JSON-массив {name, url, size, ext}, до 5 файлов)
+ALTER TABLE startups ADD COLUMN IF NOT EXISTS attachments TEXT DEFAULT '[]';
+
 -- Привязка модераторов к группам (модератор видит/модерирует только свои группы)
 -- group_id — UUID, как groups.id / user_groups.group_id (иначе JOIN'ы падают uuid=text)
 CREATE TABLE IF NOT EXISTS moderator_groups (

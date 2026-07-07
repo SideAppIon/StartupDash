@@ -150,6 +150,17 @@
       </div>
     </div>
 
+    <!-- ВЛОЖЕНИЯ / ДОКУМЕНТАЦИЯ -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:6px">Вложения / документация</h3>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px">До 5 файлов: pdf, doc, docx, xls, xlsx, ppt, pptx, txt, csv, zip. Каждый до ~2 МБ. Другие пользователи смогут их скачать.</p>
+      <div id="attachList" style="margin-bottom:12px"></div>
+      <input type="file" id="attachInput" multiple
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+        class="form-input" style="padding:6px" onchange="onAttachmentPick(this)"/>
+      <div id="attachStatus" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
+    </div>
+
     <!-- ПРИВАТНОСТЬ -->
     <div class="card" style="margin-bottom:20px">
       <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:16px">Приватность</h3>
@@ -205,10 +216,65 @@ EMOJIS.forEach(function(e){
   grid.appendChild(btn);
 });
 
-async function uploadFile(base64, contentType, folder) {
-  var res = await api.post('/upload', { data: base64, contentType: contentType, folder: folder || 'startups' });
+async function uploadFile(base64, contentType, folder, filename) {
+  var body = { data: base64, contentType: contentType, folder: folder || 'startups' };
+  if (filename) body.filename = filename;
+  var res = await api.post('/upload', body);
   return res.url;
 }
+
+// ── Вложения (документы стартапа) ─────────────────────────
+var attachments = [];
+var ATTACH_MAX_BYTES = 2.3 * 1024 * 1024;
+var ATTACH_MIME = {
+  pdf:'application/pdf', doc:'application/msword',
+  docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls:'application/vnd.ms-excel',
+  xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt:'application/vnd.ms-powerpoint',
+  pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  txt:'text/plain', csv:'text/csv', zip:'application/zip'
+};
+function fmtSize(b){
+  if (b>=1048576) return (b/1048576).toFixed(1)+' МБ';
+  if (b>=1024) return Math.round(b/1024)+' КБ';
+  return (b||0)+' Б';
+}
+async function onAttachmentPick(input){
+  var files = Array.prototype.slice.call(input.files||[]);
+  input.value='';
+  var status=document.getElementById('attachStatus');
+  for (var i=0;i<files.length;i++){
+    if (attachments.length>=5){ showToast('Максимум 5 файлов','warn'); break; }
+    var f=files[i];
+    var ext=(f.name.split('.').pop()||'').toLowerCase();
+    var mime=ATTACH_MIME[ext];
+    if (!mime){ status.textContent='«'+f.name+'»: формат не поддерживается'; continue; }
+    if (f.size>ATTACH_MAX_BYTES){ status.textContent='«'+f.name+'» слишком большой (макс. ~2 МБ)'; continue; }
+    status.textContent='Загружаю «'+f.name+'»...';
+    try {
+      var base64=await readFileAsBase64(f);
+      var url=await uploadFile(base64, mime, 'docs', f.name);
+      attachments.push({ name:f.name, url:url, size:f.size, ext:ext });
+      renderAttachments();
+      status.textContent='✓ Загружено: '+f.name;
+    } catch(e){ status.textContent='Ошибка: '+(e.message||'не удалось'); }
+  }
+}
+function renderAttachments(){
+  var el=document.getElementById('attachList');
+  if (!el) return;
+  if (!attachments.length){ el.innerHTML='<div style="font-size:13px;color:var(--text3)">Файлы не добавлены</div>'; return; }
+  el.innerHTML=attachments.map(function(a,i){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px">'+
+      '<span style="font-size:18px">📄</span>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(a.name||'файл')+'</div>'+
+      '<div style="font-size:11px;color:var(--text3)">'+fmtSize(a.size)+'</div></div>'+
+      '<button type="button" class="btn btn--danger btn--sm" onclick="removeAttachment('+i+')">✕</button>'+
+    '</div>';
+  }).join('');
+}
+function removeAttachment(i){ attachments.splice(i,1); renderAttachments(); }
 
 function readFileAsBase64(file) {
   return new Promise(function(resolve, reject) {
@@ -551,8 +617,12 @@ onAuthReady(async function(user, userData){
         blockId=blocks.length;
         renderBlocks();
       }
+      // Вложения
+      attachments = safeArray(d.attachments);
+      renderAttachments();
     }
   }
+  renderAttachments();
 });
 
 async function save(){
@@ -583,6 +653,7 @@ async function save(){
     tags:     tags,
     privacy:  selectedPrivacy,
     contentBlocks: contentBlocks,
+    attachments: attachments.slice(0, 5),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 

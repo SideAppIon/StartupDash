@@ -19,12 +19,13 @@ async function ensureUpdatesSchema() {
   }
 }
 
-// Мягкое скрытие стартапа админом (не влияет на privacy; владелец видит свой)
+// Доп. колонки стартапа: мягкое скрытие (hidden) и вложения-документы (attachments)
 let hiddenSchemaEnsured = false;
 async function ensureHiddenSchema() {
   if (hiddenSchemaEnsured) return;
   try {
     await query('ALTER TABLE startups ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE');
+    await query("ALTER TABLE startups ADD COLUMN IF NOT EXISTS attachments TEXT DEFAULT '[]'");
     hiddenSchemaEnsured = true;
   } catch (e) {
     console.error('ensureHiddenSchema (startups) error:', e.message);
@@ -176,15 +177,17 @@ router.post('/', requireAuth, async (req, res) => {
     const tags           = b.tags;
     const privacy        = b.privacy;
     const content_blocks = b.content_blocks || b.contentBlocks || [];
+    const attachments    = (b.attachments || []).slice(0, 5); // до 5 файлов
 
     if (!name || !tagline) return res.status(400).json({ error: 'name и tagline обязательны' });
 
+    await ensureHiddenSchema();
     const id = uuidv4();
     const startup = await queryOne(
       `INSERT INTO startups
          (id, owner_uid, owner_name, name, tagline, stage, category, website,
-          looking_for, cover_image, emoji, icon_image, tags, privacy, content_blocks, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW(),NOW())
+          looking_for, cover_image, emoji, icon_image, tags, privacy, content_blocks, attachments, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),NOW())
        RETURNING *`,
       [id, req.user.uid, req.user.name || '',
        name, tagline, stage || 'Идея', category || '',
@@ -192,7 +195,8 @@ router.post('/', requireAuth, async (req, res) => {
        cover_image || '', emoji || '🚀', icon_image || '',
        JSON.stringify(tags || []),
        privacy || 'public',
-       JSON.stringify(content_blocks || [])]
+       JSON.stringify(content_blocks || []),
+       JSON.stringify(attachments || [])]
     );
 
     res.status(201).json({ startup: parseStartup(startup) });
@@ -211,7 +215,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const isOwner = startup.owner_uid === req.user.uid;
     const isAdmin = req.user.role === 'admin';
     if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Нет доступа' });
-    if (isAdmin) await ensureHiddenSchema();
+    await ensureHiddenSchema();
 
     // Нормализуем тело — camelCase → snake_case
     const b2 = req.body;
@@ -229,18 +233,20 @@ router.patch('/:id', requireAuth, async (req, res) => {
       tags:           b2.tags,
       content_blocks: b2.content_blocks ?? b2.contentBlocks,
     };
+    // Вложения (до 5) — владелец и админ
+    if (b2.attachments !== undefined) normalized.attachments = (b2.attachments || []).slice(0, 5);
     // Мягкое скрытие — только админ
     if (isAdmin && b2.hidden !== undefined) normalized.hidden = b2.hidden;
 
     const allowed = ['name', 'tagline', 'stage', 'category', 'website', 'looking_for',
-                     'cover_image', 'emoji', 'icon_image', 'tags', 'privacy', 'content_blocks'];
+                     'cover_image', 'emoji', 'icon_image', 'tags', 'privacy', 'content_blocks', 'attachments'];
     if (isAdmin) allowed.push('hidden');
     const updates = [];
     const values  = [];
 
     allowed.forEach(field => {
       if (normalized[field] !== undefined && normalized[field] !== null) {
-        const val = ['tags', 'content_blocks'].includes(field)
+        const val = ['tags', 'content_blocks', 'attachments'].includes(field)
           ? JSON.stringify(normalized[field])
           : normalized[field];
         values.push(val);
@@ -609,6 +615,7 @@ function parseStartup(s) {
     ...s,
     tags: tryParse(s.tags, []),
     content_blocks: tryParse(s.content_blocks, []),
+    attachments: tryParse(s.attachments, []),
     // Поля с camelCase для совместимости с фронтендом
     ownerUid: s.owner_uid,
     ownerName: s.owner_name,
