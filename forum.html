@@ -334,7 +334,7 @@ function renderTopics() {
         '</div>'+
         '<div class="topic-item__meta">'+
           '<span class="badge badge--gray" style="font-size:11px">'+esc(t.category||'Общее')+'</span>'+
-          '<span>'+esc(t.authorName||'Аноним')+'</span>'+
+          '<span>'+esc(t.authorName||'Аноним')+((t.authorDiamond===true||t.authorDiamond==='true')?' 💎':'')+'</span>'+
           '<span>'+formatDate(t.createdAt)+'</span>'+
         '</div>'+
       '</div>'+
@@ -387,7 +387,7 @@ async function loadTopic(topicId) {
     document.getElementById('topicCat').textContent = (CAT_ICONS[t.category]||'💬')+' '+t.category;
     document.getElementById('topicTitle').textContent = t.title||'';
     document.getElementById('topicMeta').innerHTML =
-      'Автор: <strong>'+esc(t.authorName||'')+'</strong> · '+
+      'Автор: <strong>'+esc(t.authorName||'')+((t.authorDiamond===true||t.authorDiamond==='true')?' 💎':'')+'</strong> · '+
       formatDate(t.createdAt)+' · '+
       '<span style="color:var(--text3)">'+(t.replyCount||0)+' ответов · '+(t.views||0)+' просмотров</span>';
     renderModBar(t);
@@ -454,7 +454,7 @@ function renderPosts(posts) {
       '<div class="post-card__header">'+
         '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
         '<div>'+
-          '<div class="post-card__author">'+esc(p.authorName||'Аноним')+
+          '<div class="post-card__author">'+esc(p.authorName||'Аноним')+((p.authorDiamond===true||p.authorDiamond==='true')?' 💎':'')+
             (isOp?'<span style="margin-left:6px;font-size:10px;background:var(--accent);color:#000;padding:1px 5px;border-radius:3px;font-weight:700">ТС</span>':'')+
             (authorBanned?'<span class="badge badge--red" style="margin-left:6px;font-size:10px;padding:1px 6px">🚫 Бан</span>':'')+
           '</div>'+

@@ -238,6 +238,9 @@ ALTER TABLE users    ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE;
 -- Статус эксперта: 'available' (готов помочь, по умолчанию) | 'busy' (занят)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS expert_status TEXT DEFAULT 'available';
 
+-- Значок-алмаз (💎), включается админом для конкретного пользователя
+ALTER TABLE users ADD COLUMN IF NOT EXISTS diamond BOOLEAN DEFAULT FALSE;
+
 -- Вложения-документы стартапа (JSON-массив {name, url, size, ext}, до 5 файлов)
 ALTER TABLE startups ADD COLUMN IF NOT EXISTS attachments TEXT DEFAULT '[]';
 

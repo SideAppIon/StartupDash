@@ -182,7 +182,7 @@ onAuthReady(async function(user, userData) {
   document.getElementById('memberAvatar').src = mav;
 
   // Имя
-  document.getElementById('memberName').textContent = profileData.name || 'Без имени';
+  document.getElementById('memberName').innerHTML = esc(profileData.name || 'Без имени') + ((profileData.diamond===true||profileData.diamond==='true')?' 💎':'');
 
   // Роль
   var roleEl = document.getElementById('memberRole');

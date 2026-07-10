@@ -113,7 +113,7 @@
           <div class="member-card__top">
             <img src="${av}" class="avatar avatar--md"/>
             <div>
-              <div class="member-card__name">${m.name||'Без имени'}</div>
+              <div class="member-card__name">${m.name||'Без имени'}${(m.diamond===true||m.diamond==='true')?' 💎':''}</div>
               <span class="badge ${ROLE_CLASSES[m.role]||'badge--gray'}">${ROLE_LABELS[m.role]||m.role}</span>
             </div>
           </div>

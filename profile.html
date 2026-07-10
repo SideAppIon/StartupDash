@@ -196,7 +196,7 @@ onAuthReady(async function(user, userData) {
     'https://ui-avatars.com/api/?background=181c24&color=00e676&name='+encodeURIComponent(userData.name||'U');
   document.getElementById('profileAvatar').src   = av;
   document.getElementById('avatarPreview').src   = av;
-  document.getElementById('profileName').textContent  = userData.name  || '';
+  document.getElementById('profileName').innerHTML  = esc(userData.name || '') + ((userData.diamond===true||userData.diamond==='true')?' 💎':'');
   document.getElementById('profileEmail').textContent = userData.email || '';
   var pr = document.getElementById('profileRole');
   pr.textContent = ROLE_LABELS[userData.role]||userData.role;
@@ -344,7 +344,7 @@ async function saveProfile() {
     Object.assign(uData, upd);
     showToast('Профиль сохранен!','success');
     // Обновляем отображение без перезагрузки
-    document.getElementById('profileName').textContent = name;
+    document.getElementById('profileName').innerHTML = esc(name) + ((uData.diamond===true||uData.diamond==='true')?' 💎':'');
     document.getElementById('viewBio').textContent = upd.bio||'Пока ничего не написано.';
     document.getElementById('viewSkills').innerHTML = upd.skills.length
       ? safeArray(upd.skills).map(function(s){return '<span class="badge badge--gray">'+esc(s)+'</span>';}).join(' ')

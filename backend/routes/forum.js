@@ -32,7 +32,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const isAdmin = req.user && req.user.role === 'admin';
     const { search } = req.query;
 
-    let sql = `SELECT t.*, u.name AS author_name, u.avatar AS author_avatar
+    let sql = `SELECT t.*, u.name AS author_name, u.avatar AS author_avatar, u.diamond AS author_diamond
                FROM forum_topics t
                JOIN users u ON u.uid = t.author_uid
                WHERE 1=1`;
@@ -86,7 +86,7 @@ router.post('/', requireAuth, async (req, res) => {
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const topic = await queryOne(
-      `SELECT t.*, u.name AS author_name, u.avatar AS author_avatar,
+      `SELECT t.*, u.name AS author_name, u.avatar AS author_avatar, u.diamond AS author_diamond,
               u.role AS author_role, u.forum_banned AS author_forum_banned
        FROM forum_topics t
        JOIN users u ON u.uid = t.author_uid
@@ -164,7 +164,7 @@ router.get('/:id/posts', optionalAuth, async (req, res) => {
   try {
     const posts = await queryAll(
       `SELECT p.*, u.name AS author_name, u.avatar AS author_avatar, u.role AS author_role,
-              u.forum_banned AS author_forum_banned
+              u.forum_banned AS author_forum_banned, u.diamond AS author_diamond
        FROM forum_posts p
        JOIN users u ON u.uid = p.author_uid
        WHERE p.topic_id=$1

@@ -15,6 +15,8 @@ async function ensureHiddenSchema() {
     await queryOne('ALTER TABLE users ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE');
     // Статус эксперта: 'available' (готов помочь, по умолчанию) | 'busy' (занят)
     await queryOne("ALTER TABLE users ADD COLUMN IF NOT EXISTS expert_status TEXT DEFAULT 'available'");
+    // Значок-алмаз (💎) — включается админом для конкретного пользователя
+    await queryOne('ALTER TABLE users ADD COLUMN IF NOT EXISTS diamond BOOLEAN DEFAULT FALSE');
     hiddenSchemaEnsured = true;
   } catch (e) {
     console.error('ensureHiddenSchema (users) error:', e.message);
@@ -27,7 +29,7 @@ router.get('/', optionalAuth, async (req, res) => {
     await ensureHiddenSchema();
     const { role, search } = req.query;
     const isAdmin = req.user && req.user.role === 'admin';
-    let sql = `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, hidden, expert_status, created_at, onboarding_done
+    let sql = `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, hidden, expert_status, diamond, created_at, onboarding_done
                FROM users WHERE 1=1`;
     const params = [];
 
@@ -66,7 +68,7 @@ router.get('/:uid', optionalAuth, async (req, res) => {
   try {
     await ensureHiddenSchema();
     const user = await queryOne(
-      `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, hidden, expert_status, created_at
+      `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, hidden, expert_status, diamond, created_at
        FROM users WHERE uid = $1`,
       [req.params.uid]
     );
@@ -99,7 +101,7 @@ router.patch('/:uid', requireAuth, async (req, res) => {
     }
 
     const allowed = ['name', 'bio', 'skills', 'avatar', 'contacts', 'portfolio', 'expert_status'];
-    if (req.user.role === 'admin') allowed.push('role', 'blocked', 'forum_banned', 'hidden');
+    if (req.user.role === 'admin') allowed.push('role', 'blocked', 'forum_banned', 'hidden', 'diamond');
     const updates = [];
     const values  = [];
 
