@@ -241,6 +241,14 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS expert_status TEXT DEFAULT 'available
 -- Вложения-документы стартапа (JSON-массив {name, url, size, ext}, до 5 файлов)
 ALTER TABLE startups ADD COLUMN IF NOT EXISTS attachments TEXT DEFAULT '[]';
 
+-- Лайки стартапов (один лайк на пользователя)
+CREATE TABLE IF NOT EXISTS startup_likes (
+  startup_id TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+  user_uid   TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (startup_id, user_uid)
+);
+
 -- Привязка модераторов к группам (модератор видит/модерирует только свои группы)
 -- group_id — UUID, как groups.id / user_groups.group_id (иначе JOIN'ы падают uuid=text)
 CREATE TABLE IF NOT EXISTS moderator_groups (

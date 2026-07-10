@@ -39,6 +39,12 @@
     .perm-toggle input:checked+.perm-toggle__slider{background:var(--accent)}
     .perm-toggle input:checked+.perm-toggle__slider:before{transform:translateX(16px)}
 
+    .like-btn{display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border:1px solid var(--border2);border-radius:999px;background:var(--bg2);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;transition:border-color .2s,background .2s;user-select:none}
+    .like-btn:hover{border-color:#ff5a7a}
+    .like-btn.is-liked{border-color:#ff375f;background:rgba(255,55,95,.10);color:#ff5a7a}
+    .like-btn .like-heart{font-size:16px;line-height:1;display:inline-block}
+    .like-btn.pop .like-heart{animation:likePop .45s ease}
+    @keyframes likePop{0%{transform:scale(1)}30%{transform:scale(1.5) translateY(-3px)}55%{transform:scale(.9)}75%{transform:scale(1.15)}100%{transform:scale(1)}}
 </style>
 </head>
 <body>
@@ -72,6 +78,9 @@
             <span class="badge badge--green" id="sStage"></span>
             <span class="badge badge--gray" id="sCategory"></span>
             <span id="sWebsite"></span>
+            <button id="likeBtn" class="like-btn" onclick="toggleLike()" style="display:none" aria-label="Нравится">
+              <span class="like-heart" id="likeHeart">🤍</span><span id="likeCount">0</span>
+            </button>
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-self:flex-start" id="actionBtns"></div>
@@ -357,6 +366,7 @@ onAuthReady(async function(user, userData) {
     }
 
     renderStartupAttachments();
+    renderLike();
 
     var tags = safeArray(startupData.tags);
     if (tags.length) {
@@ -1153,6 +1163,46 @@ async function deleteUpdate(btn) {
     showToast('Обновление удалено', 'success');
     await loadUpdates();
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
+}
+
+// ── Лайки ─────────────────────────────────────────────
+function renderLike() {
+  var btn = document.getElementById('likeBtn');
+  if (!btn || !startupData) return;
+  var likes = startupData.likes || 0;
+  var liked = startupData.liked === true;
+  document.getElementById('likeCount').textContent = likes;
+  document.getElementById('likeHeart').textContent = liked ? '❤️' : '🤍';
+  btn.classList.toggle('is-liked', liked);
+  btn.style.display = 'inline-flex';
+}
+
+var likeBusy = false;
+async function toggleLike() {
+  if (!pageUser) { window.location.href = 'login.html'; return; }
+  if (likeBusy) return;
+  likeBusy = true;
+  var btn = document.getElementById('likeBtn');
+  var wasLiked = startupData.liked === true;
+  // Оптимистично обновляем UI + анимация при постановке
+  startupData.liked = !wasLiked;
+  startupData.likes = (startupData.likes || 0) + (wasLiked ? -1 : 1);
+  renderLike();
+  if (!wasLiked) { btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); }
+  try {
+    var res = wasLiked
+      ? await api.delete('/startups/' + startupId + '/like')
+      : await api.post('/startups/' + startupId + '/like', {});
+    startupData.likes = res.likes;
+    startupData.liked = res.liked;
+    renderLike();
+  } catch(e) {
+    // Откат при ошибке
+    startupData.liked = wasLiked;
+    startupData.likes = (startupData.likes || 0) + (wasLiked ? 1 : -1);
+    renderLike();
+    showToast('Ошибка: ' + (e.message||'не удалось'), 'error');
+  } finally { likeBusy = false; }
 }
 
 // ── Вложения стартапа ─────────────────────────────────

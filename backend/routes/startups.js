@@ -19,6 +19,23 @@ async function ensureUpdatesSchema() {
   }
 }
 
+// Лайки стартапов (один лайк на пользователя)
+let likesSchemaEnsured = false;
+async function ensureLikesSchema() {
+  if (likesSchemaEnsured) return;
+  try {
+    await query(`CREATE TABLE IF NOT EXISTS startup_likes (
+      startup_id TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+      user_uid   TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (startup_id, user_uid)
+    )`);
+    likesSchemaEnsured = true;
+  } catch (e) {
+    console.error('ensureLikesSchema error:', e.message);
+  }
+}
+
 // Доп. колонки стартапа: мягкое скрытие (hidden) и вложения-документы (attachments)
 let hiddenSchemaEnsured = false;
 async function ensureHiddenSchema() {
@@ -149,7 +166,46 @@ router.get('/:id', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Стартап не найден' });
     }
 
-    res.json({ startup: parseStartup(startup) });
+    // Лайки: общее число и поставил ли текущий пользователь
+    await ensureLikesSchema();
+    const out = parseStartup(startup);
+    const cnt = await queryOne('SELECT COUNT(*)::int AS c FROM startup_likes WHERE startup_id=$1', [req.params.id]);
+    out.likes = cnt ? cnt.c : 0;
+    out.liked = false;
+    if (uid) {
+      const mine = await queryOne('SELECT 1 FROM startup_likes WHERE startup_id=$1 AND user_uid=$2', [req.params.id, uid]);
+      out.liked = !!mine;
+    }
+    res.json({ startup: out });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// POST /startups/:id/like — поставить лайк (идемпотентно)
+router.post('/:id/like', requireAuth, async (req, res) => {
+  try {
+    await ensureLikesSchema();
+    const s = await queryOne('SELECT id FROM startups WHERE id=$1', [req.params.id]);
+    if (!s) return res.status(404).json({ error: 'Стартап не найден' });
+    await queryOne(
+      'INSERT INTO startup_likes (startup_id, user_uid, created_at) VALUES ($1,$2,NOW()) ON CONFLICT DO NOTHING',
+      [req.params.id, req.user.uid]
+    );
+    const cnt = await queryOne('SELECT COUNT(*)::int AS c FROM startup_likes WHERE startup_id=$1', [req.params.id]);
+    res.json({ likes: cnt ? cnt.c : 0, liked: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// DELETE /startups/:id/like — убрать лайк
+router.delete('/:id/like', requireAuth, async (req, res) => {
+  try {
+    await ensureLikesSchema();
+    await queryOne('DELETE FROM startup_likes WHERE startup_id=$1 AND user_uid=$2', [req.params.id, req.user.uid]);
+    const cnt = await queryOne('SELECT COUNT(*)::int AS c FROM startup_likes WHERE startup_id=$1', [req.params.id]);
+    res.json({ likes: cnt ? cnt.c : 0, liked: false });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
