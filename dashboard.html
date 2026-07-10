@@ -112,7 +112,7 @@ onAuthReady(async function(user, userData) {
 
   renderNav(userData);
 
-  document.getElementById('sideName').textContent  = userData.name  || '—';
+  document.getElementById('sideName').innerHTML  = esc(userData.name || '—') + ((userData.diamond===true||userData.diamond==='true')?' 💎':'');
   document.getElementById('sideEmail').textContent = userData.email || '—';
   document.getElementById('sideAvatar').src = av;
   var sr = document.getElementById('sideRole');
