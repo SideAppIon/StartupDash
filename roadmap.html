@@ -247,12 +247,17 @@ onAuthReady(async function(user, userData) {
         memberPerms = inv.permissions || {};
       }
     } catch(e) {}
-    // Также проверяем team subcollection
+    // Также проверяем team subcollection.
+    // ВАЖНО: бэкенд отдаёт всю команду и игнорирует фильтр по uid,
+    // поэтому находим запись текущего пользователя на клиенте.
     try {
-      var teamCheck = await db.collection('startups').doc(startupId).collection('team').where('uid','==',user.uid).get();
-      if (!teamCheck.empty) {
+      var teamCheck = await db.collection('startups').doc(startupId).collection('team').get();
+      var myTeam = teamCheck.docs.map(function(d){ return d.data(); }).find(function(m){
+        return (m.userUid || m.user_uid || m.uid) === user.uid;
+      });
+      if (myTeam) {
         isMember = true;
-        memberPerms = teamCheck.docs[0].data().permissions || {};
+        memberPerms = myTeam.permissions || {};
       }
     } catch(e) {}
 
