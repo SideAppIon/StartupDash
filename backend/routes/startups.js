@@ -19,6 +19,31 @@ async function ensureUpdatesSchema() {
   }
 }
 
+// Доп. колонки задач: комментарии (правят все) и блокировка редактирования
+let tasksSchemaEnsured = false;
+async function ensureTasksSchema() {
+  if (tasksSchemaEnsured) return;
+  try {
+    await query("ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS comments TEXT DEFAULT ''");
+    await query('ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS locked BOOLEAN DEFAULT false');
+    tasksSchemaEnsured = true;
+  } catch (e) {
+    console.error('ensureTasksSchema error:', e.message);
+  }
+}
+
+// Является ли пользователь участником стартапа (для правки комментариев)
+async function isStartupMember(startupId, uid) {
+  if (!uid) return false;
+  const t = await queryOne('SELECT 1 FROM startup_team WHERE startup_id=$1 AND user_uid=$2', [startupId, uid]);
+  if (t) return true;
+  const inv = await queryOne(
+    `SELECT 1 FROM invites WHERE startup_id=$1 AND status='accepted' AND (from_uid=$2 OR to_uid=$2) LIMIT 1`,
+    [startupId, uid]
+  );
+  return !!inv;
+}
+
 // Лайки стартапов (один лайк на пользователя)
 let likesSchemaEnsured = false;
 async function ensureLikesSchema() {
@@ -509,6 +534,7 @@ router.delete('/:id/updates/:updateId', requireAuth, async (req, res) => {
 // ── Задачи (Roadmap/Kanban) ───────────────────────────────
 router.get('/:id/tasks', async (req, res) => {
   try {
+    await ensureTasksSchema();
     const tasks = await queryAll(
       'SELECT * FROM startup_tasks WHERE startup_id = $1 ORDER BY position ASC, created_at ASC',
       [req.params.id]
@@ -528,22 +554,26 @@ router.post('/:id/tasks', requireAuth, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const hasPerm = await checkTeamPermission(req.params.id, req.user.uid, 'kanban');
     if (!isOwner && !isAdmin && !hasPerm) return res.status(403).json({ error: 'Нет доступа' });
+    await ensureTasksSchema();
 
     const b = req.body;
     const title       = b.title       || '';
     const description = b.description || '';
+    const comments    = b.comments    || '';
     const status      = b.status      || 'todo';
     const assigned_to = b.assigned_to || b.assignedTo || null;
     const position    = b.position    || 0;
     const priority    = b.priority    || 'med';
     const assignee_name = b.assigneeName || b.assignee_name || '';
     const is_public   = b.is_public !== undefined ? b.is_public : (b.isPublic !== undefined ? b.isPublic : true);
+    // Блокировку может задать только владелец/админ
+    const locked      = (isOwner || isAdmin) ? (b.locked === true || b.locked === 'true') : false;
 
     const id = uuidv4();
     const task = await queryOne(
-      `INSERT INTO startup_tasks (id, startup_id, title, description, status, assigned_to, position, priority, assignee_name, is_public, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()) RETURNING *`,
-      [id, req.params.id, title, description, status, assigned_to, position, priority, assignee_name, is_public]
+      `INSERT INTO startup_tasks (id, startup_id, title, description, comments, status, assigned_to, position, priority, assignee_name, is_public, locked, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW()) RETURNING *`,
+      [id, req.params.id, title, description, comments, status, assigned_to, position, priority, assignee_name, is_public, locked]
     );
     res.status(201).json({ task });
   } catch (e) {
@@ -558,13 +588,22 @@ router.patch('/:id/tasks/:taskId', requireAuth, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const hasPerm = await checkTeamPermission(req.params.id, req.user.uid, 'kanban');
     if (!isOwner && !isAdmin && !hasPerm) return res.status(403).json({ error: 'Нет доступа' });
+    await ensureTasksSchema();
+
+    // Если задача заблокирована — редактировать может только владелец/админ
+    const current = await queryOne('SELECT locked FROM startup_tasks WHERE id=$1', [req.params.taskId]);
+    if (current && current.locked && !isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'Задача заблокирована основателем' });
+    }
 
     const bT = req.body;
     // Нормализуем camelCase → snake_case
     if (bT.assignedTo  !== undefined && bT.assigned_to  === undefined) bT.assigned_to  = bT.assignedTo;
     if (bT.assigneeName!== undefined && bT.assignee_name=== undefined) bT.assignee_name= bT.assigneeName;
     if (bT.isPublic    !== undefined && bT.is_public    === undefined) bT.is_public    = bT.isPublic;
-    const allowed = ['title', 'description', 'status', 'assigned_to', 'position', 'priority', 'assignee_name', 'is_public'];
+    const allowed = ['title', 'description', 'comments', 'status', 'assigned_to', 'position', 'priority', 'assignee_name', 'is_public'];
+    // Блокировку меняет только владелец/админ
+    if (isOwner || isAdmin) allowed.push('locked');
     const updates = []; const values = [];
     allowed.forEach(f => {
       if (bT[f] !== undefined) { values.push(bT[f]); updates.push(`${f}=$${values.length}`); }
@@ -587,6 +626,30 @@ router.delete('/:id/tasks/:taskId', requireAuth, async (req, res) => {
     if (!isOwner && req.user.role !== 'admin') return res.status(403).json({ error: 'Нет доступа' });
     await queryOne('DELETE FROM startup_tasks WHERE id = $1', [req.params.taskId]);
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// PATCH /:id/tasks/:taskId/comments — комментарии правят все участники стартапа
+// (не зависит от блокировки задачи и от права kanban)
+router.patch('/:id/tasks/:taskId/comments', requireAuth, async (req, res) => {
+  try {
+    await ensureTasksSchema();
+    const startup = await queryOne('SELECT owner_uid FROM startups WHERE id = $1', [req.params.id]);
+    if (!startup) return res.status(404).json({ error: 'Стартап не найден' });
+    const isOwner = startup.owner_uid === req.user.uid;
+    const isAdmin = req.user.role === 'admin';
+    if (!isOwner && !isAdmin && !(await isStartupMember(req.params.id, req.user.uid))) {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
+    const comments = req.body.comments !== undefined ? String(req.body.comments) : '';
+    const task = await queryOne(
+      'UPDATE startup_tasks SET comments=$1 WHERE id=$2 AND startup_id=$3 RETURNING *',
+      [comments, req.params.taskId, req.params.id]
+    );
+    if (!task) return res.status(404).json({ error: 'Задача не найдена' });
+    res.json({ task });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }

@@ -244,6 +244,10 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS diamond BOOLEAN DEFAULT FALSE;
 -- Вложения-документы стартапа (JSON-массив {name, url, size, ext}, до 5 файлов)
 ALTER TABLE startups ADD COLUMN IF NOT EXISTS attachments TEXT DEFAULT '[]';
 
+-- Задачи канбана: комментарии (правят все участники) и блокировка редактирования
+ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS comments TEXT DEFAULT '';
+ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS locked BOOLEAN DEFAULT false;
+
 -- Лайки стартапов (один лайк на пользователя)
 CREATE TABLE IF NOT EXISTS startup_likes (
   startup_id TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
