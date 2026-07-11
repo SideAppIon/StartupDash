@@ -281,15 +281,15 @@ onAuthReady(async function(user, userData) {
           archBtn.style.display = archivedCount > 0 ? 'flex' : 'none';
           document.getElementById('archiveCount').textContent = archivedCount;
         }
-        // Не перерисовываем доску пока открыта форма создания/редактирования
-        if (!formCol && !document.getElementById('active-task-form')) {
+        // Не перерисовываем доску пока открыта форма задачи или редактор комментария
+        if (!formCol && !document.getElementById('active-task-form') && !document.querySelector('.task-cmt__input')) {
           renderBoard(canEdit);
         }
       }, function() {
         db.collection('startups').doc(startupId).collection('tasks').get().then(function(snap){
           allTasks = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
           if (!isOwner && !isMember) allTasks = allTasks.filter(function(t){ return t.isPublic !== false; });
-          if (!formCol && !document.getElementById('active-task-form')) renderBoard(canEdit);
+          if (!formCol && !document.getElementById('active-task-form') && !document.querySelector('.task-cmt__input')) renderBoard(canEdit);
         });
       });
 
@@ -548,8 +548,12 @@ async function deleteTask(btn) { var taskId=btn.getAttribute("data-id");
 // ── КОММЕНТАРИИ (правят все участники) ────────────────
 function commentsView(t) {
   var c = t.comments || '';
+  // Править комментарий может только команда (владелец или участник)
+  var canComment = isOwner || isMember;
   return (c ? '<div class="task-cmt__text">'+esc(c)+'</div>' : '') +
-    '<button class="task-cmt__btn" onclick="editComments(\''+esc(t.id)+'\')">'+(c?'✏️ Изменить комментарий':'💬 Добавить комментарий')+'</button>';
+    (canComment
+      ? '<button class="task-cmt__btn" onclick="editComments(\''+esc(t.id)+'\')">'+(c?'✏️ Изменить комментарий':'💬 Добавить комментарий')+'</button>'
+      : '');
 }
 function editComments(taskId) {
   var t = allTasks.find(function(x){ return x.id===taskId; });
