@@ -417,6 +417,53 @@ router.post('/:id/team', requireAuth, async (req, res) => {
   }
 });
 
+// POST /startups/:id/transfer — передать стартап новому основателю (текущий владелец или админ)
+router.post('/:id/transfer', requireAuth, async (req, res) => {
+  try {
+    const startup = await queryOne('SELECT owner_uid FROM startups WHERE id=$1', [req.params.id]);
+    if (!startup) return res.status(404).json({ error: 'Стартап не найден' });
+    const isOwner = startup.owner_uid === req.user.uid;
+    const isAdmin = req.user.role === 'admin';
+    if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Только основатель может передать проект' });
+
+    const newOwnerUid = req.body.new_owner_uid || req.body.newOwnerUid;
+    if (!newOwnerUid) return res.status(400).json({ error: 'Не указан новый основатель' });
+    if (newOwnerUid === startup.owner_uid) return res.status(400).json({ error: 'Пользователь уже основатель' });
+
+    const newOwner = await queryOne('SELECT uid, name FROM users WHERE uid=$1', [newOwnerUid]);
+    if (!newOwner) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    // Меняем владельца
+    await queryOne(
+      'UPDATE startups SET owner_uid=$1, owner_name=$2, updated_at=NOW() WHERE id=$3',
+      [newOwner.uid, newOwner.name || '', req.params.id]
+    );
+
+    // Новый владелец больше не числится в команде (он теперь основатель)
+    await queryOne('DELETE FROM startup_team WHERE startup_id=$1 AND user_uid=$2', [req.params.id, newOwner.uid]);
+
+    // Старый владелец остаётся в проекте как со-основатель с полными правами
+    await queryOne(
+      `INSERT INTO startup_team (startup_id, user_uid, role, permissions)
+       VALUES ($1,$2,'Со-основатель',$3)
+       ON CONFLICT (startup_id, user_uid) DO UPDATE SET role='Со-основатель', permissions=$3`,
+      [req.params.id, startup.owner_uid, JSON.stringify({ kanban: true, updates: true, team: true })]
+    );
+
+    // Оба должны быть в групповом чате, если он есть
+    const conv2 = await queryOne('SELECT id FROM conversations WHERE startup_id=$1 AND is_group=TRUE LIMIT 1', [req.params.id]);
+    if (conv2) {
+      await queryOne('INSERT INTO conversation_participants (conv_id, user_uid) VALUES ($1,$2) ON CONFLICT DO NOTHING', [conv2.id, newOwner.uid]);
+      await queryOne('INSERT INTO conversation_participants (conv_id, user_uid) VALUES ($1,$2) ON CONFLICT DO NOTHING', [conv2.id, startup.owner_uid]);
+    }
+
+    res.json({ ok: true, owner_uid: newOwner.uid });
+  } catch (e) {
+    console.error('transfer error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 router.patch('/:id/team/:uid', requireAuth, async (req, res) => {
   try {
     await assertOwnerOrAdmin(req.params.id, req.user);

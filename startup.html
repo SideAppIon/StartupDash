@@ -669,10 +669,12 @@ async function loadTeam(isOwnerOrAdmin, isTeamMember, memberPerms) {
         var isMe = pageUser && m.uid === pageUser.uid;
         var removeBtn = '';
         var editRoleBtn = '';
+        var transferBtn = '';
         if (!m._isOwner && pageUser && startupData &&
             (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'))) {
           removeBtn  = '<button class="btn btn--danger btn--sm" onclick="removeFromTeam(this)" data-uid="' + esc(m.uid||'') + '" data-name="' + esc(m.name||'') + '">✕</button>';
           editRoleBtn = '<button class="btn btn--ghost btn--sm" onclick="editMemberRole(this)" data-uid="' + esc(m.uid||'') + '" data-name="' + esc(m.name||'') + '" data-role="' + esc(m._teamRole||'Участник') + '" title="Изменить должность">✏️</button>';
+          transferBtn = '<button class="btn btn--outline btn--sm" onclick="transferOwnership(this)" data-uid="' + esc(m.uid||'') + '" data-name="' + esc(m.name||'') + '" title="Сделать основателем">👑</button>';
         }
         // Значки разрешений для владельца
         var permsBadges = '';
@@ -692,7 +694,7 @@ async function loadTeam(isOwnerOrAdmin, isTeamMember, memberPerms) {
             '<div style="font-size:12px;color:var(--text2)">' + esc(m._teamRole||'') + '</div>' +
             permsBadges +
           '</div>' +
-          (m._isOwner ? '<span style="font-size:16px">👑</span>' : '<div style="display:flex;gap:4px">' + editRoleBtn + removeBtn + '</div>') +
+          (m._isOwner ? '<span style="font-size:16px">👑</span>' : '<div style="display:flex;gap:4px">' + editRoleBtn + transferBtn + removeBtn + '</div>') +
         '</div>';
       }).join('') +
     '</div>';
@@ -964,6 +966,18 @@ async function editMemberRole(btn) {
 }
 
 // ── REMOVE FROM TEAM ─────────────────────────────────
+async function transferOwnership(btn) {
+  var uid  = btn.getAttribute('data-uid');
+  var name = btn.getAttribute('data-name');
+  if (!uid) return;
+  if (!confirm('Передать проект пользователю ' + name + '?\n\nОн станет основателем, а вы — со-основателем с полными правами. Это действие необратимо.')) return;
+  try {
+    await api.post('/startups/' + startupId + '/transfer', { new_owner_uid: uid });
+    showToast('👑 Проект передан: ' + name, 'success');
+    setTimeout(function(){ window.location.reload(); }, 900);
+  } catch(e) { showToast('Ошибка: ' + (e.message||'не удалось'), 'error'); }
+}
+
 async function removeFromTeam(btn) {
   var uid  = btn.getAttribute('data-uid');
   var name = btn.getAttribute('data-name');
