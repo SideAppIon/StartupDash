@@ -256,6 +256,14 @@ CREATE TABLE IF NOT EXISTS startup_likes (
   PRIMARY KEY (startup_id, user_uid)
 );
 
+-- Лайки постов-обновлений (один лайк на пользователя)
+CREATE TABLE IF NOT EXISTS update_likes (
+  update_id  TEXT NOT NULL REFERENCES startup_updates(id) ON DELETE CASCADE,
+  user_uid   TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (update_id, user_uid)
+);
+
 -- Привязка модераторов к группам (модератор видит/модерирует только свои группы)
 -- group_id — UUID, как groups.id / user_groups.group_id (иначе JOIN'ы падают uuid=text)
 CREATE TABLE IF NOT EXISTS moderator_groups (

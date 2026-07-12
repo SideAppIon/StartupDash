@@ -595,6 +595,7 @@ async function loadUpdates() {
         '<div class="update-card__body">' + esc(text) + '</div>' +
         (imgUrl ? '<img src="' + esc(imgUrl) + '" style="width:100%;max-height:300px;object-fit:cover;border-radius:var(--radius);margin-top:12px;display:block" onerror="this.style.display=&quot;none&quot;"/>' : '') +
         videoHtml +
+        '<div style="margin-top:12px">' + updateLikeBtn(u, d.id) + '</div>' +
       '</div>';
     }).join('');
   } catch(e) {
@@ -1220,6 +1221,42 @@ async function toggleLike() {
     renderLike();
     showToast('Ошибка: ' + (e.message||'не удалось'), 'error');
   } finally { likeBusy = false; }
+}
+
+// ── Лайки постов-обновлений ───────────────────────────
+function updateLikeBtn(u, updateId) {
+  var liked = u.liked === true;
+  return '<button class="like-btn'+(liked?' is-liked':'')+'" data-sid="'+esc(startupId)+'" data-uid="'+esc(updateId)+'" data-liked="'+(liked?'1':'0')+'" onclick="toggleUpdateLike(this)">'+
+    '<span class="like-heart">'+(liked?'❤️':'🤍')+'</span><span class="like-count">'+(u.likes||0)+'</span></button>';
+}
+async function toggleUpdateLike(btn) {
+  if (!pageUser) { window.location.href = 'login.html'; return; }
+  if (btn._busy) return; btn._busy = true;
+  var sid = btn.getAttribute('data-sid');
+  var uid = btn.getAttribute('data-uid');
+  var wasLiked = btn.getAttribute('data-liked') === '1';
+  var heartEl = btn.querySelector('.like-heart');
+  var countEl = btn.querySelector('.like-count');
+  var cur = parseInt(countEl.textContent, 10) || 0;
+  var next = !wasLiked;
+  btn.setAttribute('data-liked', next?'1':'0');
+  heartEl.textContent = next ? '❤️' : '🤍';
+  btn.classList.toggle('is-liked', next);
+  countEl.textContent = cur + (next ? 1 : -1);
+  if (next) { btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); }
+  try {
+    var res = next
+      ? await api.post('/startups/'+sid+'/updates/'+uid+'/like', {})
+      : await api.delete('/startups/'+sid+'/updates/'+uid+'/like');
+    countEl.textContent = res.likes;
+    btn.setAttribute('data-liked', res.liked ? '1' : '0');
+  } catch(e) {
+    btn.setAttribute('data-liked', wasLiked?'1':'0');
+    heartEl.textContent = wasLiked ? '❤️' : '🤍';
+    btn.classList.toggle('is-liked', wasLiked);
+    countEl.textContent = cur;
+    showToast('Ошибка: ' + (e.message||'не удалось'), 'error');
+  } finally { btn._busy = false; }
 }
 
 // ── Вложения стартапа ─────────────────────────────────

@@ -61,6 +61,23 @@ async function ensureLikesSchema() {
   }
 }
 
+// Лайки постов-обновлений (один лайк на пользователя)
+let updateLikesSchemaEnsured = false;
+async function ensureUpdateLikesSchema() {
+  if (updateLikesSchemaEnsured) return;
+  try {
+    await query(`CREATE TABLE IF NOT EXISTS update_likes (
+      update_id  TEXT NOT NULL REFERENCES startup_updates(id) ON DELETE CASCADE,
+      user_uid   TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (update_id, user_uid)
+    )`);
+    updateLikesSchemaEnsured = true;
+  } catch (e) {
+    console.error('ensureUpdateLikesSchema error:', e.message);
+  }
+}
+
 // Доп. колонки стартапа: мягкое скрытие (hidden) и вложения-документы (attachments)
 let hiddenSchemaEnsured = false;
 async function ensureHiddenSchema() {
@@ -521,17 +538,50 @@ router.delete('/:id/team/:uid', requireAuth, async (req, res) => {
 });
 
 // ── Обновления проекта ────────────────────────────────────
-router.get('/:id/updates', async (req, res) => {
+router.get('/:id/updates', optionalAuth, async (req, res) => {
   try {
+    await ensureUpdateLikesSchema();
+    const uid = (req.user && req.user.uid) || null;
     const updates = await queryAll(
-      `SELECT u.*, usr.name AS author_name, usr.avatar AS author_avatar
+      `SELECT u.*, usr.name AS author_name, usr.avatar AS author_avatar,
+              (SELECT COUNT(*) FROM update_likes ul WHERE ul.update_id = u.id)::int AS likes,
+              EXISTS(SELECT 1 FROM update_likes ul2 WHERE ul2.update_id = u.id AND ul2.user_uid = $2) AS liked
        FROM startup_updates u
        JOIN users usr ON usr.uid = u.author_uid
        WHERE u.startup_id = $1
        ORDER BY u.created_at DESC`,
-      [req.params.id]
+      [req.params.id, uid]
     );
     res.json({ updates: updates.map(_parseUpdate) });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// POST /startups/:id/updates/:updateId/like — лайкнуть пост (идемпотентно)
+router.post('/:id/updates/:updateId/like', requireAuth, async (req, res) => {
+  try {
+    await ensureUpdateLikesSchema();
+    const upd = await queryOne('SELECT id FROM startup_updates WHERE id=$1 AND startup_id=$2', [req.params.updateId, req.params.id]);
+    if (!upd) return res.status(404).json({ error: 'Обновление не найдено' });
+    await queryOne(
+      'INSERT INTO update_likes (update_id, user_uid, created_at) VALUES ($1,$2,NOW()) ON CONFLICT DO NOTHING',
+      [req.params.updateId, req.user.uid]
+    );
+    const cnt = await queryOne('SELECT COUNT(*)::int AS c FROM update_likes WHERE update_id=$1', [req.params.updateId]);
+    res.json({ likes: cnt ? cnt.c : 0, liked: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// DELETE /startups/:id/updates/:updateId/like — убрать лайк
+router.delete('/:id/updates/:updateId/like', requireAuth, async (req, res) => {
+  try {
+    await ensureUpdateLikesSchema();
+    await queryOne('DELETE FROM update_likes WHERE update_id=$1 AND user_uid=$2', [req.params.updateId, req.user.uid]);
+    const cnt = await queryOne('SELECT COUNT(*)::int AS c FROM update_likes WHERE update_id=$1', [req.params.updateId]);
+    res.json({ likes: cnt ? cnt.c : 0, liked: false });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
@@ -819,6 +869,8 @@ function _parseUpdate(u) {
     authorUid:  u.author_uid,
     authorName: u.author_name,
     createdAt:  u.created_at,
+    likes:      u.likes || 0,
+    liked:      u.liked === true,
   };
 }
 

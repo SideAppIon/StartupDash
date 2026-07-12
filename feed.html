@@ -90,6 +90,12 @@
       font-size: 14px; cursor: pointer; transition: all .2s; margin-top: 8px;
     }
     .load-more-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .like-btn{display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border:1px solid var(--border2);border-radius:999px;background:var(--bg2);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;transition:border-color .2s,background .2s;user-select:none}
+    .like-btn:hover{border-color:#ff5a7a}
+    .like-btn.is-liked{border-color:#ff375f;background:rgba(255,55,95,.10);color:#ff5a7a}
+    .like-btn .like-heart{font-size:16px;line-height:1;display:inline-block}
+    .like-btn.pop .like-heart{animation:likePop .45s ease}
+    @keyframes likePop{0%{transform:scale(1)}30%{transform:scale(1.5) translateY(-3px)}55%{transform:scale(.9)}75%{transform:scale(1.15)}100%{transform:scale(1)}}
   </style>
 </head>
 <body>
@@ -308,6 +314,7 @@ function renderFeed(updates) {
       '<div class="feed-card__body">' + esc(u.body || '') + '</div>' +
       (u.imageUrl ? '<img src="' + esc(u.imageUrl) + '" class="feed-card__img" onerror="this.style.display=&quot;none&quot;"/>' : '') +
       '<div class="feed-card__footer">' +
+        updateLikeBtn(u, u._startupId, u.id) +
         '<a href="startup.html?id=' + esc(u._startupId) + '" class="btn btn--ghost btn--sm">Открыть стартап →</a>' +
       '</div>' +
     '</div>';
@@ -376,6 +383,42 @@ async function loadTrending() {
   } catch(e) {
     document.getElementById('trendingList').innerHTML = '<p style="font-size:13px;color:var(--text2)">Не удалось загрузить</p>';
   }
+}
+
+// ── Лайки постов ──────────────────────────────────────
+function updateLikeBtn(u, sid, updateId) {
+  var liked = u.liked === true;
+  return '<button class="like-btn'+(liked?' is-liked':'')+'" data-sid="'+esc(sid)+'" data-uid="'+esc(updateId)+'" data-liked="'+(liked?'1':'0')+'" onclick="toggleUpdateLike(this)">'+
+    '<span class="like-heart">'+(liked?'❤️':'🤍')+'</span><span class="like-count">'+(u.likes||0)+'</span></button>';
+}
+async function toggleUpdateLike(btn) {
+  if (!currentUser) { window.location.href = 'login.html'; return; }
+  if (btn._busy) return; btn._busy = true;
+  var sid = btn.getAttribute('data-sid');
+  var uid = btn.getAttribute('data-uid');
+  var wasLiked = btn.getAttribute('data-liked') === '1';
+  var heartEl = btn.querySelector('.like-heart');
+  var countEl = btn.querySelector('.like-count');
+  var cur = parseInt(countEl.textContent, 10) || 0;
+  var next = !wasLiked;
+  btn.setAttribute('data-liked', next?'1':'0');
+  heartEl.textContent = next ? '❤️' : '🤍';
+  btn.classList.toggle('is-liked', next);
+  countEl.textContent = cur + (next ? 1 : -1);
+  if (next) { btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); }
+  try {
+    var res = next
+      ? await api.post('/startups/'+sid+'/updates/'+uid+'/like', {})
+      : await api.delete('/startups/'+sid+'/updates/'+uid+'/like');
+    countEl.textContent = res.likes;
+    btn.setAttribute('data-liked', res.liked ? '1' : '0');
+  } catch(e) {
+    btn.setAttribute('data-liked', wasLiked?'1':'0');
+    heartEl.textContent = wasLiked ? '❤️' : '🤍';
+    btn.classList.toggle('is-liked', wasLiked);
+    countEl.textContent = cur;
+    showToast('Ошибка: ' + (e.message||'не удалось'), 'error');
+  } finally { btn._busy = false; }
 }
 
 function esc(s) {
