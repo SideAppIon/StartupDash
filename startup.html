@@ -674,7 +674,10 @@ async function loadTeam(isOwnerOrAdmin, isTeamMember, memberPerms) {
             (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'))) {
           removeBtn  = '<button class="btn btn--danger btn--sm" onclick="removeFromTeam(this)" data-uid="' + esc(m.uid||'') + '" data-name="' + esc(m.name||'') + '">✕</button>';
           editRoleBtn = '<button class="btn btn--ghost btn--sm" onclick="editMemberRole(this)" data-uid="' + esc(m.uid||'') + '" data-name="' + esc(m.name||'') + '" data-role="' + esc(m._teamRole||'Участник') + '" title="Изменить должность">✏️</button>';
-          transferBtn = '<button class="btn btn--outline btn--sm" onclick="transferOwnership(this)" data-uid="' + esc(m.uid||'') + '" data-name="' + esc(m.name||'') + '" title="Сделать основателем">👑</button>';
+          // Передать проект можно только участнику с ролью «стартапер»
+          if (m.role === 'startup') {
+            transferBtn = '<button class="btn btn--outline btn--sm" onclick="transferOwnership(this)" data-uid="' + esc(m.uid||'') + '" data-name="' + esc(m.name||'') + '" title="Сделать основателем">👑</button>';
+          }
         }
         // Значки разрешений для владельца
         var permsBadges = '';

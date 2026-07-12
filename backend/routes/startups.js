@@ -433,8 +433,15 @@ router.post('/:id/transfer', requireAuth, async (req, res) => {
     if (!newOwnerUid) return res.status(400).json({ error: 'Не указан новый основатель' });
     if (newOwnerUid === startup.owner_uid) return res.status(400).json({ error: 'Пользователь уже основатель' });
 
-    const newOwner = await queryOne('SELECT uid, name FROM users WHERE uid=$1', [newOwnerUid]);
+    const newOwner = await queryOne('SELECT uid, name, role FROM users WHERE uid=$1', [newOwnerUid]);
     if (!newOwner) return res.status(404).json({ error: 'Пользователь не найден' });
+    // Передавать можно только стартаперу, который состоит в команде
+    if (newOwner.role !== 'startup') {
+      return res.status(400).json({ error: 'Передать проект можно только стартаперу' });
+    }
+    if (!(await isStartupMember(req.params.id, newOwnerUid))) {
+      return res.status(400).json({ error: 'Новый основатель должен быть в команде проекта' });
+    }
 
     // Меняем владельца
     await queryOne(
