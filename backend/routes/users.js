@@ -74,12 +74,9 @@ router.get('/:uid', optionalAuth, async (req, res) => {
     );
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
 
-    // Мягко скрытый — «не найден» для всех, кроме самого пользователя и админа
-    const viewerUid = req.user && req.user.uid;
-    const viewerRole = req.user && req.user.role;
-    if (user.hidden && viewerUid !== user.uid && viewerRole !== 'admin') {
-      return res.status(404).json({ error: 'Пользователь не найден' });
-    }
+    // Мягкое скрытие убирает пользователя из списков/поиска (GET /users),
+    // но профиль по прямому uid остаётся доступен — иначе ломается отрисовка
+    // команды, форума, дашборда, где участники подгружаются по одному.
     res.json({ user: parseUser(user) });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
