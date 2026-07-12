@@ -186,9 +186,12 @@ router.get('/:id', optionalAuth, async (req, res) => {
       }
     }
 
-    // Мягко скрытый админом — для всех «не найден», кроме владельца и админа
+    // Мягко скрытый админом — «не найден» для посторонних.
+    // Но владелец, админ и участники команды (в т.ч. по accepted-инвайту) видят его.
     if (startup.hidden && uid !== startup.owner_uid && role !== 'admin') {
-      return res.status(404).json({ error: 'Стартап не найден' });
+      if (!(await isStartupMember(req.params.id, uid))) {
+        return res.status(404).json({ error: 'Стартап не найден' });
+      }
     }
 
     // Лайки: общее число и поставил ли текущий пользователь
