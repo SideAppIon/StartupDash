@@ -115,6 +115,13 @@
               <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:12px">📎 Вложения</h3>
               <div id="attachmentsList"></div>
             </div>
+            <div class="card" id="startupForumCard" style="display:none;margin-top:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
+                <h3 style="font-family:var(--font-head);font-size:16px;margin:0">💬 Форум</h3>
+                <span id="forumManage"></span>
+              </div>
+              <div id="forumBody"></div>
+            </div>
           </div>
 
           <!-- Обновления -->
@@ -367,6 +374,7 @@ onAuthReady(async function(user, userData) {
 
     renderStartupAttachments();
     renderLike();
+    loadStartupForum();
 
     var tags = safeArray(startupData.tags);
     if (tags.length) {
@@ -1257,6 +1265,81 @@ async function toggleUpdateLike(btn) {
     countEl.textContent = cur;
     showToast('Ошибка: ' + (e.message||'не удалось'), 'error');
   } finally { btn._busy = false; }
+}
+
+// ── Форум стартапа ────────────────────────────────────
+async function loadStartupForum() {
+  var card = document.getElementById('startupForumCard');
+  var body = document.getElementById('forumBody');
+  var manage = document.getElementById('forumManage');
+  if (!card) return;
+  var canManage = pageUser && startupData && (pageUser.uid === startupData.ownerUid || (pageUserData && pageUserData.role === 'admin'));
+  var data;
+  try { data = await api.get('/startups/' + startupId + '/forum'); }
+  catch(e) { card.style.display = 'none'; return; }
+
+  manage.innerHTML = canManage
+    ? '<button class="btn btn--ghost btn--sm" onclick="toggleStartupForum(' + (data.enabled ? 'true' : 'false') + ')">' + (data.enabled ? 'Отключить форум' : 'Включить форум') + '</button>'
+    : '';
+
+  if (!data.enabled) {
+    if (!canManage) { card.style.display = 'none'; return; }
+    body.innerHTML = '<div style="font-size:14px;color:var(--text3)">Форум для этого стартапа отключён.</div>';
+    card.style.display = 'block';
+    return;
+  }
+
+  var msgs = safeArray(data.posts);
+  var msgsHtml = msgs.length
+    ? msgs.map(function(p) {
+        var av = p.author_avatar || 'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(p.author_name||'U');
+        var dm = (p.author_diamond===true||p.author_diamond==='true') ? ' 💎' : '';
+        return '<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">'+
+          '<img src="'+esc(av)+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0"/>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:13px;font-weight:500">'+esc(p.author_name||'—')+dm+' <span style="font-size:11px;color:var(--text3);font-weight:400">'+formatDate(p.created_at)+'</span></div>'+
+            '<div style="font-size:14px;color:var(--text2);white-space:pre-wrap;word-break:break-word">'+esc(p.content||'')+'</div>'+
+          '</div>'+
+        '</div>';
+      }).join('')
+    : '<div style="font-size:14px;color:var(--text3);padding:8px 0">Пока нет сообщений. Напиши первым!</div>';
+
+  var openLink = data.topicId
+    ? '<a href="forum.html?topic='+esc(data.topicId)+'" class="btn btn--ghost btn--sm">Перейти в обсуждение →</a>'
+    : '<span></span>';
+
+  var composer = pageUser
+    ? '<div style="margin-top:12px">'+
+        '<textarea id="forumInput" placeholder="Написать сообщение..." style="width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:14px;padding:10px;outline:none;resize:vertical;min-height:60px;font-family:inherit"></textarea>'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">'+ openLink +
+          '<button class="btn btn--primary btn--sm" onclick="sendStartupForum()">Отправить</button>'+
+        '</div>'+
+      '</div>'
+    : '<div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">'+ openLink +'<a href="login.html" class="btn btn--outline btn--sm">Войти, чтобы писать</a></div>';
+
+  body.innerHTML = msgsHtml + composer;
+  card.style.display = 'block';
+}
+
+async function sendStartupForum() {
+  if (!pageUser) { window.location.href = 'login.html'; return; }
+  var inp = document.getElementById('forumInput');
+  var content = (inp.value||'').trim();
+  if (!content) { showToast('Напиши сообщение','warn'); return; }
+  try {
+    var res = await api.post('/startups/'+startupId+'/forum', { content: content });
+    window.location.href = 'forum.html?topic=' + res.topicId;
+  } catch(e) { showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
+}
+
+async function toggleStartupForum(currentlyEnabled) {
+  try {
+    await api.patch('/startups/'+startupId, { forum_enabled: !currentlyEnabled });
+    startupData.forumEnabled = !currentlyEnabled;
+    startupData.forum_enabled = !currentlyEnabled;
+    showToast(!currentlyEnabled ? 'Форум включён' : 'Форум отключён','success');
+    loadStartupForum();
+  } catch(e) { showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
 }
 
 // ── Вложения стартапа ─────────────────────────────────

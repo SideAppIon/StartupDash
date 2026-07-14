@@ -256,6 +256,11 @@ CREATE TABLE IF NOT EXISTS startup_likes (
   PRIMARY KEY (startup_id, user_uid)
 );
 
+-- Форум стартапа: флаг включения + привязка темы к стартапу
+-- (тема с startup_id не показывается в общем форуме, только на странице стартапа)
+ALTER TABLE startups ADD COLUMN IF NOT EXISTS forum_enabled BOOLEAN DEFAULT true;
+ALTER TABLE forum_topics ADD COLUMN IF NOT EXISTS startup_id TEXT;
+
 -- Лайки постов-обновлений (один лайк на пользователя)
 CREATE TABLE IF NOT EXISTS update_likes (
   update_id  TEXT NOT NULL REFERENCES startup_updates(id) ON DELETE CASCADE,

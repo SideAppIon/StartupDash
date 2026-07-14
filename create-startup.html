@@ -183,6 +183,15 @@
       </div>
     </div>
 
+    <!-- ФОРУМ -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:10px">💬 Форум обсуждения</h3>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text2)">
+        <input type="checkbox" id="forumEnabled" checked style="width:16px;height:16px;accent-color:var(--accent)"/>
+        <span>Создать раздел форума на странице стартапа (последние сообщения и обсуждение). Отдельная тема не появляется в общем форуме.</span>
+      </label>
+    </div>
+
     <div id="formError" class="form-error" style="display:none;margin-bottom:12px"></div>
     <div style="display:flex;gap:12px;justify-content:flex-end;margin-bottom:40px">
       <a href="dashboard.html" class="btn btn--ghost">Отмена</a>
@@ -620,6 +629,8 @@ onAuthReady(async function(user, userData){
       // Вложения
       attachments = safeArray(d.attachments);
       renderAttachments();
+      // Форум
+      document.getElementById('forumEnabled').checked = (d.forumEnabled !== false && d.forum_enabled !== false);
     }
   }
   renderAttachments();
@@ -654,6 +665,7 @@ async function save(){
     privacy:  selectedPrivacy,
     contentBlocks: contentBlocks,
     attachments: attachments.slice(0, 5),
+    forum_enabled: document.getElementById('forumEnabled').checked,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 

@@ -61,6 +61,19 @@ async function ensureLikesSchema() {
   }
 }
 
+// Форум стартапа: флаг включения + привязка темы к стартапу
+let startupForumSchemaEnsured = false;
+async function ensureStartupForumSchema() {
+  if (startupForumSchemaEnsured) return;
+  try {
+    await query('ALTER TABLE startups ADD COLUMN IF NOT EXISTS forum_enabled BOOLEAN DEFAULT true');
+    await query('ALTER TABLE forum_topics ADD COLUMN IF NOT EXISTS startup_id TEXT');
+    startupForumSchemaEnsured = true;
+  } catch (e) {
+    console.error('ensureStartupForumSchema error:', e.message);
+  }
+}
+
 // Лайки постов-обновлений (один лайк на пользователя)
 let updateLikesSchemaEnsured = false;
 async function ensureUpdateLikesSchema() {
@@ -283,6 +296,9 @@ router.post('/', requireAuth, async (req, res) => {
     if (!name || !tagline) return res.status(400).json({ error: 'name и tagline обязательны' });
 
     await ensureHiddenSchema();
+    await ensureStartupForumSchema();
+    // Форум стартапа: включён по умолчанию, но при создании можно отключить
+    const forumEnabled = (b.forum_enabled === false || b.forumEnabled === false) ? false : true;
     const id = uuidv4();
     const startup = await queryOne(
       `INSERT INTO startups
@@ -299,6 +315,11 @@ router.post('/', requireAuth, async (req, res) => {
        JSON.stringify(content_blocks || []),
        JSON.stringify(attachments || [])]
     );
+
+    if (!forumEnabled) {
+      await queryOne('UPDATE startups SET forum_enabled=false WHERE id=$1', [id]);
+      startup.forum_enabled = false;
+    }
 
     res.status(201).json({ startup: parseStartup(startup) });
   } catch (e) {
@@ -336,11 +357,15 @@ router.patch('/:id', requireAuth, async (req, res) => {
     };
     // Вложения (до 5) — владелец и админ
     if (b2.attachments !== undefined) normalized.attachments = (b2.attachments || []).slice(0, 5);
+    // Форум стартапа вкл/выкл — владелец и админ
+    if (b2.forum_enabled !== undefined) normalized.forum_enabled = b2.forum_enabled;
+    else if (b2.forumEnabled !== undefined) normalized.forum_enabled = b2.forumEnabled;
+    if (normalized.forum_enabled !== undefined) await ensureStartupForumSchema();
     // Мягкое скрытие — только админ
     if (isAdmin && b2.hidden !== undefined) normalized.hidden = b2.hidden;
 
     const allowed = ['name', 'tagline', 'stage', 'category', 'website', 'looking_for',
-                     'cover_image', 'emoji', 'icon_image', 'tags', 'privacy', 'content_blocks', 'attachments'];
+                     'cover_image', 'emoji', 'icon_image', 'tags', 'privacy', 'content_blocks', 'attachments', 'forum_enabled'];
     if (isAdmin) allowed.push('hidden');
     const updates = [];
     const values  = [];
@@ -583,6 +608,74 @@ router.delete('/:id/updates/:updateId/like', requireAuth, async (req, res) => {
     const cnt = await queryOne('SELECT COUNT(*)::int AS c FROM update_likes WHERE update_id=$1', [req.params.updateId]);
     res.json({ likes: cnt ? cnt.c : 0, liked: false });
   } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ── Форум стартапа ────────────────────────────────────────
+// GET /startups/:id/forum — статус форума + последние 3 сообщения
+router.get('/:id/forum', optionalAuth, async (req, res) => {
+  try {
+    await ensureStartupForumSchema();
+    const s = await queryOne('SELECT id, forum_enabled FROM startups WHERE id=$1', [req.params.id]);
+    if (!s) return res.status(404).json({ error: 'Стартап не найден' });
+    if (s.forum_enabled === false) return res.json({ enabled: false });
+
+    const topic = await queryOne('SELECT id, reply_count FROM forum_topics WHERE startup_id=$1 LIMIT 1', [req.params.id]);
+    if (!topic) return res.json({ enabled: true, topicId: null, posts: [], total: 0 });
+
+    const posts = await queryAll(
+      `SELECT p.id, p.content, p.created_at, p.author_uid,
+              u.name AS author_name, u.avatar AS author_avatar, u.diamond AS author_diamond
+       FROM forum_posts p JOIN users u ON u.uid = p.author_uid
+       WHERE p.topic_id=$1 ORDER BY p.created_at DESC LIMIT 3`,
+      [topic.id]
+    );
+    res.json({ enabled: true, topicId: topic.id, posts: posts.reverse(), total: topic.reply_count || posts.length });
+  } catch (e) {
+    console.error('GET startup forum:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// POST /startups/:id/forum — написать сообщение (создаёт тему стартапа при первом сообщении)
+router.post('/:id/forum', requireAuth, async (req, res) => {
+  try {
+    await ensureStartupForumSchema();
+    const s = await queryOne('SELECT id, name, owner_uid, forum_enabled FROM startups WHERE id=$1', [req.params.id]);
+    if (!s) return res.status(404).json({ error: 'Стартап не найден' });
+    if (s.forum_enabled === false) return res.status(403).json({ error: 'Форум этого стартапа отключён' });
+
+    const content = (req.body.content || '').trim();
+    if (!content) return res.status(400).json({ error: 'Пустое сообщение' });
+
+    const ban = await queryOne('SELECT forum_banned FROM users WHERE uid=$1', [req.user.uid]);
+    if (ban && ban.forum_banned) return res.status(403).json({ error: 'Вам запрещено общение на форуме' });
+
+    let topic = await queryOne('SELECT id FROM forum_topics WHERE startup_id=$1 LIMIT 1', [req.params.id]);
+    if (!topic) {
+      const tid = uuidv4();
+      topic = await queryOne(
+        `INSERT INTO forum_topics (id, author_uid, title, content, reply_count, views, startup_id, created_at, last_at)
+         VALUES ($1,$2,$3,'',0,0,$4,NOW(),NOW()) RETURNING id`,
+        [tid, s.owner_uid, 'Обсуждение: ' + (s.name || 'стартап'), req.params.id]
+      );
+    }
+
+    const pid = uuidv4();
+    const post = await queryOne(
+      'INSERT INTO forum_posts (id, topic_id, author_uid, content, created_at) VALUES ($1,$2,$3,$4,NOW()) RETURNING *',
+      [pid, topic.id, req.user.uid, content]
+    );
+    const user = await queryOne('SELECT name FROM users WHERE uid=$1', [req.user.uid]);
+    await queryOne(
+      'UPDATE forum_topics SET reply_count=reply_count+1, last_at=NOW(), last_author=$1 WHERE id=$2',
+      [user ? user.name : '', topic.id]
+    );
+
+    res.status(201).json({ topicId: topic.id, post });
+  } catch (e) {
+    console.error('POST startup forum:', e.message);
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });

@@ -1,10 +1,22 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { queryOne, queryAll } = require('../db');
+const { query, queryOne, queryAll } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { ensureModeratorSchema, isAdmin, moderatorCanActOn } = require('../lib/moderation');
 
 const router = express.Router();
+
+// Тема стартапа привязана к startup_id и не показывается в общем форуме
+let startupTopicColEnsured = false;
+async function ensureStartupTopicCol() {
+  if (startupTopicColEnsured) return;
+  try {
+    await query('ALTER TABLE forum_topics ADD COLUMN IF NOT EXISTS startup_id TEXT');
+    startupTopicColEnsured = true;
+  } catch (e) {
+    console.error('ensureStartupTopicCol error:', e.message);
+  }
+}
 
 // Модератор или администратор
 const isModerator = (user) => user && (user.role === 'admin' || user.role === 'moderator');
@@ -26,16 +38,17 @@ async function isForumBanned(uid) {
   return !!(row && row.forum_banned);
 }
 
-// GET /forum — список тем
+// GET /forum — список тем (темы стартапов сюда не попадают)
 router.get('/', optionalAuth, async (req, res) => {
   try {
+    await ensureStartupTopicCol();
     const isAdmin = req.user && req.user.role === 'admin';
     const { search } = req.query;
 
     let sql = `SELECT t.*, u.name AS author_name, u.avatar AS author_avatar, u.diamond AS author_diamond
                FROM forum_topics t
                JOIN users u ON u.uid = t.author_uid
-               WHERE 1=1`;
+               WHERE t.startup_id IS NULL`;
     const params = [];
 
     // Скрытые темы не показываем — но автор видит свои (как теневой бан)
