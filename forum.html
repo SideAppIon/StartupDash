@@ -119,7 +119,7 @@
     <!-- TOPIC VIEW -->
     <div id="viewTopic">
       <div style="margin-bottom:16px">
-        <button class="btn btn--ghost btn--sm" onclick="showView('list')">← Назад к форуму</button>
+        <button class="btn btn--ghost btn--sm" id="topicBackBtn" onclick="showView('list')">← Назад к форуму</button>
       </div>
       <div class="topic-header">
         <div class="topic-cat-badge" id="topicCat"></div>
@@ -384,7 +384,19 @@ async function loadTopic(topicId) {
     }
 
     currentTopic = t;
-    document.getElementById('topicCat').textContent = (CAT_ICONS[t.category]||'💬')+' '+t.category;
+    // Кнопка «назад»: для темы стартапа — на страницу стартапа, иначе — к форуму
+    var sid = t.startupId || t.startup_id;
+    var backBtn = document.getElementById('topicBackBtn');
+    if (backBtn) {
+      if (sid) {
+        backBtn.textContent = '← Назад к стартапу';
+        backBtn.onclick = function(){ window.location.href = 'startup.html?id=' + sid; };
+      } else {
+        backBtn.textContent = '← Назад к форуму';
+        backBtn.onclick = function(){ showView('list'); };
+      }
+    }
+    document.getElementById('topicCat').textContent = sid ? '💬 Комментарии' : ((CAT_ICONS[t.category]||'💬')+' '+(t.category||'Обсуждение'));
     document.getElementById('topicTitle').textContent = t.title||'';
     document.getElementById('topicMeta').innerHTML =
       'Автор: <strong>'+esc(t.authorName||'')+((t.authorDiamond===true||t.authorDiamond==='true')?' 💎':'')+'</strong> · '+

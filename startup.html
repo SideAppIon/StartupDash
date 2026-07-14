@@ -117,7 +117,7 @@
             </div>
             <div class="card" id="startupForumCard" style="display:none;margin-top:18px">
               <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
-                <h3 style="font-family:var(--font-head);font-size:16px;margin:0">💬 Форум</h3>
+                <h3 style="font-family:var(--font-head);font-size:16px;margin:0">💬 Комментарии</h3>
                 <span id="forumManage"></span>
               </div>
               <div id="forumBody"></div>
@@ -1279,12 +1279,12 @@ async function loadStartupForum() {
   catch(e) { card.style.display = 'none'; return; }
 
   manage.innerHTML = canManage
-    ? '<button class="btn btn--ghost btn--sm" onclick="toggleStartupForum(' + (data.enabled ? 'true' : 'false') + ')">' + (data.enabled ? 'Отключить форум' : 'Включить форум') + '</button>'
+    ? '<button class="btn btn--ghost btn--sm" onclick="toggleStartupForum(' + (data.enabled ? 'true' : 'false') + ')">' + (data.enabled ? 'Отключить комментарии' : 'Включить комментарии') + '</button>'
     : '';
 
   if (!data.enabled) {
     if (!canManage) { card.style.display = 'none'; return; }
-    body.innerHTML = '<div style="font-size:14px;color:var(--text3)">Форум для этого стартапа отключён.</div>';
+    body.innerHTML = '<div style="font-size:14px;color:var(--text3)">Комментарии для этого стартапа отключены.</div>';
     card.style.display = 'block';
     return;
   }
@@ -1305,7 +1305,7 @@ async function loadStartupForum() {
     : '<div style="font-size:14px;color:var(--text3);padding:8px 0">Пока нет сообщений. Напиши первым!</div>';
 
   var openLink = data.topicId
-    ? '<a href="forum.html?topic='+esc(data.topicId)+'" class="btn btn--ghost btn--sm">Перейти в обсуждение →</a>'
+    ? '<a href="forum.html?topic='+esc(data.topicId)+'" class="btn btn--ghost btn--sm">Все комментарии →</a>'
     : '<span></span>';
 
   var composer = pageUser
@@ -1337,7 +1337,7 @@ async function toggleStartupForum(currentlyEnabled) {
     await api.patch('/startups/'+startupId, { forum_enabled: !currentlyEnabled });
     startupData.forumEnabled = !currentlyEnabled;
     startupData.forum_enabled = !currentlyEnabled;
-    showToast(!currentlyEnabled ? 'Форум включён' : 'Форум отключён','success');
+    showToast(!currentlyEnabled ? 'Комментарии включены' : 'Комментарии отключены','success');
     loadStartupForum();
   } catch(e) { showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
 }
