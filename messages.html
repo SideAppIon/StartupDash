@@ -183,6 +183,10 @@ onAuthReady(async function(user, userData) {
   var inviteId = getUrlParam('invite');
   if (inviteId) { try { await handleInviteMsg(inviteId); } catch(e) { console.warn(e.message); } }
 
+  // Открытие конкретного чата по ссылке из уведомления
+  var convParam = getUrlParam('conv');
+  if (convParam) activeId = convParam;
+
   startConvListener();
   loadUsersForPicker();
 });

@@ -1,10 +1,84 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { queryOne, queryAll } = require('../db');
+const { query, queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { getUserGroupSettings } = require('./groups');
 
 const router = express.Router();
+
+// Отметка «уведомления просмотрены» (не влияет на прочитанность самих чатов)
+let notifSchemaEnsured = false;
+async function ensureNotifSchema() {
+  if (notifSchemaEnsured) return;
+  try {
+    await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS notif_seen_at TIMESTAMPTZ');
+    notifSchemaEnsured = true;
+  } catch (e) {
+    console.error('ensureNotifSchema error:', e.message);
+  }
+}
+
+// GET /messages/notifications — чаты с новыми сообщениями (после последнего просмотра колокольчика)
+router.get('/notifications', requireAuth, async (req, res) => {
+  try {
+    await ensureNotifSchema();
+    const rows = await queryAll(
+      `SELECT c.id, c.participant_names, c.is_group, c.startup_id,
+              s.name AS startup_name,
+              MAX(m.created_at) AS last_new_at,
+              COUNT(m.id)::int  AS new_count,
+              (ARRAY_AGG(m.text ORDER BY m.created_at DESC))[1] AS last_text
+       FROM conversation_participants cp
+       JOIN conversations c ON c.id = cp.conv_id
+       JOIN messages m      ON m.conv_id = c.id
+       LEFT JOIN startups s ON s.id = c.startup_id
+       WHERE cp.user_uid = $1
+         AND m.sender_uid <> $1
+         AND m.created_at > COALESCE((SELECT notif_seen_at FROM users WHERE uid=$1), to_timestamp(0))
+       GROUP BY c.id, s.name
+       ORDER BY MAX(m.created_at) DESC
+       LIMIT 10`,
+      [req.user.uid]
+    );
+
+    const items = rows.map(r => {
+      let title = 'Чат';
+      try {
+        const names = typeof r.participant_names === 'string' ? JSON.parse(r.participant_names) : (r.participant_names || {});
+        if (r.is_group) {
+          title = 'Чат команды' + (r.startup_name ? ': ' + r.startup_name : '');
+        } else {
+          const other = Object.keys(names).find(u => u !== req.user.uid);
+          title = (other && names[other]) || 'Личный чат';
+        }
+      } catch (e) {}
+      return {
+        convId:   r.id,
+        title,
+        isGroup:  r.is_group === true,
+        newCount: r.new_count,
+        lastText: r.last_text || '',
+        lastAt:   r.last_new_at,
+      };
+    });
+
+    res.json({ count: items.length, items });
+  } catch (e) {
+    console.error('GET notifications:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// POST /messages/notifications/seen — пометить уведомления просмотренными
+router.post('/notifications/seen', requireAuth, async (req, res) => {
+  try {
+    await ensureNotifSchema();
+    await queryOne('UPDATE users SET notif_seen_at = NOW() WHERE uid = $1', [req.user.uid]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
 
 // GET /conversations — список диалогов текущего пользователя
 router.get('/conversations', requireAuth, async (req, res) => {

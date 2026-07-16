@@ -241,6 +241,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS expert_status TEXT DEFAULT 'available
 -- Значок-алмаз (💎), включается админом для конкретного пользователя
 ALTER TABLE users ADD COLUMN IF NOT EXISTS diamond BOOLEAN DEFAULT FALSE;
 
+-- Когда пользователь последний раз открывал уведомления (колокольчик)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notif_seen_at TIMESTAMPTZ;
+
 -- Вложения-документы стартапа (JSON-массив {name, url, size, ext}, до 5 файлов)
 ALTER TABLE startups ADD COLUMN IF NOT EXISTS attachments TEXT DEFAULT '[]';
 

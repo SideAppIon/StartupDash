@@ -78,6 +78,9 @@ function _notifyCallbacks() {
   }
   _authResolved = true;
   _notifyCallbacks();
+  // Колокольчик уведомлений — с задержкой, чтобы страницы с кастомной шапкой
+  // (например, лента) успели построить .nav__user
+  if (_currentUser) setTimeout(() => { try { _initNotifBell(); } catch (e) {} }, 900);
 })();
 
 // ─────────────────────────────────────────────────────────
@@ -486,6 +489,73 @@ function renderNav(userData) {
       'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' +
       encodeURIComponent(userData.name || 'U');
   }
+  _initNotifBell();
+}
+
+// ── Уведомления: колокольчик в шапке ──────────────────────
+let _notifItems = [];
+let _notifTimer = null;
+
+function _initNotifBell() {
+  if (!currentUser) return;
+  if (document.getElementById('notifBell')) return;
+  const navUser = document.querySelector('.nav__user');
+  if (!navUser) return;
+
+  const wrap = document.createElement('div');
+  wrap.id = 'notifBell';
+  wrap.style.cssText = 'position:relative;display:flex;align-items:center';
+  wrap.innerHTML =
+    '<button style="background:none;border:none;cursor:pointer;font-size:18px;position:relative;padding:6px;line-height:1" aria-label="Уведомления">🔔' +
+      '<span id="notifBadge" style="display:none;position:absolute;top:-2px;right:-2px;background:#ff4d4f;color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;line-height:16px;border-radius:8px;text-align:center;padding:0 4px">0</span>' +
+    '</button>' +
+    '<div id="notifPopup" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:320px;max-height:380px;overflow-y:auto;background:var(--bg2,#15191f);border:1px solid var(--border2,#2b323c);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.45);z-index:1000;padding:8px"></div>';
+  navUser.insertBefore(wrap, navUser.firstChild);
+
+  wrap.addEventListener('mouseenter', _openNotifPopup);
+  wrap.addEventListener('mouseleave', () => {
+    const p = document.getElementById('notifPopup');
+    if (p) p.style.display = 'none';
+  });
+
+  _pollNotifs();
+  if (!_notifTimer) _notifTimer = setInterval(_pollNotifs, 30000);
+}
+
+async function _pollNotifs() {
+  if (!currentUser) return;
+  try {
+    const data = await api.get('/messages/notifications');
+    _notifItems = data.items || [];
+    const badge = document.getElementById('notifBadge');
+    if (badge) {
+      badge.style.display = _notifItems.length ? 'block' : 'none';
+      badge.textContent = _notifItems.length > 9 ? '9+' : _notifItems.length;
+    }
+  } catch (e) {}
+}
+
+function _openNotifPopup() {
+  const popup = document.getElementById('notifPopup');
+  if (!popup) return;
+  if (!_notifItems.length) {
+    popup.innerHTML = '<div style="padding:14px;font-size:13px;color:var(--text3,#7a828c);text-align:center">Нет новых уведомлений</div>';
+  } else {
+    popup.innerHTML = _notifItems.map(it =>
+      '<a href="messages.html?conv=' + encodeURIComponent(it.convId) + '" style="display:block;padding:10px 12px;border-radius:8px;text-decoration:none;color:inherit" ' +
+        'onmouseover="this.style.background=\'var(--bg3,#1b2028)\'" onmouseout="this.style.background=\'none\'">' +
+        '<div style="font-size:13px;font-weight:600">💬 ' + esc(it.title || 'Чат') + '</div>' +
+        '<div style="font-size:12px;color:var(--text2,#9aa3ad);margin-top:2px">Новых сообщений: ' + (it.newCount || 1) +
+          (it.lastText ? ' · «' + esc(String(it.lastText).slice(0, 60)) + '»' : '') + '</div>' +
+      '</a>'
+    ).join('');
+    // Уведомления помечаем просмотренными; сам чат остаётся непрочитанным
+    api.post('/messages/notifications/seen', {}).catch(() => {});
+    const badge = document.getElementById('notifBadge');
+    if (badge) badge.style.display = 'none';
+    _notifItems = [];
+  }
+  popup.style.display = 'block';
 }
 
 function esc(s) {
