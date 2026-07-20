@@ -90,6 +90,7 @@
       <button class="tab-a" onclick="showTab('groups',this)">🏷️ Группы</button>
       <button class="tab-a" onclick="showTab('settings',this)">⚙️ Настройки</button>
       <button class="tab-a" onclick="showTab('forum',this)">💬 Форум</button>
+      <button class="tab-a" onclick="showTab('polls',this)">📊 Опросы</button>
     </div>
     </div>
 
@@ -122,6 +123,11 @@
     <div id="tab-forum" style="display:none">
       <input type="text" class="search-bar" id="forumAdminSearch" placeholder="🔍 Поиск тем..." oninput="filterAdminTopics()"/>
       <div id="adminTopicList"><div class="spinner"></div></div>
+    </div>
+
+    <!-- POLLS -->
+    <div id="tab-polls" style="display:none">
+      <div id="adminPollsList"><div class="spinner"></div></div>
     </div>
 
     <!-- SETTINGS -->
@@ -672,7 +678,38 @@ function showTab(name, btn) {
   document.getElementById('tab-groups').style.display   = name==='groups'   ?'block':'none';
   document.getElementById('tab-settings').style.display = name==='settings' ?'block':'none';
   document.getElementById('tab-forum').style.display    = name==='forum'    ?'block':'none';
+  document.getElementById('tab-polls').style.display    = name==='polls'    ?'block':'none';
   if (name==='forum') loadAdminTopics();
+  if (name==='polls') loadAdminPolls();
+}
+
+// ── ОПРОСЫ (админ) ────────────────────────────────────
+async function loadAdminPolls() {
+  var el = document.getElementById('adminPollsList');
+  try {
+    var data = await api.get('/polls?all=1');
+    var polls = data.polls || [];
+    if (!polls.length) { el.innerHTML = '<p style="color:var(--text2);font-size:14px">Опросов нет</p>'; return; }
+    el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' + polls.map(function(p){
+      var closed = p.status === 'closed';
+      return '<div class="user-row">'+
+        '<span style="font-size:20px">📊</span>'+
+        '<div class="user-row__info">'+
+          '<div class="user-row__name">'+esc(p.question||'')+'</div>'+
+          '<div class="user-row__email">'+esc(p.owner_name||'?')+' · '+(closed?'🔒 закрыт':'🟢 открыт')+' · '+(p.audience==='registered'?'зарегистрированные':'все')+' · голосов: '+(p.total||0)+'</div>'+
+        '</div>'+
+        '<div class="user-row__actions">'+
+          '<a href="poll.html?id='+esc(p.id)+'" class="btn btn--outline btn--sm" target="_blank">📊 Результаты</a>'+
+          '<button class="btn btn--danger btn--sm" onclick="delAdminPoll(\''+esc(p.id)+'\')">✕ Удалить</button>'+
+        '</div>'+
+      '</div>';
+    }).join('') + '</div>';
+  } catch(e) { el.innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>'; }
+}
+async function delAdminPoll(id) {
+  if (!confirm('Удалить опрос?')) return;
+  try { await api.delete('/polls/'+id); showToast('Опрос удалён','success'); loadAdminPolls(); }
+  catch(e){ showToast('Ошибка: '+e.message,'error'); }
 }
 
 // ── ROLE MODAL ────────────────────────────────────────
