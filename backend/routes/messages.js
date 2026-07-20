@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const { query, queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { getUserGroupSettings } = require('./groups');
+const { checkCensor } = require('../lib/censor');
 
 const router = express.Router();
 
@@ -229,6 +230,11 @@ router.post('/conversations/:id/messages', requireAuth, async (req, res) => {
 
     const { text, type } = req.body;
     if (!text) return res.status(400).json({ error: 'text обязателен' });
+    // Фильтр слов для личных сообщений (системные сообщения не проверяем)
+    if ((type || 'user') === 'user') {
+      const cen = await checkCensor(text, 'messages');
+      if (cen.blocked) return res.status(400).json({ error: cen.message });
+    }
 
     const id  = uuidv4();
     const msg = await queryOne(

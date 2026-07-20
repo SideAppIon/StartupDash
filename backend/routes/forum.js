@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const { query, queryOne, queryAll } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { ensureModeratorSchema, isAdmin, moderatorCanActOn } = require('../lib/moderation');
+const { checkCensor } = require('../lib/censor');
 
 const router = express.Router();
 
@@ -82,6 +83,8 @@ router.post('/', requireAuth, async (req, res) => {
     if (await isForumBanned(req.user.uid)) {
       return res.status(403).json({ error: 'Вам запрещено общение на форуме. Доступен только просмотр.' });
     }
+    const cen = await checkCensor(title + ' ' + content, 'forum');
+    if (cen.blocked) return res.status(400).json({ error: cen.message });
 
     const id = uuidv4();
     const topic = await queryOne(
@@ -203,6 +206,8 @@ router.post('/:id/posts', requireAuth, async (req, res) => {
     if (await isForumBanned(req.user.uid)) {
       return res.status(403).json({ error: 'Вам запрещено общение на форуме. Доступен только просмотр.' });
     }
+    const cen = await checkCensor(content, 'forum');
+    if (cen.blocked) return res.status(400).json({ error: cen.message });
 
     const id = uuidv4();
     const post = await queryOne(

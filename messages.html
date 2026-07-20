@@ -518,7 +518,7 @@ async function send() {
     } else {
       await db.collection('conversations').doc(activeId).collection('messages').add({ text: text, type: 'user' });
     }
-  } catch(e){showToast('Ошибка: '+e.message,'error');}
+  } catch(e){ showToast(e.message||'Не удалось отправить','error'); if(inp){inp.value=text;} }
   finally{btn.disabled=false;}
 }
 

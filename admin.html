@@ -162,6 +162,30 @@
           </div>
         </div>
 
+        <!-- Фильтр слов (цензура) -->
+        <div class="settings-card" style="grid-column:1/-1">
+          <h3>🚫 Фильтр слов</h3>
+          <div class="form-group">
+            <label class="form-label">Сообщение при попытке отправить запрещённое слово</label>
+            <div class="add-row">
+              <input type="text" id="censorMsgInput" placeholder="Например: сообщение содержит недопустимое слово" style="flex:1"/>
+              <button class="btn btn--primary btn--sm" onclick="saveCensorMessage()">Сохранить</button>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Запрещённые слова</label>
+            <div class="form-hint" style="margin-bottom:10px">Для каждого слова выбери, где оно блокируется: форум и/или личные сообщения.</div>
+            <div id="censorList" style="margin-bottom:12px"></div>
+            <div class="add-row" style="flex-wrap:wrap;gap:10px;align-items:center">
+              <input type="text" id="censorWordInput" placeholder="Слово..." maxlength="60" style="flex:1;min-width:160px"
+                onkeydown="if(event.key==='Enter')addCensorWord()"/>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2)"><input type="checkbox" id="censorNewForum" checked style="width:15px;height:15px;accent-color:var(--accent)"/> Форум</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2)"><input type="checkbox" id="censorNewMsg" checked style="width:15px;height:15px;accent-color:var(--accent)"/> Сообщения</label>
+              <button class="btn btn--primary btn--sm" onclick="addCensorWord()">+ Добавить</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Стадии -->
         <div class="settings-card">
           <h3>📊 Стадии проекта</h3>
@@ -478,11 +502,74 @@ async function loadSettings() {
     stages = cfg.stages     || DEFAULT_STAGES.map(function(s){ return Object.assign({},s); });
     document.getElementById('feedLimitInput').value = cfg.feedLimit || 25;
     if (cfg.policyUrl) document.getElementById('policyUrlInput').value = cfg.policyUrl;
+    var cen = cfg.censorship || {};
+    censorship = { blockMessage: cen.blockMessage || '', words: Array.isArray(cen.words) ? cen.words : [] };
+    document.getElementById('censorMsgInput').value = censorship.blockMessage;
   } catch(e) {
     cats   = DEFAULT_CATS.slice();
     stages = DEFAULT_STAGES.map(function(s){ return Object.assign({},s); });
   }
-  renderCats(); renderStages(); renderIconPicker();
+  renderCats(); renderStages(); renderIconPicker(); renderCensorWords();
+}
+
+// ── Фильтр слов ───────────────────────────────────────
+var censorship = { blockMessage: '', words: [] };
+
+async function saveCensorship() {
+  try { await api.post('/platform-config', { censorship: censorship }); }
+  catch(e) { showToast('Ошибка: '+e.message, 'error'); }
+}
+function renderCensorWords() {
+  var el = document.getElementById('censorList');
+  if (!el) return;
+  if (!censorship.words.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text3)">Слова не добавлены</div>';
+    return;
+  }
+  el.innerHTML = censorship.words.map(function(w, i) {
+    return '<div style="display:flex;align-items:center;gap:14px;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px">'+
+      '<div style="flex:1;font-size:14px;font-weight:500;word-break:break-all">'+esc(w.word||'')+'</div>'+
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><input type="checkbox" '+(w.forum?'checked':'')+' onchange="toggleCensorScope('+i+',\'forum\',this.checked)" style="width:15px;height:15px;accent-color:var(--accent)"/> Форум</label>'+
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><input type="checkbox" '+(w.messages?'checked':'')+' onchange="toggleCensorScope('+i+',\'messages\',this.checked)" style="width:15px;height:15px;accent-color:var(--accent)"/> Сообщения</label>'+
+      '<button class="btn btn--danger btn--sm" onclick="removeCensorWord('+i+')">✕</button>'+
+    '</div>';
+  }).join('');
+}
+function addCensorWord() {
+  var inp = document.getElementById('censorWordInput');
+  var word = (inp.value||'').trim();
+  if (!word) { showToast('Введи слово','warn'); return; }
+  if (censorship.words.some(function(w){ return (w.word||'').toLowerCase() === word.toLowerCase(); })) {
+    showToast('Такое слово уже есть','warn'); return;
+  }
+  var forum = document.getElementById('censorNewForum').checked;
+  var msg   = document.getElementById('censorNewMsg').checked;
+  if (!forum && !msg) { showToast('Выбери хотя бы один раздел','warn'); return; }
+  censorship.words.push({ word: word, forum: forum, messages: msg });
+  inp.value = '';
+  renderCensorWords();
+  saveCensorship();
+  showToast('Слово добавлено','success');
+}
+function toggleCensorScope(i, scope, checked) {
+  if (!censorship.words[i]) return;
+  censorship.words[i][scope] = checked;
+  // Если оба сняты — удаляем слово
+  if (!censorship.words[i].forum && !censorship.words[i].messages) {
+    censorship.words.splice(i, 1);
+    renderCensorWords();
+  }
+  saveCensorship();
+}
+function removeCensorWord(i) {
+  censorship.words.splice(i, 1);
+  renderCensorWords();
+  saveCensorship();
+}
+async function saveCensorMessage() {
+  censorship.blockMessage = (document.getElementById('censorMsgInput').value||'').trim();
+  await saveCensorship();
+  showToast('Сообщение сохранено','success');
 }
 
 async function savePolicyUrl() {

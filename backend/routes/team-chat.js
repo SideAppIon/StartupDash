@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { checkCensor } = require('../lib/censor');
 
 const router = express.Router();
 
@@ -159,6 +160,10 @@ router.post('/:startup_id/messages', requireAuth, async (req, res) => {
 
     const { text, type } = req.body;
     if (!text) return res.status(400).json({ error: 'text обязателен' });
+    if ((type || 'user') === 'user') {
+      const cen = await checkCensor(text, 'messages');
+      if (cen.blocked) return res.status(400).json({ error: cen.message });
+    }
 
     const me = await queryOne(
       'SELECT name, avatar, role FROM users WHERE uid=$1', [req.user.uid]

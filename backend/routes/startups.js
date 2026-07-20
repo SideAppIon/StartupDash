@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const { query, queryOne, queryAll } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { getUserGroupSettings } = require('./groups');
+const { checkCensor } = require('../lib/censor');
 
 const router = express.Router();
 
@@ -651,6 +652,8 @@ router.post('/:id/forum', requireAuth, async (req, res) => {
 
     const ban = await queryOne('SELECT forum_banned FROM users WHERE uid=$1', [req.user.uid]);
     if (ban && ban.forum_banned) return res.status(403).json({ error: 'Вам запрещено общение на форуме' });
+    const cen = await checkCensor(content, 'forum');
+    if (cen.blocked) return res.status(400).json({ error: cen.message });
 
     let topic = await queryOne('SELECT id FROM forum_topics WHERE startup_id=$1 LIMIT 1', [req.params.id]);
     if (!topic) {
