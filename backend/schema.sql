@@ -244,26 +244,28 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS diamond BOOLEAN DEFAULT FALSE;
 -- Когда пользователь последний раз открывал уведомления (колокольчик)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notif_seen_at TIMESTAMPTZ;
 
--- Опросы (создаёт стартапер) и голоса
+-- Опросы (создаёт стартапер) и голоса. Опрос может содержать несколько вопросов.
 CREATE TABLE IF NOT EXISTS polls (
   id         TEXT PRIMARY KEY,
   owner_uid  TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
   owner_name TEXT DEFAULT '',
-  question   TEXT NOT NULL,
-  options    TEXT NOT NULL DEFAULT '[]',   -- JSON array
-  audience   TEXT DEFAULT 'all',            -- 'all' | 'registered'
-  status     TEXT DEFAULT 'open',           -- 'open' | 'closed'
+  question   TEXT NOT NULL DEFAULT '',       -- первый вопрос (совместимость)
+  options    TEXT NOT NULL DEFAULT '[]',      -- варианты первого вопроса (совместимость)
+  questions  TEXT NOT NULL DEFAULT '[]',      -- JSON [{question, options:[...]}]
+  audience   TEXT DEFAULT 'all',              -- 'all' | 'registered'
+  status     TEXT DEFAULT 'open',             -- 'open' | 'closed'
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS poll_votes (
-  id           TEXT PRIMARY KEY,
-  poll_id      TEXT NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
-  option_index INTEGER NOT NULL,
-  voter_uid    TEXT,   -- NULL для анонимных
-  created_at   TIMESTAMPTZ DEFAULT NOW()
+  id             TEXT PRIMARY KEY,
+  poll_id        TEXT NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+  question_index INTEGER NOT NULL DEFAULT 0,
+  option_index   INTEGER NOT NULL,
+  voter_uid      TEXT,   -- NULL для анонимных
+  created_at     TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS poll_votes_uid_uniq
-  ON poll_votes(poll_id, voter_uid) WHERE voter_uid IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS poll_votes_q_uid_uniq
+  ON poll_votes(poll_id, question_index, voter_uid) WHERE voter_uid IS NOT NULL;
 
 -- Вложения-документы стартапа (JSON-массив {name, url, size, ext}, до 5 файлов)
 ALTER TABLE startups ADD COLUMN IF NOT EXISTS attachments TEXT DEFAULT '[]';

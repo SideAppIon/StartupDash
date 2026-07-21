@@ -14,21 +14,27 @@ async function ensureSchema() {
       id         TEXT PRIMARY KEY,
       owner_uid  TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
       owner_name TEXT DEFAULT '',
-      question   TEXT NOT NULL,
+      question   TEXT NOT NULL DEFAULT '',
       options    TEXT NOT NULL DEFAULT '[]',
+      questions  TEXT NOT NULL DEFAULT '[]',
       audience   TEXT DEFAULT 'all',
       status     TEXT DEFAULT 'open',
       created_at TIMESTAMPTZ DEFAULT NOW()
     )`);
     await query(`CREATE TABLE IF NOT EXISTS poll_votes (
-      id           TEXT PRIMARY KEY,
-      poll_id      TEXT NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
-      option_index INTEGER NOT NULL,
-      voter_uid    TEXT,
-      created_at   TIMESTAMPTZ DEFAULT NOW()
+      id             TEXT PRIMARY KEY,
+      poll_id        TEXT NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+      question_index INTEGER NOT NULL DEFAULT 0,
+      option_index   INTEGER NOT NULL,
+      voter_uid      TEXT,
+      created_at     TIMESTAMPTZ DEFAULT NOW()
     )`);
-    await query(`CREATE UNIQUE INDEX IF NOT EXISTS poll_votes_uid_uniq
-                 ON poll_votes(poll_id, voter_uid) WHERE voter_uid IS NOT NULL`);
+    // На случай старой схемы (один вопрос)
+    await query("ALTER TABLE polls ADD COLUMN IF NOT EXISTS questions TEXT NOT NULL DEFAULT '[]'");
+    await query('ALTER TABLE poll_votes ADD COLUMN IF NOT EXISTS question_index INTEGER NOT NULL DEFAULT 0');
+    await query('DROP INDEX IF EXISTS poll_votes_uid_uniq');
+    await query(`CREATE UNIQUE INDEX IF NOT EXISTS poll_votes_q_uid_uniq
+                 ON poll_votes(poll_id, question_index, voter_uid) WHERE voter_uid IS NOT NULL`);
     schemaEnsured = true;
   } catch (e) {
     console.error('ensurePollsSchema error:', e.message);
@@ -37,12 +43,39 @@ async function ensureSchema() {
 
 function tryParse(v, fb) { try { return typeof v === 'string' ? JSON.parse(v) : (v || fb); } catch (e) { return fb; } }
 
-async function countsFor(pollId, optionsLen) {
-  const rows = await queryAll('SELECT option_index, COUNT(*)::int AS c FROM poll_votes WHERE poll_id=$1 GROUP BY option_index', [pollId]);
-  const counts = new Array(optionsLen).fill(0);
-  rows.forEach(r => { if (r.option_index >= 0 && r.option_index < optionsLen) counts[r.option_index] = r.c; });
-  const total = counts.reduce((a, b) => a + b, 0);
-  return { counts, total };
+// Нормализованный список вопросов опроса (с обратной совместимостью со старым форматом)
+function pollQuestions(p) {
+  const qs = tryParse(p.questions, null);
+  if (Array.isArray(qs) && qs.length) {
+    return qs.map(q => ({
+      question: String((q && q.question) || ''),
+      options: (Array.isArray(q && q.options) ? q.options : []).map(o => String(o || '')),
+    }));
+  }
+  // Старый формат: один вопрос
+  return [{ question: p.question || '', options: tryParse(p.options, []).map(String) }];
+}
+
+// Валидация входного массива вопросов
+function cleanQuestions(input) {
+  if (!Array.isArray(input)) return [];
+  return input.slice(0, 10).map(q => ({
+    question: String((q && q.question) || '').trim(),
+    options: (Array.isArray(q && q.options) ? q.options : []).map(o => String(o || '').trim()).filter(Boolean).slice(0, 4),
+  })).filter(q => q.question && q.options.length >= 2);
+}
+
+async function resultsFor(pollId, questions) {
+  const rows = await queryAll(
+    'SELECT question_index AS qi, option_index AS oi, COUNT(*)::int AS c FROM poll_votes WHERE poll_id=$1 GROUP BY question_index, option_index',
+    [pollId]
+  );
+  return questions.map((q, qi) => {
+    const counts = new Array(q.options.length).fill(0);
+    rows.forEach(r => { if (r.qi === qi && r.oi >= 0 && r.oi < counts.length) counts[r.oi] = r.c; });
+    const total = counts.reduce((a, b) => a + b, 0);
+    return { counts, total };
+  });
 }
 
 // POST /polls — создать опрос (стартапер или админ)
@@ -52,21 +85,23 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Создавать опросы могут только стартаперы' });
     }
     await ensureSchema();
-    const question = (req.body.question || '').trim();
-    let options = Array.isArray(req.body.options) ? req.body.options.map(o => String(o || '').trim()).filter(Boolean) : [];
-    options = options.slice(0, 4);
+
+    // Поддерживаем и новый формат (questions[]), и старый (question + options[])
+    let questions = cleanQuestions(req.body.questions);
+    if (!questions.length && (req.body.question || req.body.options)) {
+      questions = cleanQuestions([{ question: req.body.question, options: req.body.options }]);
+    }
     const audience = req.body.audience === 'registered' ? 'registered' : 'all';
-    if (!question) return res.status(400).json({ error: 'Введите вопрос' });
-    if (options.length < 2) return res.status(400).json({ error: 'Нужно минимум 2 варианта ответа' });
+    if (!questions.length) return res.status(400).json({ error: 'Нужен хотя бы один вопрос с 2 вариантами' });
 
     const id = uuidv4();
     const user = await queryOne('SELECT name FROM users WHERE uid=$1', [req.user.uid]);
     const poll = await queryOne(
-      `INSERT INTO polls (id, owner_uid, owner_name, question, options, audience, status, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,'open',NOW()) RETURNING *`,
-      [id, req.user.uid, user ? user.name : '', question, JSON.stringify(options), audience]
+      `INSERT INTO polls (id, owner_uid, owner_name, question, options, questions, audience, status, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'open',NOW()) RETURNING *`,
+      [id, req.user.uid, user ? user.name : '', questions[0].question, JSON.stringify(questions[0].options), JSON.stringify(questions), audience]
     );
-    res.status(201).json({ poll: { ...poll, options: tryParse(poll.options, []) } });
+    res.status(201).json({ poll: { ...poll, questions } });
   } catch (e) {
     console.error('POST /polls:', e.message);
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -83,9 +118,10 @@ router.get('/', requireAuth, async (req, res) => {
       : await queryAll('SELECT * FROM polls WHERE owner_uid=$1 ORDER BY created_at DESC', [req.user.uid]);
     const polls = [];
     for (const p of rows) {
-      const opts = tryParse(p.options, []);
-      const { counts, total } = await countsFor(p.id, opts.length);
-      polls.push({ ...p, options: opts, counts, total });
+      const questions = pollQuestions(p);
+      const results = await resultsFor(p.id, questions);
+      const total = results.reduce((a, r) => Math.max(a, r.total), 0); // максимум голосов среди вопросов
+      polls.push({ ...p, questions, questionCount: questions.length, results, total });
     }
     res.json({ polls });
   } catch (e) {
@@ -93,55 +129,64 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// GET /polls/:id — один опрос + результаты + мой голос
+// GET /polls/:id — один опрос + результаты + мои голоса
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     await ensureSchema();
     const p = await queryOne('SELECT * FROM polls WHERE id=$1', [req.params.id]);
     if (!p) return res.status(404).json({ error: 'Опрос не найден' });
-    const opts = tryParse(p.options, []);
-    const { counts, total } = await countsFor(p.id, opts.length);
-    let myVote = -1;
+    const questions = pollQuestions(p);
+    const results = await resultsFor(p.id, questions);
+    let myVotes = questions.map(() => -1);
+    let voted = false;
     if (req.user) {
-      const mine = await queryOne('SELECT option_index FROM poll_votes WHERE poll_id=$1 AND voter_uid=$2', [p.id, req.user.uid]);
-      if (mine) myVote = mine.option_index;
+      const votes = await queryAll('SELECT question_index AS qi, option_index AS oi FROM poll_votes WHERE poll_id=$1 AND voter_uid=$2', [p.id, req.user.uid]);
+      voted = votes.length > 0;
+      votes.forEach(v => { if (v.qi >= 0 && v.qi < myVotes.length) myVotes[v.qi] = v.oi; });
     }
     const isOwnerOrAdmin = !!req.user && (req.user.uid === p.owner_uid || req.user.role === 'admin');
-    res.json({ poll: { ...p, options: opts, counts, total, myVote, isOwnerOrAdmin } });
+    res.json({ poll: { ...p, questions, results, myVotes, voted, isOwnerOrAdmin } });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
 
-// POST /polls/:id/vote — проголосовать
+// POST /polls/:id/vote — проголосовать (votes: [{question, option}])
 router.post('/:id/vote', optionalAuth, async (req, res) => {
   try {
     await ensureSchema();
     const p = await queryOne('SELECT * FROM polls WHERE id=$1', [req.params.id]);
     if (!p) return res.status(404).json({ error: 'Опрос не найден' });
     if (p.status === 'closed') return res.status(400).json({ error: 'Опрос закрыт' });
-
-    const opts = tryParse(p.options, []);
-    const idx = parseInt(req.body.option, 10);
-    if (isNaN(idx) || idx < 0 || idx >= opts.length) return res.status(400).json({ error: 'Неверный вариант' });
-
     if (p.audience === 'registered' && !req.user) {
       return res.status(401).json({ error: 'Голосовать могут только зарегистрированные пользователи' });
     }
 
+    const questions = pollQuestions(p);
+    const votes = Array.isArray(req.body.votes) ? req.body.votes : [];
+    if (!votes.length) return res.status(400).json({ error: 'Нет ответов' });
+
     if (req.user) {
-      const existing = await queryOne('SELECT id FROM poll_votes WHERE poll_id=$1 AND voter_uid=$2', [p.id, req.user.uid]);
+      const existing = await queryOne('SELECT 1 FROM poll_votes WHERE poll_id=$1 AND voter_uid=$2 LIMIT 1', [p.id, req.user.uid]);
       if (existing) return res.status(400).json({ error: 'Вы уже голосовали' });
-      await queryOne('INSERT INTO poll_votes (id, poll_id, option_index, voter_uid, created_at) VALUES ($1,$2,$3,$4,NOW())',
-        [uuidv4(), p.id, idx, req.user.uid]);
-    } else {
-      // Анонимный голос (audience='all')
-      await queryOne('INSERT INTO poll_votes (id, poll_id, option_index, voter_uid, created_at) VALUES ($1,$2,$3,NULL,NOW())',
-        [uuidv4(), p.id, idx]);
     }
 
-    const { counts, total } = await countsFor(p.id, opts.length);
-    res.json({ counts, total });
+    let inserted = 0;
+    for (const v of votes) {
+      const qi = parseInt(v.question, 10);
+      const oi = parseInt(v.option, 10);
+      if (isNaN(qi) || qi < 0 || qi >= questions.length) continue;
+      if (isNaN(oi) || oi < 0 || oi >= questions[qi].options.length) continue;
+      await queryOne(
+        'INSERT INTO poll_votes (id, poll_id, question_index, option_index, voter_uid, created_at) VALUES ($1,$2,$3,$4,$5,NOW())',
+        [uuidv4(), p.id, qi, oi, req.user ? req.user.uid : null]
+      );
+      inserted++;
+    }
+    if (!inserted) return res.status(400).json({ error: 'Неверные ответы' });
+
+    const results = await resultsFor(p.id, questions);
+    res.json({ results });
   } catch (e) {
     console.error('POST vote:', e.message);
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -157,7 +202,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (p.owner_uid !== req.user.uid && req.user.role !== 'admin') return res.status(403).json({ error: 'Нет доступа' });
     const status = req.body.status === 'open' ? 'open' : 'closed';
     const updated = await queryOne('UPDATE polls SET status=$1 WHERE id=$2 RETURNING *', [status, req.params.id]);
-    res.json({ poll: { ...updated, options: tryParse(updated.options, []) } });
+    res.json({ poll: { ...updated, questions: pollQuestions(updated) } });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }

@@ -86,15 +86,9 @@
       <button class="modal__close" onclick="closePollModal()">×</button>
     </div>
     <div class="form-group">
-      <label class="form-label">Вопрос *</label>
-      <input type="text" class="form-input" id="pollQ" maxlength="200" placeholder="Что улучшить в первую очередь?"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Варианты ответов (2–4)</label>
-      <input type="text" class="form-input" id="pollO0" maxlength="120" placeholder="Вариант 1" style="margin-bottom:8px"/>
-      <input type="text" class="form-input" id="pollO1" maxlength="120" placeholder="Вариант 2" style="margin-bottom:8px"/>
-      <input type="text" class="form-input" id="pollO2" maxlength="120" placeholder="Вариант 3 (необяз.)" style="margin-bottom:8px"/>
-      <input type="text" class="form-input" id="pollO3" maxlength="120" placeholder="Вариант 4 (необяз.)"/>
+      <label class="form-label">Вопросы (можно несколько, у каждого 2–4 варианта)</label>
+      <div id="pollQuestions"></div>
+      <button class="btn btn--outline btn--sm" type="button" onclick="addQuestionBlock()">+ Добавить вопрос</button>
     </div>
     <div class="form-group" style="margin-bottom:20px">
       <label class="form-label">Кто может голосовать</label>
@@ -203,6 +197,10 @@ async function renderStartup(el, uid) {
     }).join('') :
       '<div class="empty-state"><div class="empty-state__icon">🚀</div><div class="empty-state__title">Еще нет стартапов</div><a href="create-startup.html" class="btn btn--primary" style="margin-top:16px">Создать стартап</a></div>'
     ) +
+    '<hr class="divider"><div class="section-header" style="margin-bottom:16px" id="polls">' +
+      '<div class="section-title">📊 Мои опросы</div>' +
+      '<button class="btn btn--primary btn--sm" onclick="openPollModal()">+ Создать опрос</button>' +
+    '</div><div id="pollsList"><div class="spinner" style="margin:20px auto"></div></div>' +
     (invites.length ?
       '<hr class="divider"><div class="section-header" style="margin-bottom:16px"><div class="section-title">Заявки в команду</div></div>' +
       invites.map(function(inv){
@@ -227,11 +225,7 @@ async function renderStartup(el, uid) {
             '<button class="btn btn--outline btn--sm" data-iid="'+inv.id+'" data-st="rejected" onclick="answer(this)">✕</button>' +
           '</div></div>';
       }).join('')
-    : '') +
-    '<hr class="divider"><div class="section-header" style="margin-bottom:16px">' +
-      '<div class="section-title">📊 Мои опросы</div>' +
-      '<button class="btn btn--primary btn--sm" onclick="openPollModal()">+ Создать опрос</button>' +
-    '</div><div id="pollsList"><div class="spinner" style="margin:20px auto"></div></div>';
+    : '');
 
   loadMyPolls();
 
@@ -409,21 +403,49 @@ function esc(s) {
 }
 
 // ── ОПРОСЫ ────────────────────────────────────────────
+function questionBlockHtml() {
+  return '<div class="qblock" style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px;background:var(--bg3)">'+
+    '<div style="display:flex;gap:8px;margin-bottom:8px">'+
+      '<input type="text" class="form-input qtext" maxlength="200" placeholder="Текст вопроса" style="flex:1"/>'+
+      '<button class="btn btn--ghost btn--sm qremove" type="button" onclick="removeQuestionBlock(this)" title="Удалить вопрос">✕</button>'+
+    '</div>'+
+    '<input type="text" class="form-input qopt" maxlength="120" placeholder="Вариант 1" style="margin-bottom:6px"/>'+
+    '<input type="text" class="form-input qopt" maxlength="120" placeholder="Вариант 2" style="margin-bottom:6px"/>'+
+    '<input type="text" class="form-input qopt" maxlength="120" placeholder="Вариант 3 (необяз.)" style="margin-bottom:6px"/>'+
+    '<input type="text" class="form-input qopt" maxlength="120" placeholder="Вариант 4 (необяз.)"/>'+
+  '</div>';
+}
+function addQuestionBlock() {
+  document.getElementById('pollQuestions').insertAdjacentHTML('beforeend', questionBlockHtml());
+  updateQRemoveBtns();
+}
+function removeQuestionBlock(btn) {
+  var blk = btn.closest('.qblock'); if (blk) blk.remove();
+  updateQRemoveBtns();
+}
+function updateQRemoveBtns() {
+  var blocks = document.querySelectorAll('#pollQuestions .qblock');
+  document.querySelectorAll('#pollQuestions .qremove').forEach(function(b){ b.style.visibility = blocks.length > 1 ? 'visible' : 'hidden'; });
+}
 function openPollModal() {
-  ['pollQ','pollO0','pollO1','pollO2','pollO3'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('pollQuestions').innerHTML = '';
+  addQuestionBlock();
   document.querySelector('input[name="pollAud"][value="all"]').checked = true;
   document.getElementById('pollModal').classList.add('open');
 }
 function closePollModal() { document.getElementById('pollModal').classList.remove('open'); }
 
 async function createPoll() {
-  var q = document.getElementById('pollQ').value.trim();
-  var opts = ['pollO0','pollO1','pollO2','pollO3'].map(function(id){ return document.getElementById(id).value.trim(); }).filter(Boolean);
+  var questions = [];
+  document.querySelectorAll('#pollQuestions .qblock').forEach(function(blk){
+    var q = blk.querySelector('.qtext').value.trim();
+    var opts = Array.prototype.map.call(blk.querySelectorAll('.qopt'), function(i){ return i.value.trim(); }).filter(Boolean);
+    if (q && opts.length >= 2) questions.push({ question: q, options: opts });
+  });
   var aud = document.querySelector('input[name="pollAud"]:checked').value;
-  if (!q) { showToast('Введи вопрос','error'); return; }
-  if (opts.length < 2) { showToast('Нужно минимум 2 варианта','error'); return; }
+  if (!questions.length) { showToast('Заполни хотя бы один вопрос с 2 вариантами','error'); return; }
   try {
-    var res = await api.post('/polls', { question: q, options: opts, audience: aud });
+    await api.post('/polls', { questions: questions, audience: aud });
     closePollModal();
     showToast('Опрос создан!','success');
     loadMyPolls();
@@ -443,12 +465,14 @@ function renderMyPolls(polls) {
   if (!polls.length) { el.innerHTML = '<p style="font-size:13px;color:var(--text3)">Опросов пока нет. Создай первый.</p>'; return; }
   el.innerHTML = polls.map(function(p){
     var closed = p.status === 'closed';
+    var firstQ = (p.questions && p.questions[0]) ? p.questions[0].question : (p.question||'');
+    var qcnt = p.questionCount || (p.questions ? p.questions.length : 1);
     return '<div class="card" style="margin-bottom:12px;padding:16px">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'+
         '<div style="flex:1;min-width:0">'+
-          '<div style="font-size:15px;font-weight:600">'+esc(p.question||'')+'</div>'+
+          '<div style="font-size:15px;font-weight:600">'+esc(firstQ)+(qcnt>1?' <span style="font-size:12px;color:var(--text3);font-weight:400">+ ещё '+(qcnt-1)+'</span>':'')+'</div>'+
           '<div style="font-size:12px;color:var(--text3);margin-top:4px">'+
-            (closed?'🔒 Закрыт':'🟢 Открыт')+' · '+(p.audience==='registered'?'зарегистрированные':'все')+' · голосов: '+(p.total||0)+'</div>'+
+            (closed?'🔒 Закрыт':'🟢 Открыт')+' · '+(p.audience==='registered'?'зарегистрированные':'все')+' · '+qcnt+' вопр. · голосов: '+(p.total||0)+'</div>'+
         '</div>'+
       '</div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+

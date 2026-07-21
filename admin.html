@@ -692,11 +692,13 @@ async function loadAdminPolls() {
     if (!polls.length) { el.innerHTML = '<p style="color:var(--text2);font-size:14px">Опросов нет</p>'; return; }
     el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' + polls.map(function(p){
       var closed = p.status === 'closed';
+      var firstQ = (p.questions && p.questions[0]) ? p.questions[0].question : (p.question||'');
+      var qcnt = p.questionCount || (p.questions ? p.questions.length : 1);
       return '<div class="user-row">'+
         '<span style="font-size:20px">📊</span>'+
         '<div class="user-row__info">'+
-          '<div class="user-row__name">'+esc(p.question||'')+'</div>'+
-          '<div class="user-row__email">'+esc(p.owner_name||'?')+' · '+(closed?'🔒 закрыт':'🟢 открыт')+' · '+(p.audience==='registered'?'зарегистрированные':'все')+' · голосов: '+(p.total||0)+'</div>'+
+          '<div class="user-row__name">'+esc(firstQ)+(qcnt>1?' (+'+(qcnt-1)+')':'')+'</div>'+
+          '<div class="user-row__email">'+esc(p.owner_name||'?')+' · '+(closed?'🔒 закрыт':'🟢 открыт')+' · '+(p.audience==='registered'?'зарегистрированные':'все')+' · '+qcnt+' вопр. · голосов: '+(p.total||0)+'</div>'+
         '</div>'+
         '<div class="user-row__actions">'+
           '<a href="poll.html?id='+esc(p.id)+'" class="btn btn--outline btn--sm" target="_blank">📊 Результаты</a>'+
