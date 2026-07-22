@@ -78,34 +78,13 @@
   </div>
 </div>
 
-<!-- Модалка создания опроса -->
-<div class="modal-overlay" id="pollModal">
-  <div class="modal" style="max-width:480px">
-    <div class="modal__header">
-      <div class="modal__title">📊 Новый опрос</div>
-      <button class="modal__close" onclick="closePollModal()">×</button>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Вопросы (можно несколько, у каждого 2–4 варианта)</label>
-      <div id="pollQuestions"></div>
-      <button class="btn btn--outline btn--sm" type="button" onclick="addQuestionBlock()">+ Добавить вопрос</button>
-    </div>
-    <div class="form-group" style="margin-bottom:20px">
-      <label class="form-label">Кто может голосовать</label>
-      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text2);margin-bottom:6px;cursor:pointer"><input type="radio" name="pollAud" value="all" checked/> Все (по ссылке, без регистрации)</label>
-      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text2);cursor:pointer"><input type="radio" name="pollAud" value="registered"/> Только зарегистрированные пользователи</label>
-    </div>
-    <button class="btn btn--primary" style="width:100%;justify-content:center" onclick="createPoll()">Создать опрос</button>
-  </div>
-</div>
-
 <div id="toast" class="toast"></div>
 <script src="api-config.js"></script>
 <script>
 requireAuth('login.html');
 
 var NAV = {
-  startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
+  startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   expert:   [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'🧑‍🚀',l:'Мои стартаперы',h:'my-founders.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}],
@@ -197,10 +176,6 @@ async function renderStartup(el, uid) {
     }).join('') :
       '<div class="empty-state"><div class="empty-state__icon">🚀</div><div class="empty-state__title">Еще нет стартапов</div><a href="create-startup.html" class="btn btn--primary" style="margin-top:16px">Создать стартап</a></div>'
     ) +
-    '<hr class="divider"><div class="section-header" style="margin-bottom:16px" id="polls">' +
-      '<div class="section-title">📊 Мои опросы</div>' +
-      '<button class="btn btn--primary btn--sm" onclick="openPollModal()">+ Создать опрос</button>' +
-    '</div><div id="pollsList"><div class="spinner" style="margin:20px auto"></div></div>' +
     (invites.length ?
       '<hr class="divider"><div class="section-header" style="margin-bottom:16px"><div class="section-title">Заявки в команду</div></div>' +
       invites.map(function(inv){
@@ -226,8 +201,6 @@ async function renderStartup(el, uid) {
           '</div></div>';
       }).join('')
     : '');
-
-  loadMyPolls();
 
   // Считаем команды
   var total = 0;
@@ -402,104 +375,6 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// ── ОПРОСЫ ────────────────────────────────────────────
-function questionBlockHtml() {
-  return '<div class="qblock" style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px;background:var(--bg3)">'+
-    '<div style="display:flex;gap:8px;margin-bottom:8px">'+
-      '<input type="text" class="form-input qtext" maxlength="200" placeholder="Текст вопроса" style="flex:1"/>'+
-      '<button class="btn btn--ghost btn--sm qremove" type="button" onclick="removeQuestionBlock(this)" title="Удалить вопрос">✕</button>'+
-    '</div>'+
-    '<input type="text" class="form-input qopt" maxlength="120" placeholder="Вариант 1" style="margin-bottom:6px"/>'+
-    '<input type="text" class="form-input qopt" maxlength="120" placeholder="Вариант 2" style="margin-bottom:6px"/>'+
-    '<input type="text" class="form-input qopt" maxlength="120" placeholder="Вариант 3 (необяз.)" style="margin-bottom:6px"/>'+
-    '<input type="text" class="form-input qopt" maxlength="120" placeholder="Вариант 4 (необяз.)"/>'+
-  '</div>';
-}
-function addQuestionBlock() {
-  document.getElementById('pollQuestions').insertAdjacentHTML('beforeend', questionBlockHtml());
-  updateQRemoveBtns();
-}
-function removeQuestionBlock(btn) {
-  var blk = btn.closest('.qblock'); if (blk) blk.remove();
-  updateQRemoveBtns();
-}
-function updateQRemoveBtns() {
-  var blocks = document.querySelectorAll('#pollQuestions .qblock');
-  document.querySelectorAll('#pollQuestions .qremove').forEach(function(b){ b.style.visibility = blocks.length > 1 ? 'visible' : 'hidden'; });
-}
-function openPollModal() {
-  document.getElementById('pollQuestions').innerHTML = '';
-  addQuestionBlock();
-  document.querySelector('input[name="pollAud"][value="all"]').checked = true;
-  document.getElementById('pollModal').classList.add('open');
-}
-function closePollModal() { document.getElementById('pollModal').classList.remove('open'); }
-
-async function createPoll() {
-  var questions = [];
-  document.querySelectorAll('#pollQuestions .qblock').forEach(function(blk){
-    var q = blk.querySelector('.qtext').value.trim();
-    var opts = Array.prototype.map.call(blk.querySelectorAll('.qopt'), function(i){ return i.value.trim(); }).filter(Boolean);
-    if (q && opts.length >= 2) questions.push({ question: q, options: opts });
-  });
-  var aud = document.querySelector('input[name="pollAud"]:checked').value;
-  if (!questions.length) { showToast('Заполни хотя бы один вопрос с 2 вариантами','error'); return; }
-  try {
-    await api.post('/polls', { questions: questions, audience: aud });
-    closePollModal();
-    showToast('Опрос создан!','success');
-    loadMyPolls();
-  } catch(e) { showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
-}
-
-async function loadMyPolls() {
-  var el = document.getElementById('pollsList');
-  if (!el) return;
-  try {
-    var data = await api.get('/polls');
-    renderMyPolls(data.polls || []);
-  } catch(e) { el.innerHTML = '<p style="font-size:13px;color:var(--text3)">Не удалось загрузить опросы</p>'; }
-}
-function renderMyPolls(polls) {
-  var el = document.getElementById('pollsList');
-  if (!polls.length) { el.innerHTML = '<p style="font-size:13px;color:var(--text3)">Опросов пока нет. Создай первый.</p>'; return; }
-  el.innerHTML = polls.map(function(p){
-    var closed = p.status === 'closed';
-    var firstQ = (p.questions && p.questions[0]) ? p.questions[0].question : (p.question||'');
-    var qcnt = p.questionCount || (p.questions ? p.questions.length : 1);
-    return '<div class="card" style="margin-bottom:12px;padding:16px">'+
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'+
-        '<div style="flex:1;min-width:0">'+
-          '<div style="font-size:15px;font-weight:600">'+esc(firstQ)+(qcnt>1?' <span style="font-size:12px;color:var(--text3);font-weight:400">+ ещё '+(qcnt-1)+'</span>':'')+'</div>'+
-          '<div style="font-size:12px;color:var(--text3);margin-top:4px">'+
-            (closed?'🔒 Закрыт':'🟢 Открыт')+' · '+(p.audience==='registered'?'зарегистрированные':'все')+' · '+qcnt+' вопр. · голосов: '+(p.total||0)+'</div>'+
-        '</div>'+
-      '</div>'+
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+
-        '<a href="poll.html?id='+esc(p.id)+'" class="btn btn--outline btn--sm">📊 Результаты</a>'+
-        '<button class="btn btn--ghost btn--sm" onclick="copyPollLink(\''+esc(p.id)+'\')">🔗 Ссылка</button>'+
-        (closed
-          ? '<button class="btn btn--ghost btn--sm" onclick="setPollStatus(\''+esc(p.id)+'\',\'open\')">Открыть</button>'
-          : '<button class="btn btn--ghost btn--sm" onclick="setPollStatus(\''+esc(p.id)+'\',\'closed\')">Закрыть</button>')+
-        '<button class="btn btn--danger btn--sm" onclick="deletePollById(\''+esc(p.id)+'\')">🗑</button>'+
-      '</div>'+
-    '</div>';
-  }).join('');
-}
-function copyPollLink(id) {
-  var url = window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'poll.html?id=' + id;
-  navigator.clipboard.writeText(url).then(function(){ showToast('🔗 Ссылка скопирована','success'); },
-    function(){ showToast(url,'info'); });
-}
-async function setPollStatus(id, status) {
-  try { await api.patch('/polls/'+id, { status: status }); showToast(status==='closed'?'Опрос закрыт':'Опрос открыт','success'); loadMyPolls(); }
-  catch(e){ showToast('Ошибка: '+e.message,'error'); }
-}
-async function deletePollById(id) {
-  if (!confirm('Удалить опрос?')) return;
-  try { await api.delete('/polls/'+id); showToast('Опрос удалён','success'); loadMyPolls(); }
-  catch(e){ showToast('Ошибка: '+e.message,'error'); }
-}
 </script>
 </body>
 </html>
