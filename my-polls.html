@@ -47,10 +47,13 @@
       <div id="pollQuestions"></div>
       <button class="btn btn--outline btn--sm" type="button" onclick="addQuestionBlock()">+ Добавить вопрос</button>
     </div>
-    <div class="form-group" style="margin-bottom:20px">
+    <div class="form-group">
       <label class="form-label">Кто может голосовать</label>
       <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text2);margin-bottom:6px;cursor:pointer"><input type="radio" name="pollAud" value="all" checked/> Все (по ссылке, без регистрации)</label>
       <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text2);cursor:pointer"><input type="radio" name="pollAud" value="registered"/> Только зарегистрированные пользователи</label>
+    </div>
+    <div class="form-group" style="margin-bottom:20px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text2);cursor:pointer"><input type="checkbox" id="pollShowResults" checked style="width:16px;height:16px;accent-color:var(--accent)"/> Показывать результаты голосующим (иначе видит только автор)</label>
     </div>
     <button class="btn btn--primary" style="width:100%;justify-content:center" onclick="createPoll()">Создать опрос</button>
   </div>
@@ -82,6 +85,7 @@ function questionBlockHtml() {
       '<input type="text" class="form-input qtext" maxlength="200" placeholder="Текст вопроса" style="flex:1"/>'+
       '<button class="btn btn--ghost btn--sm qremove" type="button" onclick="removeQuestionBlock(this)" title="Удалить вопрос">✕</button>'+
     '</div>'+
+    '<input type="text" class="form-input qdesc" maxlength="500" placeholder="Описание вопроса (необязательно)" style="margin-bottom:8px;font-size:13px"/>'+
     '<input type="text" class="form-input qopt" maxlength="120" placeholder="Вариант 1" style="margin-bottom:6px"/>'+
     '<input type="text" class="form-input qopt" maxlength="120" placeholder="Вариант 2" style="margin-bottom:6px"/>'+
     '<input type="text" class="form-input qopt" maxlength="120" placeholder="Вариант 3 (необяз.)" style="margin-bottom:6px"/>'+
@@ -112,13 +116,15 @@ async function createPoll() {
   var questions = [];
   document.querySelectorAll('#pollQuestions .qblock').forEach(function(blk){
     var q = blk.querySelector('.qtext').value.trim();
+    var desc = blk.querySelector('.qdesc').value.trim();
     var opts = Array.prototype.map.call(blk.querySelectorAll('.qopt'), function(i){ return i.value.trim(); }).filter(Boolean);
-    if (q && opts.length >= 2) questions.push({ question: q, options: opts });
+    if (q && opts.length >= 2) questions.push({ question: q, desc: desc, options: opts });
   });
   var aud = document.querySelector('input[name="pollAud"]:checked').value;
+  var showRes = document.getElementById('pollShowResults').checked;
   if (!questions.length) { showToast('Заполни хотя бы один вопрос с 2 вариантами','error'); return; }
   try {
-    await api.post('/polls', { questions: questions, audience: aud });
+    await api.post('/polls', { questions: questions, audience: aud, show_results: showRes });
     closePollModal();
     showToast('Опрос создан!','success');
     loadMyPolls();

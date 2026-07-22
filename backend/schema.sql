@@ -251,10 +251,11 @@ CREATE TABLE IF NOT EXISTS polls (
   owner_name TEXT DEFAULT '',
   question   TEXT NOT NULL DEFAULT '',       -- первый вопрос (совместимость)
   options    TEXT NOT NULL DEFAULT '[]',      -- варианты первого вопроса (совместимость)
-  questions  TEXT NOT NULL DEFAULT '[]',      -- JSON [{question, options:[...]}]
-  audience   TEXT DEFAULT 'all',              -- 'all' | 'registered'
-  status     TEXT DEFAULT 'open',             -- 'open' | 'closed'
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  questions    TEXT NOT NULL DEFAULT '[]',    -- JSON [{question, desc, options:[...]}]
+  audience     TEXT DEFAULT 'all',            -- 'all' | 'registered'
+  status       TEXT DEFAULT 'open',           -- 'open' | 'closed'
+  show_results BOOLEAN DEFAULT true,          -- показывать ли результаты голосующим
+  created_at   TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS poll_votes (
   id             TEXT PRIMARY KEY,

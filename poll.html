@@ -34,7 +34,8 @@
       <div class="card">
         <div id="pollStatus" style="font-size:12px;color:var(--text3);margin-bottom:8px"></div>
         <h1 style="font-family:var(--font-head);font-size:22px;font-weight:800;line-height:1.3;margin-bottom:6px" id="pollQuestion"></h1>
-        <div style="font-size:13px;color:var(--text2);margin-bottom:20px" id="pollBy"></div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:12px" id="pollBy"></div>
+        <div id="pollDesc" style="font-size:14px;color:var(--text2);line-height:1.6;white-space:pre-wrap;margin-bottom:16px"></div>
         <div id="pollArea"></div>
         <div id="pollMsg" style="font-size:13px;color:var(--text3);margin-top:14px"></div>
         <div id="ownerBar" style="display:none;gap:8px;flex-wrap:wrap;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)"></div>
@@ -84,15 +85,24 @@ function render() {
   var qs = poll.questions || [];
   document.getElementById('pollQuestion').textContent = qs.length > 1 ? ('🗳️ Опрос · ' + qs.length + ' вопроса') : (qs[0] ? qs[0].question : 'Опрос');
   document.getElementById('pollBy').textContent = 'Автор: ' + (poll.owner_name || '—');
+  // Описание одиночного вопроса — под заголовком (у мультивопросов описание рядом с каждым)
+  document.getElementById('pollDesc').textContent = (qs.length === 1 && qs[0]) ? (qs[0].desc || '') : '';
   document.getElementById('pollStatus').textContent =
     (poll.status === 'closed' ? '🔒 Опрос закрыт' : '🟢 Опрос открыт') +
     ' · ' + (poll.audience === 'registered' ? 'только для зарегистрированных' : 'для всех');
 
   var alreadyVoted = poll.voted || votedLocally();
-  var showResults = poll.status === 'closed' || alreadyVoted || poll.isOwnerOrAdmin;
+  var canSee = poll.canSeeResults !== false; // автор/админ или разрешён показ
 
-  if (showResults) renderResults();
-  else renderVoting();
+  if (poll.isOwnerOrAdmin) {
+    renderResults();
+  } else if (poll.status === 'open' && !alreadyVoted) {
+    renderVoting();
+  } else if (canSee) {
+    renderResults();
+  } else {
+    renderHidden(alreadyVoted);
+  }
 
   if (poll.isOwnerOrAdmin) {
     var bar = document.getElementById('ownerBar');
@@ -106,11 +116,13 @@ function render() {
   }
 }
 
-function qHeading(qi, text) {
+function qHeading(qi, q) {
   var qs = poll.questions || [];
-  return qs.length > 1
-    ? '<div style="font-family:var(--font-head);font-size:16px;font-weight:700;margin:'+(qi?'22px':'4px')+' 0 12px">'+(qi+1)+'. '+esc(text)+'</div>'
-    : (qi ? '' : '');
+  if (qs.length <= 1) return '';
+  var descHtml = (q && q.desc)
+    ? '<div style="font-size:13px;color:var(--text2);line-height:1.5;margin:-6px 0 12px;white-space:pre-wrap">'+esc(q.desc)+'</div>'
+    : '';
+  return '<div style="font-family:var(--font-head);font-size:16px;font-weight:700;margin:'+(qi?'22px':'4px')+' 0 '+(descHtml?'6px':'12px')+'">'+(qi+1)+'. '+esc(q.question)+'</div>'+descHtml;
 }
 
 function renderVoting() {
@@ -122,7 +134,7 @@ function renderVoting() {
   }
   var qs = poll.questions || [];
   var html = qs.map(function(q, qi) {
-    return qHeading(qi, q.question) +
+    return qHeading(qi, q) +
       q.options.map(function(o, oi) {
         return '<label class="poll-opt" data-q="'+qi+'" data-o="'+oi+'" onclick="selectQ('+qi+','+oi+')">'+
           '<input type="radio" name="q'+qi+'" value="'+oi+'"/> <span>'+esc(o)+'</span></label>';
@@ -149,13 +161,28 @@ async function vote() {
   }
   try {
     var res = await api.post('/polls/'+pollId+'/vote', { votes: votes });
-    poll.results = res.results;
     poll.myVotes = qs.map(function(q, qi){ return selected[qi]; });
     poll.voted = true;
     markVotedLocally();
-    renderResults();
     showToast('Голос учтён!','success');
+    // Показываем результаты, только если автор разрешил
+    if (res.canSeeResults !== false && res.results) {
+      poll.results = res.results;
+      renderResults();
+    } else {
+      renderHidden(true);
+    }
   } catch(e) { showToast(e.message || 'Не удалось проголосовать','error'); }
+}
+
+function renderHidden(voted) {
+  document.getElementById('pollArea').innerHTML =
+    '<div style="text-align:center;padding:24px 0;color:var(--text2)">'+
+      '<div style="font-size:38px;margin-bottom:10px">'+(voted?'✅':'🔒')+'</div>'+
+      '<div style="font-size:15px;font-weight:600">'+(voted?'Спасибо, голос учтён!':'Голосование недоступно')+'</div>'+
+      '<div style="font-size:13px;color:var(--text3);margin-top:6px">Результаты видны только автору опроса.</div>'+
+    '</div>';
+  document.getElementById('pollMsg').textContent = '';
 }
 
 function renderResults() {
@@ -165,7 +192,7 @@ function renderResults() {
   var html = qs.map(function(q, qi) {
     var r = results[qi] || { counts: [], total: 0 };
     var total = r.total || 0;
-    return qHeading(qi, q.question) + q.options.map(function(o, oi) {
+    return qHeading(qi, q) + q.options.map(function(o, oi) {
       var c = (r.counts && r.counts[oi]) || 0;
       var pct = total ? Math.round(c/total*100) : 0;
       var mine = (myVotes[qi] === oi);

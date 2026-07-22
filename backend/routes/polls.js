@@ -11,15 +11,16 @@ async function ensureSchema() {
   if (schemaEnsured) return;
   try {
     await query(`CREATE TABLE IF NOT EXISTS polls (
-      id         TEXT PRIMARY KEY,
-      owner_uid  TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
-      owner_name TEXT DEFAULT '',
-      question   TEXT NOT NULL DEFAULT '',
-      options    TEXT NOT NULL DEFAULT '[]',
-      questions  TEXT NOT NULL DEFAULT '[]',
-      audience   TEXT DEFAULT 'all',
-      status     TEXT DEFAULT 'open',
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      id           TEXT PRIMARY KEY,
+      owner_uid    TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+      owner_name   TEXT DEFAULT '',
+      question     TEXT NOT NULL DEFAULT '',
+      options      TEXT NOT NULL DEFAULT '[]',
+      questions    TEXT NOT NULL DEFAULT '[]',
+      audience     TEXT DEFAULT 'all',
+      status       TEXT DEFAULT 'open',
+      show_results BOOLEAN DEFAULT true,
+      created_at   TIMESTAMPTZ DEFAULT NOW()
     )`);
     await query(`CREATE TABLE IF NOT EXISTS poll_votes (
       id             TEXT PRIMARY KEY,
@@ -31,6 +32,7 @@ async function ensureSchema() {
     )`);
     // На случай старой схемы (один вопрос)
     await query("ALTER TABLE polls ADD COLUMN IF NOT EXISTS questions TEXT NOT NULL DEFAULT '[]'");
+    await query('ALTER TABLE polls ADD COLUMN IF NOT EXISTS show_results BOOLEAN DEFAULT true');
     await query('ALTER TABLE poll_votes ADD COLUMN IF NOT EXISTS question_index INTEGER NOT NULL DEFAULT 0');
     await query('DROP INDEX IF EXISTS poll_votes_uid_uniq');
     await query(`CREATE UNIQUE INDEX IF NOT EXISTS poll_votes_q_uid_uniq
@@ -49,11 +51,12 @@ function pollQuestions(p) {
   if (Array.isArray(qs) && qs.length) {
     return qs.map(q => ({
       question: String((q && q.question) || ''),
+      desc: String((q && q.desc) || ''),
       options: (Array.isArray(q && q.options) ? q.options : []).map(o => String(o || '')),
     }));
   }
   // Старый формат: один вопрос
-  return [{ question: p.question || '', options: tryParse(p.options, []).map(String) }];
+  return [{ question: p.question || '', desc: '', options: tryParse(p.options, []).map(String) }];
 }
 
 // Валидация входного массива вопросов
@@ -61,6 +64,7 @@ function cleanQuestions(input) {
   if (!Array.isArray(input)) return [];
   return input.slice(0, 10).map(q => ({
     question: String((q && q.question) || '').trim(),
+    desc: String((q && q.desc) || '').trim().slice(0, 500),
     options: (Array.isArray(q && q.options) ? q.options : []).map(o => String(o || '').trim()).filter(Boolean).slice(0, 4),
   })).filter(q => q.question && q.options.length >= 2);
 }
@@ -92,14 +96,15 @@ router.post('/', requireAuth, async (req, res) => {
       questions = cleanQuestions([{ question: req.body.question, options: req.body.options }]);
     }
     const audience = req.body.audience === 'registered' ? 'registered' : 'all';
+    const showResults = !(req.body.show_results === false || req.body.showResults === false);
     if (!questions.length) return res.status(400).json({ error: 'Нужен хотя бы один вопрос с 2 вариантами' });
 
     const id = uuidv4();
     const user = await queryOne('SELECT name FROM users WHERE uid=$1', [req.user.uid]);
     const poll = await queryOne(
-      `INSERT INTO polls (id, owner_uid, owner_name, question, options, questions, audience, status, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'open',NOW()) RETURNING *`,
-      [id, req.user.uid, user ? user.name : '', questions[0].question, JSON.stringify(questions[0].options), JSON.stringify(questions), audience]
+      `INSERT INTO polls (id, owner_uid, owner_name, question, options, questions, audience, status, show_results, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'open',$8,NOW()) RETURNING *`,
+      [id, req.user.uid, user ? user.name : '', questions[0].question, JSON.stringify(questions[0].options), JSON.stringify(questions), audience, showResults]
     );
     res.status(201).json({ poll: { ...poll, questions } });
   } catch (e) {
@@ -136,7 +141,6 @@ router.get('/:id', optionalAuth, async (req, res) => {
     const p = await queryOne('SELECT * FROM polls WHERE id=$1', [req.params.id]);
     if (!p) return res.status(404).json({ error: 'Опрос не найден' });
     const questions = pollQuestions(p);
-    const results = await resultsFor(p.id, questions);
     let myVotes = questions.map(() => -1);
     let voted = false;
     if (req.user) {
@@ -145,7 +149,11 @@ router.get('/:id', optionalAuth, async (req, res) => {
       votes.forEach(v => { if (v.qi >= 0 && v.qi < myVotes.length) myVotes[v.qi] = v.oi; });
     }
     const isOwnerOrAdmin = !!req.user && (req.user.uid === p.owner_uid || req.user.role === 'admin');
-    res.json({ poll: { ...p, questions, results, myVotes, voted, isOwnerOrAdmin } });
+    // Результаты видит автор/админ всегда; остальным — только если разрешено
+    const showResults = p.show_results !== false;
+    const canSeeResults = isOwnerOrAdmin || showResults;
+    const results = canSeeResults ? await resultsFor(p.id, questions) : null;
+    res.json({ poll: { ...p, questions, results, myVotes, voted, isOwnerOrAdmin, showResults, canSeeResults } });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
@@ -185,8 +193,11 @@ router.post('/:id/vote', optionalAuth, async (req, res) => {
     }
     if (!inserted) return res.status(400).json({ error: 'Неверные ответы' });
 
-    const results = await resultsFor(p.id, questions);
-    res.json({ results });
+    // Возвращаем результаты только если автор разрешил их показывать (или это автор/админ)
+    const isOwnerOrAdmin = !!req.user && (req.user.uid === p.owner_uid || req.user.role === 'admin');
+    const canSeeResults = isOwnerOrAdmin || p.show_results !== false;
+    const results = canSeeResults ? await resultsFor(p.id, questions) : null;
+    res.json({ results, canSeeResults });
   } catch (e) {
     console.error('POST vote:', e.message);
     res.status(500).json({ error: 'Ошибка сервера' });
