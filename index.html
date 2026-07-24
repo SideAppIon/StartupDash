@@ -4,7 +4,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LaunchPad — Платформа для стартапов</title>
+  <title>Атриум — Платформа для стартапов</title>
   <link rel="stylesheet" href="styles.css" />
   <style>
     .hero {
@@ -107,16 +107,16 @@
       border-bottom: 1px solid var(--border);
     }
     .home-nav__logo {
-      font-family: var(--font-head); font-size: 22px; font-weight: 800;
-      color: var(--accent); text-decoration: none; margin-right: auto;
+      display: flex; align-items: center;
+      text-decoration: none; margin-right: auto; flex-shrink: 0;
     }
-    .home-nav__logo span { color: var(--text); }
+    .home-nav__logo img { height: 30px; width: auto; display: block; }
   </style>
 </head>
 <body>
 
 <nav class="home-nav">
-  <a href="index.html" class="home-nav__logo">Launch<span>Pad</span></a>
+  <a href="index.html" class="home-nav__logo"><img src="assets/atrium-logo.png" alt="Атриум"/></a>
   <a href="startups.html" class="btn btn--ghost btn--sm">Стартапы</a>
   <a href="login.html" class="btn btn--outline btn--sm">Войти</a>
   <a href="register.html" class="btn btn--primary btn--sm">Регистрация</a>
@@ -132,7 +132,7 @@
       Запусти стартап.
     </h1>
     <p class="hero__sub">
-      LaunchPad объединяет основателей, талантливых специалистов и экспертов
+      Атриум объединяет основателей, талантливых специалистов и экспертов
       на одной платформе. Создай проект — или стань его частью.
     </p>
     <div class="hero__actions">

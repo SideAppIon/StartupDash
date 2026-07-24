@@ -1,6 +1,6 @@
 <svg width="680" height="405" viewBox="0 0 680 405" role="img" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
-  <title>Архитектура сервиса LaunchPad (светлая)</title>
-  <desc>Пользователь обращается к веб-приложению LaunchPad, оно ходит через API Gateway в serverless backend, который хранит данные в PostgreSQL и медиафайлы в Object Storage.</desc>
+  <title>Архитектура сервиса Атриум (светлая)</title>
+  <desc>Пользователь обращается к веб-приложению Атриум, оно ходит через API Gateway в serverless backend, который хранит данные в PostgreSQL и медиафайлы в Object Storage.</desc>
   <defs>
     <marker id="ar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
       <path d="M0,0 L6,3 L0,6 Z" fill="#12a150"/>
@@ -23,7 +23,7 @@
 
   <g>
     <rect x="200" y="108" width="280" height="52" rx="10" fill="#f3f6f8" stroke="#d3d9df"/>
-    <text x="340" y="132" text-anchor="middle" font-size="14" font-weight="600" fill="#1a1d22">LaunchPad</text>
+    <text x="340" y="132" text-anchor="middle" font-size="14" font-weight="600" fill="#1a1d22">Атриум</text>
     <text x="340" y="149" text-anchor="middle" font-size="12" fill="#586069">веб-приложение, статический фронтенд</text>
   </g>
 

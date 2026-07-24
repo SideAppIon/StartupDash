@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Профиль участника — LaunchPad</title>
+  <title>Профиль участника — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <link rel="stylesheet" href="styles.css"/>
   <style>
@@ -28,7 +28,7 @@
 <body>
 
 <nav class="nav">
-  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="index.html" class="nav__logo"><img src="assets/atrium-logo.png" alt="Атриум"/></a>
   <a href="startups.html">Стартапы</a>
   <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
@@ -174,7 +174,7 @@ onAuthReady(async function(user, userData) {
   if (!snap.exists) { window.location.href = 'members.html'; return; }
   profileData = snap.data();
 
-  document.title = (profileData.name || 'Участник') + ' — LaunchPad';
+  document.title = (profileData.name || 'Участник') + ' — Атриум';
 
   // Аватар
   var mav = profileData.avatar ||

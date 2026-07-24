@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Стартап — LaunchPad</title>
+  <title>Стартап — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <link rel="stylesheet" href="styles.css"/>
   <style>
@@ -50,7 +50,7 @@
 <body>
 
 <nav class="nav">
-  <a href="index.html" class="nav__logo">Launch<span>Pad</span></a>
+  <a href="index.html" class="nav__logo"><img src="assets/atrium-logo.png" alt="Атриум"/></a>
   <a href="startups.html">Стартапы</a>
   <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
@@ -329,7 +329,7 @@ onAuthReady(async function(user, userData) {
     document.getElementById('sTagline').textContent = startupData.tagline || '';
     document.getElementById('sStage').textContent   = startupData.stage || 'Идея';
     document.getElementById('sCategory').textContent= startupData.category || '';
-    document.title = (startupData.name || 'Стартап') + ' — LaunchPad';
+    document.title = (startupData.name || 'Стартап') + ' — Атриум';
 
     if (startupData.website) {
       document.getElementById('sWebsite').innerHTML =

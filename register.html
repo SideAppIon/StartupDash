@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Регистрация — LaunchPad</title>
+  <title>Регистрация — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <link rel="stylesheet" href="styles.css"/>
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px 0; }
     .auth-box { width:100%; max-width:480px; padding:24px; }
-    .auth-logo { font-family:var(--font-head); font-size:26px; font-weight:800; color:var(--accent); text-decoration:none; display:block; text-align:center; margin-bottom:28px; }
-    .auth-logo span { color:var(--text); }
+    .auth-logo { display:flex; justify-content:center; text-decoration:none; margin-bottom:28px; }
+    .auth-logo img { height:38px; width:auto; display:block; }
     .auth-title { font-family:var(--font-head); font-size:26px; font-weight:800; letter-spacing:-1px; margin-bottom:6px; text-align:center; }
     .auth-sub { color:var(--text2); font-size:14px; text-align:center; margin-bottom:24px; }
     .auth-link { text-align:center; font-size:14px; color:var(--text2); margin-top:16px; }
@@ -40,7 +40,7 @@
 <body>
 
 <div class="auth-box">
-  <a href="index.html" class="auth-logo">Launch<span>Pad</span></a>
+  <a href="index.html" class="auth-logo"><img src="assets/atrium-logo.png" alt="Атриум"/></a>
   <h1 class="auth-title">Создать аккаунт</h1>
   <p class="auth-sub">Заполни информацию в 3 шага</p>
 
@@ -155,7 +155,7 @@
     <div style="margin-top:16px">
       <label class="checkbox-row">
         <input type="checkbox" id="policyCheck"/>
-        <span>Я прочитал и соглашаюсь с <a id="policyLink" href="privacy.html" target="_blank">политикой конфиденциальности</a> платформы LaunchPad</span>
+        <span>Я прочитал и соглашаюсь с <a id="policyLink" href="privacy.html" target="_blank">политикой конфиденциальности</a> платформы «Атриум»</span>
       </label>
 
     </div>

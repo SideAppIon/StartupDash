@@ -57,14 +57,12 @@ body {
   z-index: 100;
 }
 .nav__logo {
-  font-family: var(--font-head);
-  font-size: 20px; font-weight: 800;
-  color: var(--accent);
+  display: flex; align-items: center;
   text-decoration: none;
-  letter-spacing: -0.5px;
   margin-right: auto;
+  flex-shrink: 0;
 }
-.nav__logo span { color: var(--text); }
+.nav__logo img { height: 28px; width: auto; display: block; }
 .nav a {
   font-size: 14px; font-weight: 500;
   color: var(--text2);
@@ -266,6 +264,7 @@ body {
 @media (max-width: 768px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .nav { padding: 0 16px; gap: 16px; }
+  .nav__logo img { height: 22px; }
   .container, .container--sm, .container--md { padding: 0 16px; }
   .page-title { font-size: 26px; }
 }
