@@ -466,6 +466,27 @@ const db = {
 };
 
 // ─────────────────────────────────────────────────────────
+// БАТЧ-ЗАГРУЗКА ПРОФИЛЕЙ
+// Один запрос вместо N штук db.collection('users').doc(uid).get() в цикле.
+// Возвращает { uid: userData } (camelCase, как остальной фронтенд).
+// ─────────────────────────────────────────────────────────
+async function fetchUsersByUids(uids) {
+  const list = [...new Set((uids || []).filter(Boolean))];
+  if (!list.length) return {};
+  const map = {};
+  try {
+    const data = await api.get('/users?uids=' + encodeURIComponent(list.join(',')));
+    (data.users || []).forEach(u => {
+      const c = _toCamel(u);
+      if (c.uid) map[c.uid] = c;
+    });
+  } catch (e) {
+    return {};
+  }
+  return map;
+}
+
+// ─────────────────────────────────────────────────────────
 // UI ХЕЛПЕРЫ (те же что были в firebase-config.js)
 // ─────────────────────────────────────────────────────────
 var ROLE_LABELS = {

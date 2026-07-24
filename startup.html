@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Стартап — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=2"/>
+  <link rel="stylesheet" href="styles.css?v=3"/>
   <style>
     .startup-hero{background:var(--bg2);border-bottom:1px solid var(--border);padding:calc(var(--nav-h) + 40px) 0 32px}
     .startup-hero__inner{display:flex;gap:24px;align-items:flex-start}
@@ -274,7 +274,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=2"></script>
+<script src="api-config.js?v=3"></script>
 <script>
 var startupId = getUrlParam('id');
 if (!startupId) window.location.href = 'startups.html';
@@ -283,6 +283,9 @@ var startupData = null;
 // Сохраняем пользователя глобально для всех функций
 var pageUser     = null;
 var pageUserData = null;
+// Команда и accepted-инвайты, загруженные при проверке доступа — чтобы loadTeam не грузил их повторно
+var _teamRawCache    = null;
+var _acceptedInvSnap = null;
 
 // ── TABS ──────────────────────────────────────────────
 function switchTab(idx, btn) {
@@ -387,31 +390,47 @@ onAuthReady(async function(user, userData) {
     var privacy   = startupData.privacy || 'public';
     var isTeamMember = false;
     var memberPerms  = {};  // разрешения текущего участника команды
+    // Членство в команде и статус своей заявки — независимы, грузим вместе
+    var userInviteStatus = null;
     if (user) {
-      // Проверяем принят ли в команду через API
-      try {
-        var teamData = await api.get('/startups/' + startupId + '/team');
-        var myEntry  = (teamData.team || []).find(function(m){ return m.user_uid === user.uid; });
+      var checks = await Promise.all([
+        api.get('/startups/' + startupId + '/team').catch(function(){ return null; }),
+        // accepted-инвайты нужны как fallback для исторических данных
+        db.collection('invites').where('startupId','==', startupId)
+          .where('status','==','accepted').get().catch(function(){ return null; }),
+        (userData && userData.role === 'user')
+          ? db.collection('invites').where('fromUid','==', user.uid)
+              .where('startupId','==', startupId).get().catch(function(){ return null; })
+          : Promise.resolve(null)
+      ]);
+
+      // Эти же данные нужны loadTeam — переиспользуем, чтобы не запрашивать дважды
+      _teamRawCache   = checks[0];
+      _acceptedInvSnap = checks[1];
+
+      var teamData = checks[0];
+      if (teamData) {
+        var myEntry = (teamData.team || []).find(function(m){ return m.user_uid === user.uid; });
         if (myEntry) {
           isTeamMember = true;
           memberPerms  = (typeof myEntry.permissions === 'object' ? myEntry.permissions : {});
         }
-      } catch(e) {}
-      if (!isTeamMember) {
-        try {
-          // Проверяем accepted invite (пользователь подавал заявку или был приглашен)
-          var myInvSnap = await db.collection('invites')
-            .where('startupId','==', startupId)
-            .where('status','==','accepted').get();
-          var myInv = myInvSnap.docs.find(function(d){
-            var inv = d.data();
-            return inv.fromUid === user.uid || inv.toUid === user.uid;
-          });
-          if (myInv) {
-            isTeamMember = true;
-            memberPerms  = myInv.data().permissions || {};
-          }
-        } catch(e) {}
+      }
+
+      if (!isTeamMember && checks[1]) {
+        var myInv = checks[1].docs.find(function(d){
+          var inv = d.data();
+          return inv.fromUid === user.uid || inv.toUid === user.uid;
+        });
+        if (myInv) {
+          isTeamMember = true;
+          memberPerms  = myInv.data().permissions || {};
+        }
+      }
+
+      if (checks[2] && !checks[2].empty) {
+        // берем последнюю заявку
+        userInviteStatus = checks[2].docs[checks[2].docs.length-1].data().status;
       }
     }
     var isOwnerOrAdmin = user && (user.uid === startupData.ownerUid || (userData && userData.role === 'admin'));
@@ -428,28 +447,16 @@ onAuthReady(async function(user, userData) {
       document.getElementById('panel0').querySelector('.card').appendChild(lockBanner);
     }
 
-    // Кнопки действий — проверяем статус заявки текущего пользователя
-    var userInviteStatus = null;
-    if (user && userData && userData.role === 'user') {
-      try {
-        var invSnap = await db.collection('invites')
-          .where('fromUid','==', user.uid)
-          .where('startupId','==', startupId).get();
-        if (!invSnap.empty) {
-          // берем последнюю заявку
-          userInviteStatus = invSnap.docs[invSnap.docs.length-1].data().status;
-        }
-      } catch(e) { /* игнорируем */ }
-    }
     renderActions(user, userData, userInviteStatus, isTeamMember, memberPerms);
 
-    // Основатель
-    await loadOwner();
-
-    // Обновления, команда, вакансии
-    await loadUpdates();
-    await loadTeam(isOwnerOrAdmin, isTeamMember, memberPerms);
-    await loadVacancies(isOwnerOrAdmin, isTeamMember);
+    // Основатель, обновления, команда и вакансии не зависят друг от друга —
+    // грузим одной волной вместо четырёх последовательных
+    await Promise.all([
+      loadOwner(),
+      loadUpdates(),
+      loadTeam(isOwnerOrAdmin, isTeamMember, memberPerms),
+      loadVacancies(isOwnerOrAdmin, isTeamMember)
+    ]);
 
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('pageContent').style.display  = 'block';
@@ -617,19 +624,28 @@ async function loadTeam(isOwnerOrAdmin, isTeamMember, memberPerms) {
   try {
     var members = [];
 
-    // Основатель всегда первый
-    var ownerSnap = await db.collection('users').doc(startupData.ownerUid).get();
-    if (ownerSnap.exists) {
-      members.push(Object.assign({ _teamRole: 'Основатель', _isOwner: true }, ownerSnap.data()));
-    } else {
-      members.push({ name: startupData.ownerName||'Основатель', uid: startupData.ownerUid, _teamRole: 'Основатель', _isOwner: true });
-    }
+    // Состав команды и исторические accepted-инвайты. Для залогиненного пользователя
+    // они уже загружены при проверке доступа — берём оттуда, иначе запрашиваем одной волной.
+    var loaded = await Promise.all([
+      _teamRawCache
+        ? Promise.resolve({ docs: (_teamRawCache.team || []).map(function(t){
+            return { data: function(){ return t; } };
+          }) })
+        : db.collection('startups').doc(startupId).collection('team').get()
+            .catch(function(){ return { docs: [] }; }),
+      _acceptedInvSnap
+        ? Promise.resolve(_acceptedInvSnap)
+        : db.collection('invites').where('startupId','==', startupId)
+            .where('status','==','accepted').get()
+            .catch(function(){ return { docs: [] }; })
+    ]);
+    var teamSnap = loaded[0];
+    var accSnap  = loaded[1];
 
-    // Участники из коллекции team
-    var teamSnap = await db.collection('startups').doc(startupId).collection('team').get();
     // Собираем данные команды для панели разрешений
     var teamDocs = {}; // uid -> docId
     var teamUids = [];
+    var teamRows = [];
     for (var i = 0; i < teamSnap.docs.length; i++) {
       var t = teamSnap.docs[i].data();
       // После миграции поле может быть userUid, user_uid или uid
@@ -637,38 +653,49 @@ async function loadTeam(isOwnerOrAdmin, isTeamMember, memberPerms) {
       if (!tUid) continue;
       teamUids.push(tUid);
       teamDocs[tUid] = { docId: tUid, permissions: t.permissions || {}, role: t.role || 'Участник', src: 'team' };
-      try {
-        var uSnap = await db.collection('users').doc(tUid).get();
-        if (uSnap.exists) {
-          members.push(Object.assign({ _teamRole: t.role || 'Участник', _teamDocId: tUid, _src: 'team', _perms: t.permissions || {} }, uSnap.data()));
-        }
-      } catch(e) {}
+      teamRows.push({ uid: tUid, role: t.role || 'Участник', perms: t.permissions || {} });
     }
 
     // Участники через accepted invites (fallback для исторических данных)
-    try {
-      var accSnap = await db.collection('invites')
-        .where('startupId','==', startupId)
-        .where('status','==','accepted').get();
-      for (var j = 0; j < accSnap.docs.length; j++) {
-        var inv = accSnap.docs[j].data();
-        // from_startup: владелец пригласил → member = toUid; иначе → member = fromUid
-        var memberUid = (inv.type === 'from_startup' && inv.toUid) ? inv.toUid : inv.fromUid;
-        if (!memberUid || memberUid === startupData.ownerUid) continue;
-        if (teamUids.indexOf(memberUid) !== -1) continue;
-        var invRole = 'Участник';
-        if (inv.applications && inv.applications.length && inv.applications[0].role) {
-          invRole = inv.applications[0].role;
-        } else if (inv.role) { invRole = inv.role; }
-        teamDocs[memberUid] = { docId: accSnap.docs[j].id, permissions: inv.permissions || {}, role: invRole, src: 'invite' };
-        try {
-          var iUsnap = await db.collection('users').doc(memberUid).get();
-          if (iUsnap.exists) {
-            members.push(Object.assign({ _teamRole: invRole, _teamDocId: accSnap.docs[j].id, _src: 'invite', _perms: inv.permissions || {} }, iUsnap.data()));
-          }
-        } catch(e) {}
-      }
-    } catch(e) {}
+    var inviteRows = [];
+    for (var j = 0; j < accSnap.docs.length; j++) {
+      var inv = accSnap.docs[j].data();
+      // from_startup: владелец пригласил → member = toUid; иначе → member = fromUid
+      var memberUid = (inv.type === 'from_startup' && inv.toUid) ? inv.toUid : inv.fromUid;
+      if (!memberUid || memberUid === startupData.ownerUid) continue;
+      if (teamUids.indexOf(memberUid) !== -1) continue;
+      var invRole = 'Участник';
+      if (inv.applications && inv.applications.length && inv.applications[0].role) {
+        invRole = inv.applications[0].role;
+      } else if (inv.role) { invRole = inv.role; }
+      teamDocs[memberUid] = { docId: accSnap.docs[j].id, permissions: inv.permissions || {}, role: invRole, src: 'invite' };
+      inviteRows.push({ uid: memberUid, role: invRole, docId: accSnap.docs[j].id, perms: inv.permissions || {} });
+    }
+
+    // Все профили (владелец + команда + инвайты) одним запросом вместо запроса на каждого
+    var profiles = await fetchUsersByUids(
+      [startupData.ownerUid]
+        .concat(teamRows.map(function(r){ return r.uid; }))
+        .concat(inviteRows.map(function(r){ return r.uid; }))
+    );
+
+    // Основатель всегда первый
+    var ownerProfile = profiles[startupData.ownerUid];
+    if (ownerProfile) {
+      members.push(Object.assign({ _teamRole: 'Основатель', _isOwner: true }, ownerProfile));
+    } else {
+      members.push({ name: startupData.ownerName||'Основатель', uid: startupData.ownerUid, _teamRole: 'Основатель', _isOwner: true });
+    }
+
+    teamRows.forEach(function(r){
+      var p = profiles[r.uid];
+      if (p) members.push(Object.assign({ _teamRole: r.role, _teamDocId: r.uid, _src: 'team', _perms: r.perms }, p));
+    });
+
+    inviteRows.forEach(function(r){
+      var p = profiles[r.uid];
+      if (p) members.push(Object.assign({ _teamRole: r.role, _teamDocId: r.docId, _src: 'invite', _perms: r.perms }, p));
+    });
 
     // Список команды
     var membersHtml = '<div class="card">' +

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Дашборд — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=2"/>
+  <link rel="stylesheet" href="styles.css?v=3"/>
   <style>
     .dash-grid{display:grid;grid-template-columns:280px 1fr;gap:24px}
     @media(max-width:900px){.dash-grid{grid-template-columns:1fr}}
@@ -79,7 +79,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=2"></script>
+<script src="api-config.js?v=3"></script>
 <script>
 requireAuth('login.html');
 
@@ -124,39 +124,73 @@ onAuthReady(async function(user, userData) {
   }).join('');
 
   var main = document.getElementById('main');
+
+  // Всё для дашборда одним запросом. Если бэкенд с /dashboard ещё не задеплоен —
+  // dash останется null и render-функции сходят за данными по старому пути.
+  var dash = null;
+  try { dash = await api.get('/dashboard'); } catch(e) {}
+
   try {
-    if (role==='startup')  await renderStartup(main, user.uid);
-    else if (role==='expert') await renderExpert(main, user.uid);
-    else if (role==='admin')    await renderAdmin(main);
+    if (role==='startup')  await renderStartup(main, user.uid, dash);
+    else if (role==='expert') await renderExpert(main, user.uid, dash);
+    else if (role==='admin')    await renderAdmin(main, dash);
     else if (role==='moderator') await renderModerator(main);
-    else                         await renderUser(main, user.uid);
+    else                         await renderUser(main, user.uid, dash);
   } catch(e) {
     main.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Ошибка загрузки</div><p style="font-size:14px">'+e.message+'</p><button class="btn btn--outline" onclick="location.reload()">Попробовать снова</button></div>';
   }
 });
 
-async function renderStartup(el, uid) {
-  var snap    = await db.collection('startups').where('ownerUid','==',uid).get();
-  var startups = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+// Данные для роли «стартапер»: из батч-ответа, иначе старым путём, но параллельно.
+async function loadStartupData(uid, dash) {
+  if (dash && dash.startups) {
+    return { startups: dash.startups, invites: dash.invites || [], teamTotal: dash.teamTotal };
+  }
 
-  var invSnap = await db.collection('invites').where('startupOwner','==',uid).get();
-  var invites = invSnap.docs.filter(function(d){ return d.data().status==='pending' && d.data().type !== 'from_startup'; }).map(function(d){ return Object.assign({id:d.id},d.data()); });
+  // Два независимых запроса — одной волной вместо двух
+  var res = await Promise.all([
+    db.collection('startups').where('ownerUid','==',uid).get(),
+    db.collection('invites').where('startupOwner','==',uid).get()
+  ]);
+  var startups = res[0].docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+  var invites  = res[1].docs
+    .filter(function(d){ return d.data().status==='pending' && d.data().type !== 'from_startup'; })
+    .map(function(d){ return Object.assign({id:d.id},d.data()); });
 
-  // Подтягиваем глобальную роль заявителя (эксперт / специалист / стартапер)
-  for (var iv = 0; iv < invites.length; iv++) {
-    invites[iv]._fromRole = 'user';
+  // Роли заявителей — одним батч-запросом вместо запроса на каждую заявку
+  var uids = invites.map(function(i){ return i.fromUid; }).filter(Boolean);
+  var roleByUid = {};
+  if (uids.length) {
     try {
-      if (invites[iv].fromUid) {
-        var uDoc = await db.collection('users').doc(invites[iv].fromUid).get();
-        if (uDoc.exists) invites[iv]._fromRole = uDoc.data().role || 'user';
-      }
+      var data = await api.get('/users?uids=' + encodeURIComponent(uids.join(',')));
+      (data.users||[]).forEach(function(u){ roleByUid[u.uid] = u.role || 'user'; });
     } catch(e) {}
   }
+  invites.forEach(function(i){ i._fromRole = roleByUid[i.fromUid] || 'user'; });
+
+  // Размеры команд — тоже одной волной
+  var teamTotal = 0;
+  try {
+    var teams = await Promise.all(startups.map(function(s){
+      return db.collection('startups').doc(s.id).collection('team').get()
+        .then(function(t){ return t.size; })
+        .catch(function(){ return 0; });
+    }));
+    teamTotal = teams.reduce(function(a,b){ return a+b; }, 0);
+  } catch(e) {}
+
+  return { startups: startups, invites: invites, teamTotal: teamTotal };
+}
+
+async function renderStartup(el, uid, dash) {
+  var data     = await loadStartupData(uid, dash);
+  var startups = data.startups;
+  var invites  = data.invites;
 
   el.innerHTML =
     '<div class="stat-row">' +
       '<div class="stat-box"><div class="stat-box__num">'+startups.length+'</div><div class="stat-box__lbl">Мои стартапы</div></div>' +
-      '<div class="stat-box"><div class="stat-box__num" id="teamTotal">...</div><div class="stat-box__lbl">В командах</div></div>' +
+      '<div class="stat-box"><div class="stat-box__num" id="teamTotal">'+(data.teamTotal!=null?data.teamTotal:'...')+'</div><div class="stat-box__lbl">В командах</div></div>' +
       '<div class="stat-box"><div class="stat-box__num">'+invites.length+'</div><div class="stat-box__lbl">Заявок</div></div>' +
     '</div>' +
     '<div class="section-header" style="margin-bottom:16px">' +
@@ -202,22 +236,22 @@ async function renderStartup(el, uid) {
       }).join('')
     : '');
 
-  // Считаем команды
-  var total = 0;
-  for (var i=0; i<startups.length; i++) {
-    try { var t = await db.collection('startups').doc(startups[i].id).collection('team').get(); total+=t.size; } catch(e){}
-  }
-  var tt = document.getElementById('teamTotal');
-  if (tt) tt.textContent = total;
 }
 
-async function renderExpert(el, uid) {
-  var mySnap = await db.collection('startups').where('ownerUid','==',uid).get();
-  var myStartups = mySnap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
-
-  var snap = await db.collection('startups').orderBy('createdAt','desc').limit(10).get();
-  var list = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); })
-    .filter(function(s){ return s.privacy !== 'closed'; });
+async function renderExpert(el, uid, dash) {
+  var myStartups, list;
+  if (dash && dash.myStartups) {
+    myStartups = dash.myStartups;
+    list       = dash.recentStartups || [];
+  } else {
+    var res = await Promise.all([
+      db.collection('startups').where('ownerUid','==',uid).get(),
+      db.collection('startups').orderBy('createdAt','desc').limit(10).get()
+    ]);
+    myStartups = res[0].docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+    list = res[1].docs.map(function(d){ return Object.assign({id:d.id},d.data()); })
+      .filter(function(s){ return s.privacy !== 'closed'; });
+  }
 
   var myStartupsHtml = '';
   if (myStartups.length) {
@@ -267,19 +301,26 @@ async function renderModerator(el) {
     );
 }
 
-async function renderUser(el, uid) {
-  // Входящие приглашения от стартапов (type=from_startup, status=pending, toUid=uid)
-  var incomingInvites = [];
-  try {
-    var inSnap = await db.collection('invites')
-      .where('toUid','==',uid).where('status','==','pending').get();
-    incomingInvites = inSnap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
-  } catch(e) {}
-  var snap = await db.collection('startups').orderBy('createdAt','desc').limit(6).get();
-  var list = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); })
-    .filter(function(s){ return s.privacy !== 'closed'; }).slice(0,4);
-  var iSnap = await db.collection('invites').where('fromUid','==',uid).get();
-  var invs  = iSnap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+async function renderUser(el, uid, dash) {
+  var incomingInvites, list, invs;
+
+  if (dash && dash.recentStartups) {
+    incomingInvites = dash.incomingInvites || [];
+    list            = (dash.recentStartups || []).slice(0,4);
+    invs            = dash.myInvites || [];
+  } else {
+    // Три независимых запроса — одной волной вместо трёх подряд
+    var res = await Promise.all([
+      db.collection('invites').where('toUid','==',uid).where('status','==','pending').get()
+        .catch(function(){ return { docs: [] }; }),
+      db.collection('startups').orderBy('createdAt','desc').limit(6).get(),
+      db.collection('invites').where('fromUid','==',uid).get()
+    ]);
+    incomingInvites = res[0].docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+    list = res[1].docs.map(function(d){ return Object.assign({id:d.id},d.data()); })
+      .filter(function(s){ return s.privacy !== 'closed'; }).slice(0,4);
+    invs = res[2].docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+  }
 
   var invitesHtml = '';
   if (invs.length) {
@@ -333,13 +374,25 @@ async function renderUser(el, uid) {
     }).join('') + invitesHtml + incomingHtml;
 }
 
-async function renderAdmin(el) {
-  var u = await db.collection('users').get();
-  var s = await db.collection('startups').get();
-  // Скрытые админом не учитываем в статистике
-  var users    = u.docs.map(function(d){return d.data();}).filter(function(x){return !(x.hidden===true||x.hidden==='true');});
-  var startups = s.docs.map(function(d){return d.data();}).filter(function(x){return !(x.hidden===true||x.hidden==='true');});
-  el.innerHTML = '<div class="stat-row"><div class="stat-box"><div class="stat-box__num">'+users.length+'</div><div class="stat-box__lbl">Пользователей</div></div><div class="stat-box"><div class="stat-box__num">'+startups.length+'</div><div class="stat-box__lbl">Стартапов</div></div><div class="stat-box"><div class="stat-box__num">'+(users.filter(function(x){return x.role==='expert';}).length)+'</div><div class="stat-box__lbl">Экспертов</div></div></div>' +
+async function renderAdmin(el, dash) {
+  var nUsers, nStartups, nExperts;
+
+  if (dash && dash.stats) {
+    // Считает БД — вместо выкачивания обеих таблиц целиком на клиент
+    nUsers = dash.stats.users; nStartups = dash.stats.startups; nExperts = dash.stats.experts;
+  } else {
+    var res = await Promise.all([
+      db.collection('users').get(),
+      db.collection('startups').get()
+    ]);
+    var notHidden = function(x){ return !(x.hidden===true||x.hidden==='true'); };
+    var users    = res[0].docs.map(function(d){return d.data();}).filter(notHidden);
+    var startups = res[1].docs.map(function(d){return d.data();}).filter(notHidden);
+    nUsers = users.length; nStartups = startups.length;
+    nExperts = users.filter(function(x){return x.role==='expert';}).length;
+  }
+
+  el.innerHTML = '<div class="stat-row"><div class="stat-box"><div class="stat-box__num">'+nUsers+'</div><div class="stat-box__lbl">Пользователей</div></div><div class="stat-box"><div class="stat-box__num">'+nStartups+'</div><div class="stat-box__lbl">Стартапов</div></div><div class="stat-box"><div class="stat-box__num">'+nExperts+'</div><div class="stat-box__lbl">Экспертов</div></div></div>' +
     '<div class="grid-2"><a href="admin.html" class="card card--clickable" style="text-decoration:none"><div style="font-size:32px;margin-bottom:12px">👥</div><div class="section-title" style="font-size:18px">Пользователи</div><p style="font-size:14px;color:var(--text2);margin-top:6px">Роли, блокировка, сброс паролей</p></a><a href="startups.html" class="card card--clickable" style="text-decoration:none"><div style="font-size:32px;margin-bottom:12px">🚀</div><div class="section-title" style="font-size:18px">Стартапы</div><p style="font-size:14px;color:var(--text2);margin-top:6px">Просмотр и удаление</p></a></div>';
 }
 

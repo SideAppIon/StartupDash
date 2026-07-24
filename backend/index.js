@@ -15,6 +15,7 @@ const teamChatRoutes  = require('./routes/team-chat');
 const groupsRoutes    = require('./routes/groups');
 const pollsRoutes     = require('./routes/polls');
 const complaintsRoutes = require('./routes/complaints');
+const dashboardRoutes  = require('./routes/dashboard');
 
 const app = express();
 
@@ -87,6 +88,7 @@ app.use('/team-chat',       teamChatRoutes);
 app.use('/groups',          groupsRoutes);
 app.use('/complaints',      complaintsRoutes);
 app.use('/polls',           pollsRoutes);
+app.use('/dashboard',       dashboardRoutes);
 
 // ── 404 ───────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ error: `Маршрут ${req.method} ${req.path} не найден` }));

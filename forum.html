@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Форум — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=2"/>
+  <link rel="stylesheet" href="styles.css?v=3"/>
   <style>
     .forum-layout{display:grid;grid-template-columns:1fr 260px;gap:24px}
     @media(max-width:860px){.forum-layout{grid-template-columns:1fr}}
@@ -187,7 +187,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=2"></script>
+<script src="api-config.js?v=3"></script>
 <script>
 var currentView    = 'list';
 var currentCat     = '';
@@ -235,9 +235,8 @@ onAuthReady(async function(user, userData) {
     await loadTopic(topicId);
     showView('topic');
   } else {
-    await loadTopics();
-    loadStats();
-    loadHotTopics();
+    // Список тем, статистика и популярное независимы — одной волной
+    await Promise.all([loadTopics(), loadStats(), loadHotTopics()]);
   }
 });
 
@@ -369,8 +368,15 @@ async function loadTopic(topicId) {
   document.getElementById('replyArea').innerHTML = '';
 
   try {
-    // Загружаем тему
-    var tSnap = await db.collection('forum_topics').doc(topicId).get();
+    // Тема и её посты не зависят друг от друга — грузим вместе
+    var loadedTopic = await Promise.all([
+      db.collection('forum_topics').doc(topicId).get(),
+      db.collection('forum_topics').doc(topicId).collection('posts')
+        .orderBy('createdAt','asc').get()
+        .catch(function(){ return { docs: [] }; })
+    ]);
+    var tSnap  = loadedTopic[0];
+    var pSnapPreloaded = loadedTopic[1];
     if (!tSnap.exists) { showView('list'); return; }
     var t = Object.assign({id:tSnap.id}, tSnap.data());
     // Скрытая тема — только для модераторов/админов
@@ -406,10 +412,8 @@ async function loadTopic(topicId) {
 
     // views обновляет бэкенд при GET /forum/:id/posts
 
-    // Загружаем посты
-    var pSnap = await db.collection('forum_topics').doc(topicId).collection('posts')
-      .orderBy('createdAt','asc').get();
-    var posts = pSnap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
+    // Посты уже загружены выше, вместе с темой
+    var posts = pSnapPreloaded.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
 
     // OP всегда первый — контент из самой темы
     var opPost = {

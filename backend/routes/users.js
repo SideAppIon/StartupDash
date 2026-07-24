@@ -27,8 +27,23 @@ async function ensureHiddenSchema() {
 router.get('/', optionalAuth, async (req, res) => {
   try {
     await ensureHiddenSchema();
-    const { role, search } = req.query;
+    const { role, search, uids } = req.query;
     const isAdmin = req.user && req.user.role === 'admin';
+
+    // Батч-загрузка профилей по списку uid: ?uids=a,b,c
+    // Эквивалент N вызовов GET /users/:uid — поэтому фильтры скрытия здесь
+    // не применяются (профиль по прямому uid доступен, см. GET /users/:uid).
+    if (uids) {
+      const list = String(uids).split(',').map(s => s.trim()).filter(Boolean).slice(0, 200);
+      if (!list.length) return res.json({ users: [] });
+      const rows = await queryAll(
+        `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio,
+                forum_banned, hidden, expert_status, diamond, created_at
+         FROM users WHERE uid = ANY($1)`,
+        [list]
+      );
+      return res.json({ users: rows.map(parseUser) });
+    }
     let sql = `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, hidden, expert_status, diamond, created_at, onboarding_done
                FROM users WHERE 1=1`;
     const params = [];
