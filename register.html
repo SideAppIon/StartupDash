@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Регистрация — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css"/>
+  <link rel="stylesheet" href="styles.css?v=2"/>
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px 0; }
     .auth-box { width:100%; max-width:480px; padding:24px; }
     .auth-logo { display:flex; justify-content:center; text-decoration:none; margin-bottom:28px; }
-    .auth-logo img { height:38px; width:auto; display:block; }
+    .auth-logo img { height:32px; width:auto; display:block; }
     .auth-title { font-family:var(--font-head); font-size:26px; font-weight:800; letter-spacing:-1px; margin-bottom:6px; text-align:center; }
     .auth-sub { color:var(--text2); font-size:14px; text-align:center; margin-bottom:24px; }
     .auth-link { text-align:center; font-size:14px; color:var(--text2); margin-top:16px; }
@@ -172,7 +172,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js"></script>
+<script src="api-config.js?v=2"></script>
 <script>
 // Редирект только если уже авторизован при загрузке страницы (не во время регистрации)
 var registering = false;

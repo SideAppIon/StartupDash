@@ -62,7 +62,7 @@ body {
   margin-right: auto;
   flex-shrink: 0;
 }
-.nav__logo img { height: 28px; width: auto; display: block; }
+.nav__logo img { height: 22px; width: auto; display: block; }
 .nav a {
   font-size: 14px; font-weight: 500;
   color: var(--text2);
@@ -264,7 +264,7 @@ body {
 @media (max-width: 768px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .nav { padding: 0 16px; gap: 16px; }
-  .nav__logo img { height: 22px; }
+  .nav__logo img { height: 18px; }
   .container, .container--sm, .container--md { padding: 0 16px; }
   .page-title { font-size: 26px; }
 }
