@@ -27,6 +27,18 @@
     .vac-card__title{font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:6px}
     .vac-card__desc{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:12px;white-space:pre-wrap}
     .vac-card__footer{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    /* Витрина */
+    .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+    .prod-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column;transition:border-color .2s}
+    .prod-card:hover{border-color:var(--border2)}
+    .prod-card__img{width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--bg3);display:block}
+    .prod-card__img--empty{display:flex;align-items:center;justify-content:center;font-size:38px;color:var(--text3)}
+    .prod-card__body{padding:14px;display:flex;flex-direction:column;gap:8px;flex:1}
+    .prod-card__name{font-family:var(--font-head);font-size:15px;font-weight:700;line-height:1.3}
+    .prod-card__desc{font-size:13px;color:var(--text2);line-height:1.6;white-space:pre-wrap;flex:1}
+    .prod-card__price{font-family:var(--font-head);font-size:16px;font-weight:700;color:var(--accent)}
+    .prod-card__actions{display:flex;gap:8px;align-items:center;margin-top:4px}
+    .prod-card__manage{display:flex;gap:6px;padding:0 14px 14px}
     .perms-panel{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:16px}
     .perms-panel__title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px}
     .perm-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
@@ -98,6 +110,7 @@
             <button class="tab" onclick="switchTab(1,this)">Обновления</button>
             <button class="tab" onclick="switchTab(2,this)">Команда</button>
             <button class="tab" onclick="switchTab(3,this)">Вакансии</button>
+            <button class="tab" id="tabProducts" onclick="switchTab(4,this)" style="display:none">🛍 Витрина</button>
           </div>
 
           <!-- О проекте -->
@@ -141,6 +154,12 @@
           <div class="tab-panel" id="panel3">
             <div id="vacOwnerActions" style="display:none;margin-bottom:14px"></div>
             <div id="vacList"><div class="spinner" style="margin:32px auto"></div></div>
+          </div>
+
+          <!-- Витрина -->
+          <div class="tab-panel" id="panel4">
+            <div id="prodOwnerActions" style="display:none;margin-bottom:14px"></div>
+            <div id="prodList"><div class="spinner" style="margin:32px auto"></div></div>
           </div>
         </div>
 
@@ -269,6 +288,67 @@
     </div>
     <div id="vacApplyErr" class="form-error" style="display:none;margin-top:10px"></div>
     <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="sendVacApply()">Отправить заявку</button>
+  </div>
+</div>
+
+<!-- Product Modal (добавление/редактирование товара) -->
+<div class="modal-overlay" id="prodModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal__header">
+      <div class="modal__title" id="prodModalTitle">Новый товар</div>
+      <button class="modal__close" onclick="document.getElementById('prodModal').classList.remove('open')">×</button>
+    </div>
+    <input type="hidden" id="prodId"/>
+    <div class="form-group">
+      <label class="form-label">Фото товара <span style="color:var(--text3);font-weight:400">(необязательно, до ~2 МБ)</span></label>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div id="prodImgPreview" style="width:72px;height:72px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--text3);overflow:hidden;flex-shrink:0">🛍</div>
+        <div>
+          <input type="file" id="prodImgInput" accept="image/*" style="display:none" onchange="onProdImagePick(this)"/>
+          <button type="button" class="btn btn--outline btn--sm" onclick="document.getElementById('prodImgInput').click()">Загрузить фото</button>
+          <button type="button" class="btn btn--ghost btn--sm" id="prodImgClear" style="display:none" onclick="clearProdImage()">Убрать</button>
+          <div id="prodImgStatus" style="font-size:12px;color:var(--text3);margin-top:6px"></div>
+        </div>
+      </div>
+      <input type="hidden" id="prodImgUrl"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Название <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
+      <input type="text" class="form-input" id="prodName" maxlength="120" placeholder="Например: Подписка Pro на месяц"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Описание *</label>
+      <textarea class="form-textarea" id="prodDesc" maxlength="2000" style="min-height:90px" placeholder="Что это за товар или услуга, что входит..."></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Цена <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
+      <input type="text" class="form-input" id="prodPrice" maxlength="60" placeholder="1500 ₽ · от 990 ₽ · договорная"/>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Ссылка «Купить» *</label>
+      <input type="text" class="form-input" id="prodBuyUrl" maxlength="1000" placeholder="https://... — сайт, оплата или личка в соцсети"/>
+      <div class="form-hint">Куда попадёт покупатель: страница оплаты, товар на маркетплейсе или сообщение в соцсети</div>
+    </div>
+    <div id="prodErr" class="form-error" style="display:none;margin-top:10px"></div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" id="prodSaveBtn" onclick="saveProduct()">Опубликовать</button>
+  </div>
+</div>
+
+<!-- Leaving-site interstitial -->
+<div class="modal-overlay" id="leaveModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal__header">
+      <div class="modal__title">🔗 Вы покидаете Атриум</div>
+      <button class="modal__close" onclick="document.getElementById('leaveModal').classList.remove('open')">×</button>
+    </div>
+    <p style="font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:12px">
+      Вы переходите на внешний ресурс. Атриум не отвечает за содержимое и безопасность сторонних сайтов — будьте внимательны, прежде чем вводить данные или оплачивать.
+    </p>
+    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 14px;font-size:13px;color:var(--text);word-break:break-all;margin-bottom:18px" id="leaveUrlText"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn--ghost" style="flex:1;justify-content:center" onclick="document.getElementById('leaveModal').classList.remove('open')">Отмена</button>
+      <a class="btn btn--primary" style="flex:2;justify-content:center" id="leaveGoBtn" href="#" target="_blank" rel="noopener noreferrer nofollow" onclick="document.getElementById('leaveModal').classList.remove('open')">Продолжить →</a>
+    </div>
   </div>
 </div>
 
@@ -451,11 +531,15 @@ onAuthReady(async function(user, userData) {
 
     // Основатель, обновления, команда и вакансии не зависят друг от друга —
     // грузим одной волной вместо четырёх последовательных
+    // Витрина: у приватного стартапа — только для команды/владельца (как обновления и команда)
+    var canViewProducts = !(privacy === 'private' && !hasFullAccess);
+
     await Promise.all([
       loadOwner(),
       loadUpdates(),
       loadTeam(isOwnerOrAdmin, isTeamMember, memberPerms),
-      loadVacancies(isOwnerOrAdmin, isTeamMember)
+      loadVacancies(isOwnerOrAdmin, isTeamMember),
+      loadProducts(isOwnerOrAdmin, canViewProducts)
     ]);
 
     document.getElementById('loadingState').style.display = 'none';
@@ -1397,6 +1481,226 @@ function renderStartupAttachments() {
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── ВИТРИНА ───────────────────────────────────────────────
+var _products    = [];
+var _canManageProducts = false;
+
+// Только http(s) — чтобы в кнопку не попал javascript:/data:
+function isSafeHttpUrl(url) {
+  if (!url) return false;
+  try {
+    var u = new URL(url, window.location.href);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch(e) { return false; }
+}
+
+async function loadProducts(isOwnerOrAdmin, canView) {
+  _canManageProducts = !!isOwnerOrAdmin;
+  var tab   = document.getElementById('tabProducts');
+  var actEl = document.getElementById('prodOwnerActions');
+  var el    = document.getElementById('prodList');
+
+  // Приватный стартап: посторонним витрину не показываем и не грузим
+  if (!canView) { if (tab) tab.style.display = 'none'; return; }
+
+  try {
+    var data = await api.get('/startups/' + startupId + '/products');
+    _products = (data.products || []);
+  } catch(e) { _products = []; }
+
+  // Вкладку показываем: владельцу/админу — всегда (чтобы наполнять),
+  // посетителю — только если товары есть (пустой магазин не показываем)
+  if (tab) tab.style.display = (isOwnerOrAdmin || _products.length) ? '' : 'none';
+
+  if (isOwnerOrAdmin) {
+    actEl.style.display = '';
+    actEl.innerHTML = '<button class="btn btn--primary btn--sm" onclick="openProdModal()">+ Добавить товар</button>';
+  } else {
+    actEl.style.display = 'none';
+  }
+
+  if (!_products.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🛍</div>' +
+      '<div class="empty-state__title">Витрина пуста</div>' +
+      '<p style="font-size:14px;color:var(--text2)">' +
+      (isOwnerOrAdmin ? 'Добавьте первый товар или услугу — покупатели увидят их здесь' : 'Товары ещё не добавлены') +
+      '</p></div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="prod-grid">' + _products.map(renderProductCard).join('') + '</div>';
+}
+
+function renderProductCard(p) {
+  var img = p.imageUrl
+    ? '<img class="prod-card__img" src="'+esc(p.imageUrl)+'" alt="'+esc(p.name||p.description||'')+'" onerror="this.classList.add(&quot;prod-card__img--empty&quot;);this.removeAttribute(&quot;src&quot;);this.textContent=&quot;🛍&quot;"/>'
+    : '<div class="prod-card__img prod-card__img--empty">🛍</div>';
+
+  var name  = p.name ? '<div class="prod-card__name">'+esc(p.name)+'</div>' : '';
+  var price = p.price ? '<div class="prod-card__price">'+esc(p.price)+'</div>' : '';
+
+  // Кнопка «Купить» ведёт через интерстишл (confirmLeave), даже если ссылка кривая — не рендерим переход
+  var safe  = isSafeHttpUrl(p.buyUrl);
+  var buyBtn = safe
+    ? '<button class="btn btn--primary btn--sm" style="flex:1;justify-content:center" ' +
+        'data-url="'+esc(p.buyUrl)+'" onclick="confirmLeave(this.getAttribute(&quot;data-url&quot;))">Купить →</button>'
+    : '<span class="badge badge--gray">Ссылка недоступна</span>';
+
+  var manage = _canManageProducts
+    ? '<div class="prod-card__manage">' +
+        '<button class="btn btn--ghost btn--sm" data-pid="'+esc(p.id)+'" onclick="editProduct(this)">✏️</button>' +
+        '<button class="btn btn--danger btn--sm" data-pid="'+esc(p.id)+'" onclick="deleteProduct(this)">✕</button>' +
+      '</div>'
+    : '';
+
+  return '<div class="prod-card">' +
+    img +
+    '<div class="prod-card__body">' +
+      name +
+      '<div class="prod-card__desc">'+esc(p.description||'')+'</div>' +
+      price +
+      '<div class="prod-card__actions">' + buyBtn + '</div>' +
+    '</div>' +
+    manage +
+  '</div>';
+}
+
+// Интерстишл «вы покидаете сайт»
+function confirmLeave(url) {
+  if (!isSafeHttpUrl(url)) { showToast('Ссылка недоступна', 'error'); return; }
+  document.getElementById('leaveUrlText').textContent = url;
+  document.getElementById('leaveGoBtn').href = url;
+  document.getElementById('leaveModal').classList.add('open');
+}
+
+// ── Управление товарами (владелец/админ) ──────────────────
+function openProdModal() {
+  document.getElementById('prodModalTitle').textContent = 'Новый товар';
+  document.getElementById('prodId').value    = '';
+  document.getElementById('prodName').value  = '';
+  document.getElementById('prodDesc').value  = '';
+  document.getElementById('prodPrice').value = '';
+  document.getElementById('prodBuyUrl').value= '';
+  document.getElementById('prodImgUrl').value= '';
+  document.getElementById('prodErr').style.display = 'none';
+  document.getElementById('prodImgStatus').textContent = '';
+  _renderProdPreview('');
+  document.getElementById('prodSaveBtn').textContent = 'Опубликовать';
+  document.getElementById('prodModal').classList.add('open');
+}
+
+function editProduct(btn) {
+  var pid = btn.getAttribute('data-pid');
+  var p = _products.find(function(x){ return String(x.id) === String(pid); });
+  if (!p) return;
+  document.getElementById('prodModalTitle').textContent = 'Редактировать товар';
+  document.getElementById('prodId').value    = p.id;
+  document.getElementById('prodName').value  = p.name || '';
+  document.getElementById('prodDesc').value  = p.description || '';
+  document.getElementById('prodPrice').value = p.price || '';
+  document.getElementById('prodBuyUrl').value= p.buyUrl || '';
+  document.getElementById('prodImgUrl').value= p.imageUrl || '';
+  document.getElementById('prodErr').style.display = 'none';
+  document.getElementById('prodImgStatus').textContent = '';
+  _renderProdPreview(p.imageUrl || '');
+  document.getElementById('prodSaveBtn').textContent = 'Сохранить';
+  document.getElementById('prodModal').classList.add('open');
+}
+
+function _renderProdPreview(url) {
+  var box = document.getElementById('prodImgPreview');
+  var clr = document.getElementById('prodImgClear');
+  if (url) {
+    box.innerHTML = '<img src="'+esc(url)+'" style="width:100%;height:100%;object-fit:cover"/>';
+    clr.style.display = '';
+  } else {
+    box.textContent = '🛍';
+    clr.style.display = 'none';
+  }
+}
+
+function clearProdImage() {
+  document.getElementById('prodImgUrl').value = '';
+  document.getElementById('prodImgStatus').textContent = '';
+  _renderProdPreview('');
+}
+
+function _readFileAsBase64(file) {
+  return new Promise(function(resolve, reject) {
+    var r = new FileReader();
+    r.onload  = function(e){ resolve(e.target.result.split(',')[1]); };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+async function onProdImagePick(input) {
+  var file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  var status = document.getElementById('prodImgStatus');
+  if (!/^image\//.test(file.type)) { status.textContent = 'Нужен файл изображения'; return; }
+  if (file.size > 2 * 1024 * 1024)  { status.textContent = 'Фото слишком большое (макс. ~2 МБ)'; return; }
+  status.textContent = 'Загружаю фото...';
+  try {
+    var base64 = await _readFileAsBase64(file);
+    var res = await api.post('/upload', { data: base64, contentType: file.type, folder: 'startups' });
+    document.getElementById('prodImgUrl').value = res.url;
+    _renderProdPreview(res.url);
+    status.textContent = '✓ Фото загружено';
+  } catch(e) {
+    status.textContent = 'Ошибка загрузки: ' + (e.message || 'не удалось');
+  }
+}
+
+async function saveProduct() {
+  var id    = document.getElementById('prodId').value;
+  var body  = {
+    name:        document.getElementById('prodName').value.trim(),
+    description: document.getElementById('prodDesc').value.trim(),
+    price:       document.getElementById('prodPrice').value.trim(),
+    buy_url:     document.getElementById('prodBuyUrl').value.trim(),
+    image_url:   document.getElementById('prodImgUrl').value.trim()
+  };
+  var err = document.getElementById('prodErr');
+  err.style.display = 'none';
+  if (!body.description) { err.textContent = 'Добавьте описание товара'; err.style.display = 'block'; return; }
+  if (!isSafeHttpUrl(body.buy_url)) {
+    err.textContent = 'Укажите корректную ссылку «Купить» — она должна начинаться с http:// или https://';
+    err.style.display = 'block'; return;
+  }
+  var btn = document.getElementById('prodSaveBtn');
+  btn.disabled = true;
+  try {
+    if (id) {
+      await api.patch('/startups/' + startupId + '/products/' + id, body);
+      showToast('Товар обновлён', 'success');
+    } else {
+      await api.post('/startups/' + startupId + '/products', body);
+      showToast('Товар добавлен', 'success');
+    }
+    document.getElementById('prodModal').classList.remove('open');
+    await loadProducts(true, true);
+  } catch(e) {
+    err.textContent = 'Ошибка: ' + (e.message || 'не удалось сохранить');
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteProduct(btn) {
+  var pid = btn.getAttribute('data-pid');
+  if (!confirm('Удалить этот товар из витрины?')) return;
+  try {
+    await api.delete('/startups/' + startupId + '/products/' + pid);
+    showToast('Товар удалён', 'success');
+    await loadProducts(true, true);
+  } catch(e) {
+    showToast('Ошибка: ' + (e.message || 'не удалось удалить'), 'error');
+  }
 }
 </script>
 </body>

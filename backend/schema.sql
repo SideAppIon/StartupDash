@@ -106,6 +106,21 @@ CREATE TABLE IF NOT EXISTS startup_vacancies (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ── Витрина товаров стартапа ─────────────────────────────
+CREATE TABLE IF NOT EXISTS startup_products (
+  id          TEXT PRIMARY KEY,
+  startup_id  TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+  name        TEXT DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  image_url   TEXT DEFAULT '',
+  price       TEXT DEFAULT '',            -- свободный текст: «1500 ₽», «от 990 ₽», «договорная»
+  buy_url     TEXT NOT NULL DEFAULT '',   -- куда ведёт кнопка «Купить» (сайт, личка в соцсети…)
+  position    INTEGER DEFAULT 0,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_products_startup ON startup_products(startup_id);
+
 -- ── Форум ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS forum_topics (
   id          TEXT PRIMARY KEY,

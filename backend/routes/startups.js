@@ -92,6 +92,29 @@ async function ensureUpdateLikesSchema() {
   }
 }
 
+// Витрина товаров стартапа (в проде нет автораннера миграций — создаём таблицу лениво)
+let productsSchemaEnsured = false;
+async function ensureProductsSchema() {
+  if (productsSchemaEnsured) return;
+  try {
+    await query(`CREATE TABLE IF NOT EXISTS startup_products (
+      id          TEXT PRIMARY KEY,
+      startup_id  TEXT NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+      name        TEXT DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      image_url   TEXT DEFAULT '',
+      price       TEXT DEFAULT '',
+      buy_url     TEXT NOT NULL DEFAULT '',
+      position    INTEGER DEFAULT 0,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    )`);
+    await query('CREATE INDEX IF NOT EXISTS idx_products_startup ON startup_products(startup_id)');
+    productsSchemaEnsured = true;
+  } catch (e) {
+    console.error('ensureProductsSchema error:', e.message);
+  }
+}
+
 // Доп. колонки стартапа: мягкое скрытие (hidden) и вложения-документы (attachments)
 let hiddenSchemaEnsured = false;
 async function ensureHiddenSchema() {
@@ -909,6 +932,123 @@ router.post('/:id/vacancies/:vacId/apply', requireAuth, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (e) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ── Витрина товаров ───────────────────────────────────────
+// Доступ на чтение: как у самого стартапа (приватность проверяется на клиенте
+// так же, как для команды/обновлений). Изменять — только владелец/админ.
+function parseProduct(p) {
+  return {
+    ...p,
+    imageUrl:  p.image_url,
+    buyUrl:    p.buy_url,
+    startupId: p.startup_id,
+    createdAt: p.created_at,
+  };
+}
+
+// Обрезаем и валидируем поля товара
+function sanitizeProductInput(body) {
+  const clip = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+  return {
+    name:        clip(body.name, 120),
+    description: clip(body.description, 2000),
+    image_url:   clip(body.image_url != null ? body.image_url : body.imageUrl, 1000),
+    price:       clip(body.price, 60),
+    buy_url:     clip(body.buy_url != null ? body.buy_url : body.buyUrl, 1000),
+  };
+}
+
+// Разрешаем только http(s)-ссылки — чтобы в кнопку «Купить» не попал javascript:/data:
+function isSafeHttpUrl(url) {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch (e) {
+    return false;
+  }
+}
+
+router.get('/:id/products', async (req, res) => {
+  try {
+    await ensureProductsSchema();
+    const rows = await queryAll(
+      'SELECT * FROM startup_products WHERE startup_id=$1 ORDER BY position ASC, created_at ASC',
+      [req.params.id]
+    );
+    res.json({ products: rows.map(parseProduct) });
+  } catch (e) {
+    console.error('GET products error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+router.post('/:id/products', requireAuth, async (req, res) => {
+  try {
+    await assertOwnerOrAdmin(req.params.id, req.user);
+    await ensureProductsSchema();
+    const data = sanitizeProductInput(req.body);
+    if (!data.description) return res.status(400).json({ error: 'Добавьте описание товара' });
+    if (!isSafeHttpUrl(data.buy_url)) {
+      return res.status(400).json({ error: 'Укажите корректную ссылку «Купить» (http/https)' });
+    }
+    const posRow = await queryOne(
+      'SELECT COALESCE(MAX(position), -1) + 1 AS pos FROM startup_products WHERE startup_id=$1',
+      [req.params.id]
+    );
+    const id = uuidv4();
+    const product = await queryOne(
+      `INSERT INTO startup_products (id, startup_id, name, description, image_url, price, buy_url, position, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *`,
+      [id, req.params.id, data.name, data.description, data.image_url, data.price, data.buy_url, posRow ? posRow.pos : 0]
+    );
+    res.status(201).json({ product: parseProduct(product) });
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ error: e.message });
+    console.error('POST products error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+router.patch('/:id/products/:productId', requireAuth, async (req, res) => {
+  try {
+    await assertOwnerOrAdmin(req.params.id, req.user);
+    await ensureProductsSchema();
+    const existing = await queryOne(
+      'SELECT * FROM startup_products WHERE id=$1 AND startup_id=$2',
+      [req.params.productId, req.params.id]
+    );
+    if (!existing) return res.status(404).json({ error: 'Товар не найден' });
+
+    const data = sanitizeProductInput(req.body);
+    if (!data.description) return res.status(400).json({ error: 'Добавьте описание товара' });
+    if (!isSafeHttpUrl(data.buy_url)) {
+      return res.status(400).json({ error: 'Укажите корректную ссылку «Купить» (http/https)' });
+    }
+    const product = await queryOne(
+      `UPDATE startup_products SET name=$1, description=$2, image_url=$3, price=$4, buy_url=$5
+       WHERE id=$6 RETURNING *`,
+      [data.name, data.description, data.image_url, data.price, data.buy_url, req.params.productId]
+    );
+    res.json({ product: parseProduct(product) });
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ error: e.message });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+router.delete('/:id/products/:productId', requireAuth, async (req, res) => {
+  try {
+    await assertOwnerOrAdmin(req.params.id, req.user);
+    await ensureProductsSchema();
+    await queryOne('DELETE FROM startup_products WHERE id=$1 AND startup_id=$2',
+      [req.params.productId, req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ error: e.message });
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
