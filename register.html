@@ -84,9 +84,14 @@
         <label class="form-label">Пароль *</label>
         <input type="password" class="form-input" id="passInput" placeholder="Минимум 6 символов"/>
       </div>
-      <div class="form-group" style="margin-bottom:0">
+      <div class="form-group">
         <label class="form-label">Повтори пароль *</label>
         <input type="password" class="form-input" id="pass2Input" placeholder="Повтори пароль"/>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Ник <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
+        <input type="text" class="form-input" id="nickInput" maxlength="30" placeholder="Например: ivan_cool"/>
+        <div class="form-hint">От 5 символов: латиница, цифры, . _ -. Оставьте пустым — придумаем автоматически.</div>
       </div>
     </div>
 
@@ -229,6 +234,13 @@ function goStep1() {
   if (!email)          { showErr(0,'Введи email'); return; }
   if (pass.length < 6) { showErr(0,'Пароль минимум 6 символов'); return; }
   if (pass !== pass2)  { showErr(0,'Пароли не совпадают'); return; }
+  // Ник необязателен, но если задан — проверяем формат сразу
+  var nick = document.getElementById('nickInput').value.trim();
+  if (nick) {
+    if (nick.length < 5)              { showErr(0,'Ник должен быть не короче 5 символов'); return; }
+    if (nick.length > 30)             { showErr(0,'Ник не длиннее 30 символов'); return; }
+    if (!/^[A-Za-z0-9._-]+$/.test(nick)) { showErr(0,'Ник: только латиница, цифры и символы . _ -'); return; }
+  }
   goStep(1);
 }
 
@@ -276,6 +288,7 @@ async function doRegister() {
   var bio       = document.getElementById('bioInput').value.trim();
   var contacts  = document.getElementById('contactsInput').value.trim();
   var portfolio = document.getElementById('portfolioInput').value.trim();
+  var nickname  = document.getElementById('nickInput').value.trim();
   var roleToSave = selectedRole; // явная копия
 
   try {
@@ -285,7 +298,8 @@ async function doRegister() {
       bio:       bio,
       skills:    skills.slice(),
       contacts:  contacts,
-      portfolio: portfolio
+      portfolio: portfolio,
+      nickname:  nickname   // пусто → бэкенд сгенерирует уникальный
     });
     window.location.href = 'onboarding.html';
   } catch(e) {

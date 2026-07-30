@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { queryOne, queryAll } = require('../db');
 const { requireAuth, optionalAuth, signToken } = require('../middleware/auth');
 const { ensureModeratorSchema, isAdmin, moderatorCanActOn } = require('../lib/moderation');
+const { ensureNicknameSchema, validateNicknameFormat, isNicknameFree, resolveNicknameForCreate } = require('../lib/nickname');
 
 const router = express.Router();
 
@@ -17,6 +18,9 @@ async function ensureHiddenSchema() {
     await queryOne("ALTER TABLE users ADD COLUMN IF NOT EXISTS expert_status TEXT DEFAULT 'available'");
     // Значок-алмаз (💎) — включается админом для конкретного пользователя
     await queryOne('ALTER TABLE users ADD COLUMN IF NOT EXISTS diamond BOOLEAN DEFAULT FALSE');
+    // Ник — колонку заводим здесь, чтобы SELECT-ы её видели; уникальный индекс
+    // создаёт ensureNicknameSchema (lib/nickname) на путях регистрации/смены ника.
+    await queryOne('ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT');
     hiddenSchemaEnsured = true;
   } catch (e) {
     console.error('ensureHiddenSchema (users) error:', e.message);
@@ -37,14 +41,14 @@ router.get('/', optionalAuth, async (req, res) => {
       const list = String(uids).split(',').map(s => s.trim()).filter(Boolean).slice(0, 200);
       if (!list.length) return res.json({ users: [] });
       const rows = await queryAll(
-        `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio,
+        `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, nickname,
                 forum_banned, hidden, expert_status, diamond, created_at
          FROM users WHERE uid = ANY($1)`,
         [list]
       );
       return res.json({ users: rows.map(parseUser) });
     }
-    let sql = `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, hidden, expert_status, diamond, created_at, onboarding_done
+    let sql = `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, nickname, forum_banned, hidden, expert_status, diamond, created_at, onboarding_done
                FROM users WHERE 1=1`;
     const params = [];
 
@@ -83,7 +87,7 @@ router.get('/:uid', optionalAuth, async (req, res) => {
   try {
     await ensureHiddenSchema();
     const user = await queryOne(
-      `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, forum_banned, hidden, expert_status, diamond, created_at
+      `SELECT uid, name, email, role, bio, skills, avatar, contacts, portfolio, nickname, forum_banned, hidden, expert_status, diamond, created_at
        FROM users WHERE uid = $1`,
       [req.params.uid]
     );
@@ -182,6 +186,30 @@ router.patch('/:uid/role', requireAuth, async (req, res) => {
   }
 });
 
+// Admin: PATCH /users/:uid/nickname — сменить ник вручную (уникальный, от 5 символов)
+router.patch('/:uid/nickname', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
+    await ensureNicknameSchema();
+
+    const fmt = validateNicknameFormat(req.body.nickname);
+    if (!fmt.ok) return res.status(400).json({ error: fmt.error });
+
+    const target = await queryOne('SELECT uid FROM users WHERE uid = $1', [req.params.uid]);
+    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    if (!(await isNicknameFree(fmt.value, req.params.uid))) {
+      return res.status(409).json({ error: 'Этот ник уже занят' });
+    }
+
+    await queryOne('UPDATE users SET nickname = $1 WHERE uid = $2', [fmt.value, req.params.uid]);
+    res.json({ ok: true, nickname: fmt.value });
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'Этот ник уже занят' });
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // Модератор/админ: PATCH /users/:uid/forum-ban — запретить/разрешить общение на форуме (мут)
 router.patch('/:uid/forum-ban', requireAuth, async (req, res) => {
   try {
@@ -258,14 +286,18 @@ router.post('/admin/create', requireAuth, async (req, res) => {
     const existing = await queryOne('SELECT uid FROM users WHERE email=$1', [email.toLowerCase()]);
     if (existing) return res.status(409).json({ error: 'Email уже занят' });
 
+    // Ник: заданный проверяем, пустой — генерируем уникальный
+    const nick = await resolveNicknameForCreate(req.body.nickname);
+    if (!nick.ok) return res.status(400).json({ error: nick.error });
+
     const uid          = uuidv4();
     const passwordHash = await bcrypt.hash(password, 10);
     await queryOne(
-      `INSERT INTO users (uid, email, password_hash, name, role, bio, skills, contacts, portfolio, avatar, onboarding_done, created_at)
-       VALUES ($1,$2,$3,$4,$5,'','[]','','','',FALSE,NOW())`,
-      [uid, email.toLowerCase(), passwordHash, name, userRole]
+      `INSERT INTO users (uid, email, password_hash, name, role, bio, skills, contacts, portfolio, nickname, avatar, onboarding_done, created_at)
+       VALUES ($1,$2,$3,$4,$5,'','[]','','',$6,'',FALSE,NOW())`,
+      [uid, email.toLowerCase(), passwordHash, name, userRole, nick.nickname]
     );
-    res.status(201).json({ ok: true, uid });
+    res.status(201).json({ ok: true, uid, nickname: nick.nickname });
   } catch (e) {
     console.error('admin create user:', e.message);
     res.status(500).json({ error: 'Ошибка сервера' });

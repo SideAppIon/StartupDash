@@ -462,9 +462,9 @@ function renderPosts(posts) {
     // Пожаловаться — для обычных пользователей (не на себя, не модераторам)
     var canReport = pageUser && p.authorUid && p.authorUid !== pageUser.uid && !mod;
     var reportBtn = canReport
-      ? '<button class="btn btn--ghost btn--sm" style="font-size:12px;color:var(--text3)" '+
+      ? '<button class="btn btn--ghost" style="font-size:11px;padding:2px 7px;color:var(--text3)" '+
         'data-uid="'+esc(p.authorUid)+'" data-name="'+esc((p.authorName||'').replace(/"/g,''))+'" data-pid="'+esc(p.id||'')+'" '+
-        'onclick="openReport(this)">⚠️ Пожаловаться</button>'
+        'onclick="openReport(this)" title="Пожаловаться">⚠️ Пожаловаться</button>'
       : '';
     return '<div class="post-card'+(isOp?' op':'')+'">'+
       '<div class="post-card__header">'+

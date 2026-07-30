@@ -728,6 +728,10 @@ router.post('/:id/updates', requireAuth, async (req, res) => {
 
     if (!content) return res.status(400).json({ error: 'Напиши содержание обновления' });
 
+    // Фильтр слов для публикуемых обновлений (область публичного контента)
+    const cen = await checkCensor(title + ' ' + content, 'forum');
+    if (cen.blocked) return res.status(400).json({ error: cen.message });
+
     const id = uuidv4();
     const update = await queryOne(
       `INSERT INTO startup_updates (id, startup_id, author_uid, title, content, type, image_url, video_url, created_at)
@@ -870,6 +874,9 @@ router.patch('/:id/tasks/:taskId/comments', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Нет доступа' });
     }
     const comments = req.body.comments !== undefined ? String(req.body.comments) : '';
+    // Фильтр слов для комментариев к задачам (область публичного контента)
+    const cen = await checkCensor(comments, 'forum');
+    if (cen.blocked) return res.status(400).json({ error: cen.message });
     const task = await queryOne(
       'UPDATE startup_tasks SET comments=$1 WHERE id=$2 AND startup_id=$3 RETURNING *',
       [comments, req.params.taskId, req.params.id]

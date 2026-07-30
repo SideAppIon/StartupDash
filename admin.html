@@ -180,12 +180,12 @@
           </div>
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Запрещённые слова</label>
-            <div class="form-hint" style="margin-bottom:10px">Для каждого слова выбери, где оно блокируется: форум и/или личные сообщения.</div>
+            <div class="form-hint" style="margin-bottom:10px">Для каждого слова выбери, где оно блокируется. <b>Публикации</b> — форум, обновления и комментарии к задачам. <b>Сообщения</b> — личные сообщения и командные чаты.</div>
             <div id="censorList" style="margin-bottom:12px"></div>
             <div class="add-row" style="flex-wrap:wrap;gap:10px;align-items:center">
               <input type="text" id="censorWordInput" placeholder="Слово..." maxlength="60" style="flex:1;min-width:160px"
                 onkeydown="if(event.key==='Enter')addCensorWord()"/>
-              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2)"><input type="checkbox" id="censorNewForum" checked style="width:15px;height:15px;accent-color:var(--accent)"/> Форум</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2)"><input type="checkbox" id="censorNewForum" checked style="width:15px;height:15px;accent-color:var(--accent)"/> Публикации</label>
               <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2)"><input type="checkbox" id="censorNewMsg" checked style="width:15px;height:15px;accent-color:var(--accent)"/> Сообщения</label>
               <button class="btn btn--primary btn--sm" onclick="addCensorWord()">+ Добавить</button>
             </div>
@@ -446,7 +446,8 @@ function renderUsers(users) {
         '<img src="'+esc(av)+'" class="avatar avatar--sm"/>'+
         '<div class="user-row__info">'+
           '<div class="user-row__name">'+esc(u.name||'—')+diamondBadge+' '+obBadge+' '+hiddenBadge+'</div>'+
-          '<div class="user-row__email">'+esc(u.email||'—')+'</div>'+
+          '<div class="user-row__email">'+esc(u.email||'—')+
+            ' · <span style="color:var(--text3)">ник:</span> '+(u.nickname?'@'+esc(u.nickname):'<span style="color:var(--text3)">—</span>')+'</div>'+
         '</div>'+
         '<span class="badge '+(ROLE_CLASSES[u.role]||'badge--gray')+'">'+esc(ROLE_LABELS[u.role]||u.role||'')+'</span>'+
         '<div class="user-row__actions">'+
@@ -454,6 +455,7 @@ function renderUsers(users) {
           '<button class="btn btn--outline btn--sm" data-action="diamond" data-uid="'+esc(u.uid||'')+'" data-on="'+(diamond?'1':'0')+'" title="Значок 💎">'+(diamond?'💎 Убрать':'💎 Выдать')+'</button>'+
           '<button class="btn btn--outline btn--sm" data-action="hideusr" data-uid="'+esc(u.uid||'')+'" data-hidden="'+(hidden?'1':'0')+'">'+(hidden?'👁 Показать':'🙈 Скрыть')+'</button>'+
           '<button class="btn btn--outline btn--sm" data-action="role" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'" data-role="'+esc(u.role||'')+'">Роль</button>'+
+          '<button class="btn btn--outline btn--sm" data-action="nick" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'" data-nick="'+esc(u.nickname||'')+'" title="Сменить ник">@ Ник</button>'+
           '<button class="btn btn--ghost btn--sm" data-action="pwd" data-uid="'+esc(u.uid||'')+'" data-email="'+esc(u.email||'')+'">🔑</button>'+
           '<button class="btn btn--outline btn--sm" data-action="resetob" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'" title="Сбросить онбординг">🔄 Онбординг</button>'+
           '<button class="btn btn--danger btn--sm" data-action="delusr" data-uid="'+esc(u.uid||'')+'" data-name="'+esc(u.name||'')+'">✕</button>'+
@@ -535,7 +537,7 @@ function renderCensorWords() {
   el.innerHTML = censorship.words.map(function(w, i) {
     return '<div style="display:flex;align-items:center;gap:14px;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px">'+
       '<div style="flex:1;font-size:14px;font-weight:500;word-break:break-all">'+esc(w.word||'')+'</div>'+
-      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><input type="checkbox" '+(w.forum?'checked':'')+' onchange="toggleCensorScope('+i+',\'forum\',this.checked)" style="width:15px;height:15px;accent-color:var(--accent)"/> Форум</label>'+
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><input type="checkbox" '+(w.forum?'checked':'')+' onchange="toggleCensorScope('+i+',\'forum\',this.checked)" style="width:15px;height:15px;accent-color:var(--accent)"/> Публикации</label>'+
       '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><input type="checkbox" '+(w.messages?'checked':'')+' onchange="toggleCensorScope('+i+',\'messages\',this.checked)" style="width:15px;height:15px;accent-color:var(--accent)"/> Сообщения</label>'+
       '<button class="btn btn--danger btn--sm" onclick="removeCensorWord('+i+')">✕</button>'+
     '</div>';
@@ -906,6 +908,7 @@ document.addEventListener('click', function(e) {
   if (a==='hidetopic') hideTopic(btn.getAttribute('data-tid'), btn.getAttribute('data-hidden')==='1');
   if (a==='deltopic')  delTopic(btn.getAttribute('data-tid'), btn.getAttribute('data-name'));
   if (a==='role')      openRoleModal(btn.getAttribute('data-uid'), btn.getAttribute('data-name'), btn.getAttribute('data-role'));
+  if (a==='nick')      changeNickname(btn.getAttribute('data-uid'), btn.getAttribute('data-name'), btn.getAttribute('data-nick'));
   if (a==='pwd')       openPwdModal(btn.getAttribute('data-uid'), btn.getAttribute('data-email'));
   if (a==='resetob')   resetOnboarding(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));
   if (a==='delusr')    delUser(btn.getAttribute('data-uid'), btn.getAttribute('data-name'));
@@ -914,6 +917,23 @@ document.addEventListener('click', function(e) {
   if (a==='hidest')    toggleStartupHidden(btn.getAttribute('data-sid'), btn.getAttribute('data-hidden')==='1');
   if (a==='diamond')   toggleDiamond(btn.getAttribute('data-uid'), btn.getAttribute('data-on')==='1');
 });
+
+async function changeNickname(uid, name, currentNick) {
+  if (!uid) return;
+  var val = prompt('Ник для «' + (name||'пользователя') + '»\nОт 5 символов: латиница, цифры, . _ -', currentNick || '');
+  if (val === null) return;              // отменили
+  val = val.trim();
+  if (val.length < 5)                 { showToast('Ник не короче 5 символов', 'error'); return; }
+  if (val.length > 30)                { showToast('Ник не длиннее 30 символов', 'error'); return; }
+  if (!/^[A-Za-z0-9._-]+$/.test(val)) { showToast('Только латиница, цифры и . _ -', 'error'); return; }
+  try {
+    await api.patch('/users/'+uid+'/nickname', { nickname: val });
+    showToast('Ник обновлён: @'+val, 'success');
+    await loadUsers();
+  } catch(e) {
+    showToast(e.message || 'Не удалось сменить ник', 'error');
+  }
+}
 
 async function toggleDiamond(uid, currentlyOn) {
   if (!uid) return;

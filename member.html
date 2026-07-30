@@ -268,7 +268,7 @@ function renderActions(user, userData, inviteStatus) {
   // Пожаловаться — для обычных пользователей (не модераторам/админам)
   var viewerIsMod = userData && (userData.role === 'admin' || userData.role === 'moderator');
   if (!viewerIsMod) {
-    btns += '<button class="btn btn--ghost btn--sm" style="color:var(--text3)" onclick="openReport()">⚠️ Пожаловаться</button>';
+    btns += '<button class="btn btn--ghost" style="font-size:11px;padding:2px 7px;color:var(--text3)" onclick="openReport()" title="Пожаловаться">⚠️ Пожаловаться</button>';
   }
   // Пригласить в команду — только стартаперы
   if (userData && userData.role === 'startup') {

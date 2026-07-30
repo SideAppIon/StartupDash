@@ -3,13 +3,14 @@ const bcrypt  = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { queryOne } = require('../db');
 const { signToken, requireAuth } = require('../middleware/auth');
+const { resolveNicknameForCreate } = require('../lib/nickname');
 
 const router = express.Router();
 
 // POST /auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, name, role, bio, skills, contacts, portfolio } = req.body;
+    const { email, password, name, role, bio, skills, contacts, portfolio, nickname } = req.body;
 
     if (!email || !password || !name) {
       return res.status(400).json({ error: 'email, password и name обязательны' });
@@ -19,6 +20,10 @@ router.post('/register', async (req, res) => {
     }
     const validRoles = ['user', 'startup', 'expert'];
     const userRole = validRoles.includes(role) ? role : 'user';
+
+    // Ник: заданный — проверяем формат и занятость; пустой — генерируем уникальный
+    const nick = await resolveNicknameForCreate(nickname);
+    if (!nick.ok) return res.status(400).json({ error: nick.error });
 
     // Проверяем дубль email
     const existing = await queryOne('SELECT uid FROM users WHERE email = $1', [email.toLowerCase()]);
@@ -30,11 +35,11 @@ router.post('/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
 
     await queryOne(
-      `INSERT INTO users (uid, email, password_hash, name, role, bio, skills, contacts, portfolio, avatar, onboarding_done, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '', FALSE, NOW())
+      `INSERT INTO users (uid, email, password_hash, name, role, bio, skills, contacts, portfolio, nickname, avatar, onboarding_done, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, '', FALSE, NOW())
        RETURNING uid`,
       [uid, email.toLowerCase(), passwordHash, name, userRole, bio || '',
-       JSON.stringify(skills || []), contacts || '', portfolio || '']
+       JSON.stringify(skills || []), contacts || '', portfolio || '', nick.nickname]
     );
 
     const user  = await queryOne('SELECT * FROM users WHERE uid = $1', [uid]);
@@ -42,6 +47,10 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({ token, user: sanitizeUser(user) });
   } catch (e) {
+    // Гонка по уникальному индексу ника (Postgres unique_violation)
+    if (e.code === '23505' && String(e.constraint || e.detail || '').includes('nickname')) {
+      return res.status(409).json({ error: 'Этот ник уже занят' });
+    }
     console.error('register error:', e.message);
     res.status(500).json({ error: 'Ошибка сервера' });
   }

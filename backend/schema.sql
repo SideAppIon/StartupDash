@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
                   CHECK (role IN ('user','startup','expert','admin','moderator')),
   bio           TEXT DEFAULT '',
   skills        TEXT DEFAULT '[]',       -- JSON array
+  nickname      TEXT,                    -- ник (уникальный, пока нигде не используется — на будущее)
   avatar        TEXT DEFAULT '',
   contacts      TEXT DEFAULT '',
   portfolio     TEXT DEFAULT '',
@@ -24,6 +25,10 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ
 );
+
+-- Ник уникален без учёта регистра; частичный индекс допускает NULL у старых аккаунтов.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_nickname_lower
+  ON users (LOWER(nickname)) WHERE nickname IS NOT NULL;
 
 -- ── Стартапы ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS startups (
