@@ -18,15 +18,40 @@ pool.on('error', (err) => {
   console.error('PostgreSQL pool error:', err.message);
 });
 
-// Хелпер: выполнить запрос с параметрами
+// Похоже ли на ошибку мёртвого/оборванного соединения (а не на ошибку SQL).
+// Такое бывает после рестарта БД/простоя: инстанс функции держит в пуле уже
+// закрытые соединения, и первый запрос по ним падает.
+function isConnectionError(e) {
+  const s = String((e && (e.code || e.message)) || '').toLowerCase();
+  return /econnreset|epipe|etimedout|econnrefused|enotfound|connection terminated|server closed|connection error|terminating connection|shutdown|57p01|08006|08003|08000|timeout/.test(s);
+}
+
+// Хелпер: выполнить запрос. При обрыве соединения — отбрасываем мёртвый клиент
+// и повторяем один раз на свежем. Обычные SQL-ошибки не ретраятся.
 async function query(text, params) {
-  const client = await pool.connect();
-  try {
-    const result = await client.query(text, params);
-    return result;
-  } finally {
-    client.release();
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let client;
+    try {
+      client = await pool.connect();
+    } catch (e) {
+      lastErr = e;                       // не смогли даже подключиться — дадим пулу шанс на новом клиенте
+      if (isConnectionError(e) && attempt === 0) continue;
+      throw e;
+    }
+    try {
+      const result = await client.query(text, params);
+      client.release();                  // вернуть здоровый клиент в пул
+      return result;
+    } catch (e) {
+      lastErr = e;
+      const dead = isConnectionError(e);
+      client.release(dead);              // dead=true → уничтожить клиент, не возвращать в пул
+      if (dead && attempt === 0) continue;  // повтор на свежем соединении
+      throw e;
+    }
   }
+  throw lastErr;
 }
 
 // Хелпер: одна строка или null
