@@ -1,0 +1,55 @@
+# Автодеплой фронта на боевой хостинг reg.ru (atriumplatform.ru) по FTP.
+#
+# Модель «Гит = тест, хостинг = релиз»:
+#   • GitHub Pages обновляется сам при пуше (тестовая среда) — этот workflow её не трогает.
+#   • На хостинг выкатываем ОСОЗНАННО, кнопкой «Run workflow» (боевой релиз).
+#     Чтобы деплоить автоматически на каждый пуш в main — раскомментируй блок push ниже.
+#
+# Нужны секреты репозитория (Settings → Secrets and variables → Actions):
+#   FTP_SERVER    — хост FTP хостинга (например server101.hosting.reg.ru или 37.140.192.190)
+#   FTP_USERNAME  — имя FTP-пользователя (создать в ISPmanager → FTP users)
+#   FTP_PASSWORD  — его пароль
+# Значения нигде не хранятся в коде — только в зашифрованных секретах GitHub.
+
+name: Deploy to hosting (atriumplatform.ru)
+
+on:
+  workflow_dispatch:        # ручной запуск: вкладка Actions → этот workflow → «Run workflow»
+  # push:                   # ← раскомментируй, если хочешь выкатывать автоматически на каждый пуш
+  #   branches: [ main ]
+
+concurrency:
+  group: deploy-hosting     # не запускать два деплоя одновременно
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Забрать код
+        uses: actions/checkout@v4
+
+      # Собираем ТОЛЬКО статику сайта в dist/ — без backend, доков, исходников логотипа и т.п.
+      - name: Собрать статику сайта
+        run: |
+          mkdir -p dist/assets
+          # все страницы, кроме мёртвой тестовой firebase-страницы
+          for f in *.html; do
+            [ "$f" = "test-firebase.html" ] && continue
+            cp "$f" dist/
+          done
+          cp styles.css api-config.js favicon.svg dist/
+          cp -r assets/. dist/assets/
+          echo "Файлов к заливке:"; find dist -type f | sort
+
+      - name: Залить на хостинг по FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:   ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps            # шифрованный FTP; если хостинг не даёт TLS — поменяй на ftp
+          port: 21
+          local-dir: ./dist/
+          server-dir: /www/atriumplatform.ru/   # папка сайта в File manager; поправь под home FTP-пользователя
+          # FTP-Deploy хранит на сервере состояние синхронизации и заливает только изменённые файлы
