@@ -67,11 +67,12 @@ requireAuth('login.html');
 onAuthReady(function(user, userData) {
   if (!user) return;
   renderNav(userData);
-  if (userData && userData.role !== 'startup' && userData.role !== 'admin') {
+  var canPolls = userData && ['startup', 'expert', 'user', 'admin'].indexOf(userData.role) !== -1;
+  if (!canPolls) {
     document.getElementById('pollsList').innerHTML =
       '<div class="empty-state"><div class="empty-state__icon">📊</div>'+
-      '<div class="empty-state__title">Опросы доступны стартаперам</div>'+
-      '<p style="font-size:14px">Создавать опросы могут пользователи с ролью «стартапер».</p></div>';
+      '<div class="empty-state__title">Опросы недоступны</div>'+
+      '<p style="font-size:14px">Создавать опросы могут стартаперы, эксперты и специалисты.</p></div>';
     document.querySelector('.section-header button').style.display = 'none';
     return;
   }

@@ -85,8 +85,10 @@ async function resultsFor(pollId, questions) {
 // POST /polls — создать опрос (стартапер или админ)
 router.post('/', requireAuth, async (req, res) => {
   try {
-    if (req.user.role !== 'startup' && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Создавать опросы могут только стартаперы' });
+    // Опросы доступны стартаперам, экспертам и специалистам (и админам)
+    const canCreatePolls = ['startup', 'expert', 'user', 'admin'].includes(req.user.role);
+    if (!canCreatePolls) {
+      return res.status(403).json({ error: 'Нет доступа к опросам' });
     }
     await ensureSchema();
 
