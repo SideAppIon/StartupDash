@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <link rel="stylesheet" href="styles.css?v=3"/>
   <style>
-    .roadmap-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:calc(var(--nav-h)+32px) 0 28px}
+    .roadmap-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:calc(var(--nav-h) + 32px) 0 28px}
     .rm-title{font-family:var(--font-head);font-size:24px;font-weight:800;letter-spacing:-.5px}
     .rm-sub{font-size:14px;color:var(--text2);margin-top:4px}
     .rm-stats{display:flex;gap:14px;flex-wrap:wrap;margin-top:20px}
@@ -455,6 +455,9 @@ function showForm(col) {
 function cancelForm() {
   var f = document.getElementById('active-task-form'); if (f) f.remove();
   formCol = null;
+  // перерисовываем доску — возвращаем карточку, спрятанную при редактировании
+  var canEdit = isOwner || (memberPerms && memberPerms.kanban === true);
+  renderBoard(canEdit);
 }
 
 async function saveTask(btn) {
@@ -482,6 +485,10 @@ async function saveTask(btn) {
   };
   var lockedEl = document.getElementById('tf-locked');
   if (lockedEl) data.locked = lockedEl.checked;   // только основатель видит этот чекбокс
+  var deadlineEl = document.getElementById('tf-deadline');
+  if (deadlineEl) data.deadline = deadlineEl.value || null;   // пусто → снять дедлайн
+  var archiveEl = document.getElementById('tf-archive');
+  if (archiveEl) data.archived = archiveEl.checked;
   if (taskStatus !== undefined) data.status = taskStatus;
 
   try {
@@ -523,6 +530,10 @@ function editTask(btn) { var taskId=btn.getAttribute("data-id");
     '<textarea id="tf-desc" placeholder="Описание">'+esc(t.description||'')+'</textarea>' +
     '<select id="tf-priority"><option value="med"'+(t.priority==='med'?' selected':'')+'>🟡 Средний</option><option value="high"'+(t.priority==='high'?' selected':'')+'>🔴 Высокий</option><option value="low"'+(t.priority==='low'?' selected':'')+'>🔵 Низкий</option></select>' +
     '<select id="tf-assignee">'+assigneeOpts+'</select>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      '<div><label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Дедлайн</label><input type="date" id="tf-deadline" value="'+esc((t.deadline||'').slice(0,10))+'" style="width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;padding:6px 9px;outline:none"/></div>' +
+      '<div style="display:flex;align-items:flex-end;padding-bottom:2px"><label class="tf-check" style="margin:0"><input type="checkbox" id="tf-archive"'+(t.archived?' checked':'')+'/> В архив</label></div>' +
+    '</div>' +
     '<label class="tf-check"><input type="checkbox" id="tf-public"'+(t.isPublic!==false?' checked':'')+'/> Публичная (видна всем)</label>' +
     (isOwner ? '<label class="tf-check"><input type="checkbox" id="tf-locked"'+(t.locked?' checked':'')+'/> 🔒 Только основатель может редактировать</label>' : '') +
     '<div class="task-form__btns">' +
@@ -531,7 +542,7 @@ function editTask(btn) { var taskId=btn.getAttribute("data-id");
     '</div>';
 
   var tc = document.getElementById('tc-'+taskId);
-  if (tc) tc.parentNode.insertBefore(form, tc);
+  if (tc) { tc.parentNode.insertBefore(form, tc); tc.style.display = 'none'; }  // прячем карточку — форма встаёт на её место
   else document.getElementById('col-'+t.status).insertBefore(form, document.getElementById('col-'+t.status).firstChild);
   document.getElementById('tf-title').focus();
 }
@@ -601,7 +612,7 @@ function deadlineBadge(dateStr) {
   now.setHours(0,0,0,0);
   var diff = Math.ceil((d-now)/(1000*60*60*24));
   var cls  = diff < 0 ? 'deadline-over' : diff <= 3 ? 'deadline-soon' : 'deadline-ok';
-  var lbl  = diff < 0 ? '⚠ Просрочено' : diff === 0 ? '⚡ Сегодня' : diff <= 3 ? '⏰ '+diff+'д' : '📅 '+dateStr;
+  var lbl  = diff < 0 ? '⚠ Просрочено' : diff === 0 ? '⚡ Сегодня' : diff <= 3 ? '⏰ '+diff+'д' : '📅 '+String(dateStr).slice(0,10);
   return '<span class="deadline-badge '+cls+'">'+lbl+'</span>';
 }
 
@@ -625,7 +636,7 @@ function renderArchive() {
           '<div style="font-size:13px;text-decoration:line-through;color:var(--text2)">'+esc(t.title||'')+'</div>' +
           (asgn?'<div style="font-size:11px;color:var(--text3)">👤 '+esc(asgn.name)+'</div>':'') +
         '</div>' +
-        (t.deadline?'<span style="font-size:11px;color:var(--text3)">📅 '+t.deadline+'</span>':'')+
+        (t.deadline?'<span style="font-size:11px;color:var(--text3)">📅 '+String(t.deadline).slice(0,10)+'</span>':'')+
         (isOwner?'<button class="btn btn--ghost btn--sm" style="font-size:11px" data-id="'+t.id+'" onclick="unarchiveTask(this)">↩ Вернуть</button>':'') +
       '</div>';
     }).join('') + '</div>';

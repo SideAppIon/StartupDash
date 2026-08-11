@@ -27,6 +27,9 @@ async function ensureTasksSchema() {
   try {
     await query("ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS comments TEXT DEFAULT ''");
     await query('ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS locked BOOLEAN DEFAULT false');
+    // Дедлайн и архив — на случай, если таблица создавалась до их появления в схеме
+    await query('ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS deadline DATE');
+    await query('ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false');
     tasksSchemaEnsured = true;
   } catch (e) {
     console.error('ensureTasksSchema error:', e.message);
@@ -798,12 +801,14 @@ router.post('/:id/tasks', requireAuth, async (req, res) => {
     const is_public   = b.is_public !== undefined ? b.is_public : (b.isPublic !== undefined ? b.isPublic : true);
     // Блокировку может задать только владелец/админ
     const locked      = (isOwner || isAdmin) ? (b.locked === true || b.locked === 'true') : false;
+    const deadline    = b.deadline ? b.deadline : null;   // пустая строка → NULL (колонка DATE)
+    const archived    = b.archived === true || b.archived === 'true';
 
     const id = uuidv4();
     const task = await queryOne(
-      `INSERT INTO startup_tasks (id, startup_id, title, description, comments, status, assigned_to, position, priority, assignee_name, is_public, locked, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW()) RETURNING *`,
-      [id, req.params.id, title, description, comments, status, assigned_to, position, priority, assignee_name, is_public, locked]
+      `INSERT INTO startup_tasks (id, startup_id, title, description, comments, status, assigned_to, position, priority, assignee_name, is_public, locked, deadline, archived, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW()) RETURNING *`,
+      [id, req.params.id, title, description, comments, status, assigned_to, position, priority, assignee_name, is_public, locked, deadline, archived]
     );
     res.status(201).json({ task });
   } catch (e) {
@@ -831,7 +836,8 @@ router.patch('/:id/tasks/:taskId', requireAuth, async (req, res) => {
     if (bT.assignedTo  !== undefined && bT.assigned_to  === undefined) bT.assigned_to  = bT.assignedTo;
     if (bT.assigneeName!== undefined && bT.assignee_name=== undefined) bT.assignee_name= bT.assigneeName;
     if (bT.isPublic    !== undefined && bT.is_public    === undefined) bT.is_public    = bT.isPublic;
-    const allowed = ['title', 'description', 'comments', 'status', 'assigned_to', 'position', 'priority', 'assignee_name', 'is_public'];
+    if (bT.deadline === '') bT.deadline = null;   // пустая дата → NULL, а не ошибка колонки DATE
+    const allowed = ['title', 'description', 'comments', 'status', 'assigned_to', 'position', 'priority', 'assignee_name', 'is_public', 'deadline', 'archived'];
     // Блокировку меняет только владелец/админ
     if (isOwner || isAdmin) allowed.push('locked');
     const updates = []; const values = [];
