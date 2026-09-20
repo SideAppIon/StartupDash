@@ -61,6 +61,17 @@
       <button class="btn btn--outline" onclick="toggleEdit()" id="editBtn">✏️ Редактировать</button>
     </div>
 
+    <!-- Заполненность профиля -->
+    <div id="profileCompleteness" style="margin:4px 0 24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+        <span style="font-size:13px;color:var(--text2)">Профиль заполнен</span>
+        <span id="complPercent" style="font-size:13px;font-weight:700;color:var(--accent)">0%</span>
+      </div>
+      <div style="height:8px;background:var(--bg3);border-radius:6px;overflow:hidden">
+        <div id="complBar" style="height:100%;width:0%;background:var(--accent);border-radius:6px;transition:width .5s ease"></div>
+      </div>
+    </div>
+
     <div class="profile-body">
       <div>
         <!-- VIEW -->
@@ -217,6 +228,9 @@ onAuthReady(async function(user, userData) {
     ? '<p style="font-size:14px;color:var(--text2);white-space:pre-wrap;line-height:1.7">'+esc(userData.contacts)+'</p>'
     : '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
 
+  // Заполненность профиля
+  renderCompleteness(userData);
+
   // Портфолио — каждая строка как ссылка
   if (userData.portfolio) {
     document.getElementById('portfolioViewCard').style.display = 'block';
@@ -342,6 +356,7 @@ async function saveProfile() {
   try {
     await db.collection('users').doc(currentUser.uid).update(upd);
     Object.assign(uData, upd);
+    renderCompleteness(uData);   // обновляем шкалу заполненности после сохранения
     showToast('Профиль сохранен!','success');
     // Обновляем отображение без перезагрузки
     document.getElementById('profileName').innerHTML = esc(name) + ((uData.diamond===true||uData.diamond==='true')?' 💎':'');
@@ -423,6 +438,25 @@ async function doSaveAvatar() {
 
 function escHtml(s){ return esc(s); }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// Заполненность профиля: каждое поле — равная доля от 100%
+function renderCompleteness(d){
+  d = d || {};
+  var has = function(v){ return !!(v && String(v).trim()); };
+  var fields = [
+    has(d.name),                          // имя
+    has(d.avatar),                        // загруженный аватар
+    has(d.bio),                           // о себе
+    safeArray(d.skills).length > 0,       // хотя бы один навык
+    has(d.contacts),                      // контакты
+    has(d.portfolio)                      // портфолио
+  ];
+  var pct = Math.round(fields.filter(Boolean).length / fields.length * 100);
+  var bar = document.getElementById('complBar');
+  var lbl = document.getElementById('complPercent');
+  if (bar) bar.style.width = pct + '%';
+  if (lbl) lbl.textContent = pct + '%';
+}
 </script>
 </body>
 </html>
