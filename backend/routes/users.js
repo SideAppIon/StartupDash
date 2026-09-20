@@ -27,6 +27,20 @@ async function ensureHiddenSchema() {
   }
 }
 
+// Разрешаем роль 'support' в CHECK-констрейнте users.role (в проде он мог быть создан без неё)
+let roleConstraintEnsured = false;
+async function ensureRoleConstraint() {
+  if (roleConstraintEnsured) return;
+  try {
+    await queryOne('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check');
+    await queryOne(`ALTER TABLE users ADD CONSTRAINT users_role_check
+      CHECK (role IN ('user','startup','expert','admin','moderator','support'))`);
+    roleConstraintEnsured = true;
+  } catch (e) {
+    console.error('ensureRoleConstraint error:', e.message);
+  }
+}
+
 // GET /users — список всех (публично); admin видит onboarding_done
 router.get('/', optionalAuth, async (req, res) => {
   try {
@@ -176,9 +190,10 @@ router.patch('/:uid/role', requireAuth, async (req, res) => {
   try {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Только администратор' });
     const { role } = req.body;
-    const valid = ['user', 'startup', 'expert', 'admin', 'moderator'];
+    const valid = ['user', 'startup', 'expert', 'admin', 'moderator', 'support'];
     if (!valid.includes(role)) return res.status(400).json({ error: 'Неверная роль' });
 
+    await ensureRoleConstraint();   // разрешить роль 'support' в CHECK-констрейнте
     await queryOne('UPDATE users SET role = $1 WHERE uid = $2', [role, req.params.uid]);
     res.json({ ok: true });
   } catch (e) {
@@ -280,7 +295,8 @@ router.post('/admin/create', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'email, password и name обязательны' });
     }
     if (password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
-    const validRoles = ['user', 'startup', 'expert', 'admin', 'moderator'];
+    const validRoles = ['user', 'startup', 'expert', 'admin', 'moderator', 'support'];
+    await ensureRoleConstraint();
     const userRole = validRoles.includes(role) ? role : 'user';
 
     const existing = await queryOne('SELECT uid FROM users WHERE email=$1', [email.toLowerCase()]);

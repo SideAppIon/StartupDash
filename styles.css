@@ -88,6 +88,7 @@ body {
 .nav__role--user     { background: rgba(61,142,245,.12); color: var(--info); }
 .nav__role--admin    { background: rgba(255,71,87,.12);  color: var(--danger); }
 .nav__role--moderator{ background: rgba(255,159,67,.12); color: #ff9f43; }
+.nav__role--support  { background: rgba(0,184,255,.12);  color: #29b6f6; }
 
 /* ── LAYOUT ── */
 .page { padding-top: calc(var(--nav-h) + 40px); padding-bottom: 80px; }

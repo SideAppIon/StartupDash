@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL DEFAULT '',
   name          TEXT NOT NULL DEFAULT '',
   role          TEXT NOT NULL DEFAULT 'user'
-                  CHECK (role IN ('user','startup','expert','admin','moderator')),
+                  CHECK (role IN ('user','startup','expert','admin','moderator','support')),
   bio           TEXT DEFAULT '',
   skills        TEXT DEFAULT '[]',       -- JSON array
   nickname      TEXT,                    -- ник (уникальный, пока нигде не используется — на будущее)
@@ -245,7 +245,7 @@ ON CONFLICT (key) DO NOTHING;
 -- Роль модератора (скрытая, назначается только из админки)
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check
-  CHECK (role IN ('user','startup','expert','admin','moderator'));
+  CHECK (role IN ('user','startup','expert','admin','moderator','support'));
 -- Запрет общения на форуме (пользователь может только читать)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS forum_banned BOOLEAN DEFAULT FALSE;
 -- Закрепление тем форума
@@ -324,3 +324,19 @@ CREATE TABLE IF NOT EXISTS moderator_groups (
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (moderator_uid, group_id)
 );
+
+-- ── Обращения в поддержку ────────────────────────────────
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id          TEXT PRIMARY KEY,
+  user_uid    TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  user_name   TEXT DEFAULT '',
+  subject     TEXT NOT NULL DEFAULT '',
+  text        TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'open'
+                CHECK (status IN ('open','answered','closed')),
+  answered_by TEXT,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  answered_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status);
+CREATE INDEX IF NOT EXISTS idx_support_user   ON support_tickets(user_uid);

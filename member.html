@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Профиль участника — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=3"/>
+  <link rel="stylesheet" href="styles.css?v=4"/>
   <style>
     .profile-cover{height:180px;background:linear-gradient(135deg,rgba(0,230,118,.15),rgba(180,139,255,.1) 50%,rgba(61,142,245,.1));border-bottom:1px solid var(--border)}
     .profile-main{max-width:860px;margin:0 auto;padding:0 24px}
@@ -59,6 +59,17 @@
         <div id="memberExpertStatus" style="display:none;margin-top:12px"></div>
       </div>
       <div id="profileActions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>
+
+    <!-- Заполненность профиля -->
+    <div id="profileCompleteness" style="margin:4px 0 24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+        <span style="font-size:13px;color:var(--text2)">Профиль заполнен</span>
+        <span id="complPercent" style="font-size:13px;font-weight:700;color:var(--accent)">0%</span>
+      </div>
+      <div style="height:8px;background:var(--bg3);border-radius:6px;overflow:hidden">
+        <div id="complBar" style="height:100%;width:0%;background:var(--accent);border-radius:6px;transition:width .5s ease"></div>
+      </div>
     </div>
 
     <div class="profile-body">
@@ -135,7 +146,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=3"></script>
+<script src="api-config.js?v=4"></script>
 <script>
 var profileUid = getUrlParam('uid');
 if (!profileUid) window.location.href = 'members.html';
@@ -240,6 +251,9 @@ onAuthReady(async function(user, userData) {
     document.getElementById('memberContacts').innerHTML =
       '<span style="color:var(--text3);font-size:14px">Не указаны</span>';
   }
+
+  // Заполненность профиля — равные доли по числу заполненных полей
+  renderCompleteness();
 
   // Кнопки действий — приглашение проверяется внутри модала для каждого стартапа отдельно
   renderActions(user, userData, null);
@@ -471,6 +485,26 @@ async function sendInviteFromStartup() {
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Заполненность профиля: каждое поле — равная доля от 100%
+function renderCompleteness() {
+  if (!profileData) return;
+  var has = function(v){ return !!(v && String(v).trim()); };
+  var fields = [
+    has(profileData.name),                       // имя
+    has(profileData.avatar),                      // загруженный аватар
+    has(profileData.bio),                         // о себе
+    safeArray(profileData.skills).length > 0,     // хотя бы один навык
+    has(profileData.contacts),                    // контакты
+    has(profileData.portfolio)                    // портфолио
+  ];
+  var filled = fields.filter(Boolean).length;
+  var pct = Math.round(filled / fields.length * 100);
+  var bar = document.getElementById('complBar');
+  var lbl = document.getElementById('complPercent');
+  if (bar) bar.style.width = pct + '%';
+  if (lbl) lbl.textContent = pct + '%';
 }
 
 // ── ЖАЛОБА ────────────────────────────────────────────

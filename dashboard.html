@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Дашборд — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=3"/>
+  <link rel="stylesheet" href="styles.css?v=4"/>
   <style>
     .dash-grid{display:grid;grid-template-columns:280px 1fr;gap:24px}
     @media(max-width:900px){.dash-grid{grid-template-columns:1fr}}
@@ -79,7 +79,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=3"></script>
+<script src="api-config.js?v=4"></script>
 <script>
 requireAuth('login.html');
 
@@ -87,8 +87,9 @@ var NAV = {
   startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   expert:   [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'🧑‍🚀',l:'Мои стартаперы',h:'my-founders.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
-  admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}],
-  moderator:[{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'💬',l:'Форум',h:'forum.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'✉️',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}]
+  admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'🎧',l:'Поддержка',h:'support.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}],
+  moderator:[{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'💬',l:'Форум',h:'forum.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'✉️',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
+  support:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'🎧',l:'Поддержка',h:'support.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}]
 };
 
 onAuthReady(async function(user, userData) {
@@ -135,6 +136,7 @@ onAuthReady(async function(user, userData) {
     else if (role==='expert') await renderExpert(main, user.uid, dash);
     else if (role==='admin')    await renderAdmin(main, dash);
     else if (role==='moderator') await renderModerator(main);
+    else if (role==='support')   renderSupportDash(main);
     else                         await renderUser(main, user.uid, dash);
   } catch(e) {
     main.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Ошибка загрузки</div><p style="font-size:14px">'+e.message+'</p><button class="btn btn--outline" onclick="location.reload()">Попробовать снова</button></div>';
@@ -271,6 +273,17 @@ async function renderExpert(el, uid, dash) {
         '<div class="s-card__logo">'+(s.iconImage?'<img src="'+s.iconImage+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.style.display=&quot;none&quot;"/>':'')+(s.iconImage?'':(s.emoji||'🚀'))+'</div>' +
         '<div><div class="s-card__name">'+esc(s.name||'')+' '+privBadge+'</div><div class="s-card__tagline">'+esc(s.tagline||'')+'</div></div></a>';
     }).join('');
+}
+
+function renderSupportDash(el) {
+  el.innerHTML =
+    '<div class="section-header" style="margin-bottom:16px"><div class="section-title">🎧 Поддержка</div>' +
+    '<a href="support.html" class="btn btn--primary btn--sm">Открыть обращения</a></div>' +
+    '<a href="support.html" class="card card--clickable" style="text-decoration:none;display:block">' +
+      '<div style="font-size:32px;margin-bottom:12px">🎧</div>' +
+      '<div class="section-title" style="font-size:18px">Обращения пользователей</div>' +
+      '<p style="font-size:14px;color:var(--text2);margin-top:6px">Отвечайте на вопросы — ответы уходят пользователю в личные сообщения.</p>' +
+    '</a>';
 }
 
 async function renderModerator(el) {

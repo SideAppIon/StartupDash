@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Поддержка — Атриум</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="stylesheet" href="styles.css?v=4"/>
+  <style>
+    .cmp-tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
+    .cmp-tab{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .2s}
+    .cmp-tab.active{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+    .tk-card{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--info);border-radius:var(--radius-lg);padding:18px 20px;margin-bottom:14px}
+    .tk-card--answered{border-left-color:var(--accent);opacity:.85}
+    .tk-card--closed{border-left-color:var(--text3);opacity:.65}
+    .tk-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+    .tk-ava{width:32px;height:32px;border-radius:50%;object-fit:cover;background:var(--bg3);border:1px solid var(--border2)}
+    .tk-link{text-decoration:none;color:inherit;font-weight:600;font-size:14px}
+    .tk-link:hover{color:var(--accent)}
+    .tk-subject{font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:8px}
+    .tk-text{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 14px;font-size:14px;color:var(--text);line-height:1.6;white-space:pre-wrap;word-break:break-word;margin-bottom:12px}
+    .tk-meta{font-size:12px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+    .tk-actions{display:flex;gap:8px;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="dashboard.html" class="nav__logo"><img src="assets/atrium-logo.png" alt="Атриум"/></a>
+  <a href="dashboard.html">Дашборд</a>
+  <div class="nav__user">
+    <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
+    <span class="nav__role" id="navRole"></span>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="goProfile()"/>
+    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="container--md">
+    <div class="section-header" style="margin-bottom:24px">
+      <div>
+        <h1 class="page-title">🎧 Поддержка</h1>
+        <p class="page-subtitle">Обращения пользователей — ответы уходят в личные сообщения</p>
+      </div>
+    </div>
+    <div class="cmp-tabs">
+      <button class="cmp-tab active" data-st="open" onclick="setTab('open')">Открытые</button>
+      <button class="cmp-tab" data-st="answered" onclick="setTab('answered')">Отвеченные</button>
+      <button class="cmp-tab" data-st="" onclick="setTab('')">Все</button>
+    </div>
+    <div id="content"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="api-config.js?v=4"></script>
+<script>
+requireAuth('login.html');
+
+var allTickets = [];
+var curTab = 'open';
+
+onAuthReady(async function(user, userData) {
+  if (!user) return;
+  renderNav(userData);
+  // Только поддержка / администратор
+  if (!userData || (userData.role !== 'support' && userData.role !== 'admin')) {
+    window.location.href = 'dashboard.html';
+    return;
+  }
+  await loadTickets();
+});
+
+async function loadTickets() {
+  var el = document.getElementById('content');
+  el.innerHTML = '<div class="spinner"></div>';
+  try {
+    var data = await api.get('/support');
+    allTickets = data.tickets || [];
+    render();
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div>' +
+      '<div class="empty-state__title">Ошибка загрузки</div><p>'+esc(e.message)+'</p></div>';
+  }
+}
+
+function setTab(st) {
+  curTab = st;
+  document.querySelectorAll('.cmp-tab').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-st')===st); });
+  render();
+}
+
+function render() {
+  var el = document.getElementById('content');
+  var list = curTab ? allTickets.filter(function(t){ return t.status===curTab; }) : allTickets;
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">✅</div>' +
+      '<div class="empty-state__title">' + (curTab==='open'?'Нет открытых обращений':'Обращений нет') + '</div>' +
+      '<p style="font-size:14px">Здесь появятся вопросы пользователей</p></div>';
+    return;
+  }
+  el.innerHTML = list.map(buildCard).join('');
+}
+
+function buildCard(t) {
+  var av = t.user_avatar || 'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(t.userName||'U');
+  var statusBadge = t.status==='open'
+    ? '<span class="badge badge--blue" style="font-size:11px">Открыто</span>'
+    : t.status==='answered'
+    ? '<span class="badge badge--green" style="font-size:11px">✅ Отвечено</span>'
+    : '<span class="badge badge--gray" style="font-size:11px">Закрыто</span>';
+  var cardCls = 'tk-card' + (t.status==='answered'?' tk-card--answered':t.status==='closed'?' tk-card--closed':'');
+
+  var actions =
+    '<button class="btn btn--primary btn--sm" data-id="'+esc(t.id)+'" data-uid="'+esc(t.userUid||'')+'" onclick="replyTicket(this)">✉️ Ответить в ЛС</button>';
+  if (t.status!=='closed') {
+    actions += '<button class="btn btn--ghost btn--sm" data-id="'+esc(t.id)+'" data-st="closed" onclick="setStatus(this)">Закрыть</button>';
+  } else {
+    actions += '<button class="btn btn--ghost btn--sm" data-id="'+esc(t.id)+'" data-st="open" onclick="setStatus(this)">Вернуть в работу</button>';
+  }
+
+  return '<div class="'+cardCls+'">' +
+    '<div class="tk-head">' +
+      '<img class="tk-ava" src="'+esc(av)+'"/>' +
+      '<a class="tk-link" href="member.html?uid='+esc(t.userUid||'')+'">'+esc(t.userName||'Пользователь')+'</a>' +
+      '<span style="margin-left:auto">'+statusBadge+'</span>' +
+    '</div>' +
+    '<div class="tk-subject">'+esc(t.subject||'')+'</div>' +
+    '<div class="tk-text">'+esc(t.text||'')+'</div>' +
+    '<div class="tk-meta"><span>'+formatDate(t.createdAt)+'</span></div>' +
+    '<div class="tk-actions">'+actions+'</div>' +
+  '</div>';
+}
+
+// Ответить: помечаем обращение отвеченным и открываем ЛС с пользователем
+async function replyTicket(btn) {
+  var id  = btn.getAttribute('data-id');
+  var uid = btn.getAttribute('data-uid');
+  if (!uid) { showToast('Не удалось определить пользователя','error'); return; }
+  try { await api.patch('/support/'+id, { status: 'answered' }); } catch(e) {}
+  window.location.href = 'messages.html?to=' + encodeURIComponent(uid);
+}
+
+async function setStatus(btn) {
+  var id = btn.getAttribute('data-id');
+  var st = btn.getAttribute('data-st');
+  if (!id) return;
+  try {
+    await api.patch('/support/'+id, { status: st });
+    showToast('Статус обновлён','success');
+    await loadTickets();
+  } catch(e) { showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
+}
+</script>
+</body>
+</html>

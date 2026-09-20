@@ -16,6 +16,7 @@ const groupsRoutes    = require('./routes/groups');
 const pollsRoutes     = require('./routes/polls');
 const complaintsRoutes = require('./routes/complaints');
 const dashboardRoutes  = require('./routes/dashboard');
+const supportRoutes    = require('./routes/support');
 
 const app = express();
 
@@ -88,6 +89,7 @@ app.use('/team-chat',       teamChatRoutes);
 app.use('/groups',          groupsRoutes);
 app.use('/complaints',      complaintsRoutes);
 app.use('/polls',           pollsRoutes);
+app.use('/support',         supportRoutes);
 app.use('/dashboard',       dashboardRoutes);
 
 // ── 404 ───────────────────────────────────────────────────

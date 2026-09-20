@@ -81,7 +81,83 @@ function _notifyCallbacks() {
   // Колокольчик уведомлений — с задержкой, чтобы страницы с кастомной шапкой
   // (например, лента) успели построить .nav__user
   if (_currentUser) setTimeout(() => { try { _initNotifBell(); } catch (e) {} }, 900);
+  // Плавающая кнопка «Написать в поддержку» — на всех страницах, кроме самих саппортов
+  if (_currentUser && _currentUserData && _currentUserData.role !== 'support') {
+    setTimeout(() => { try { _initSupportButton(); } catch (e) {} }, 500);
+  }
 })();
+
+// ── Кнопка обращения в поддержку (глобальная, на любой странице) ──
+function _initSupportButton() {
+  if (!currentUser) return;
+  if (document.getElementById('supportFab')) return;
+
+  const fab = document.createElement('button');
+  fab.id = 'supportFab';
+  fab.type = 'button';
+  fab.title = 'Написать в поддержку';
+  fab.innerHTML = '<span style="font-size:18px">🎧</span><span class="sf-label">Поддержка</span>';
+  fab.style.cssText =
+    'position:fixed;right:20px;bottom:20px;z-index:1200;display:flex;align-items:center;gap:8px;' +
+    'padding:11px 16px;border:none;border-radius:26px;cursor:pointer;font-family:inherit;font-size:14px;' +
+    'font-weight:600;color:#04120a;background:var(--accent,#00e676);box-shadow:0 6px 20px rgba(0,0,0,.35)';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'supportModal';
+  overlay.style.cssText =
+    'position:fixed;inset:0;z-index:1300;display:none;align-items:center;justify-content:center;' +
+    'background:rgba(0,0,0,.6);padding:16px';
+  overlay.innerHTML =
+    '<div style="width:100%;max-width:460px;background:var(--bg2,#15191f);border:1px solid var(--border2,#2b323c);border-radius:16px;padding:24px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
+        '<div style="font-family:var(--font-head,inherit);font-size:18px;font-weight:800;color:var(--text,#e8eaf0)">🎧 Написать в поддержку</div>' +
+        '<button type="button" id="sfClose" style="background:none;border:none;color:var(--text2,#8a8fa8);font-size:22px;cursor:pointer;line-height:1">×</button>' +
+      '</div>' +
+      '<div style="margin-bottom:14px">' +
+        '<label style="display:block;font-size:13px;color:var(--text2,#8a8fa8);margin-bottom:6px">Тема *</label>' +
+        '<input id="sfSubject" maxlength="200" placeholder="Коротко о проблеме" style="width:100%;background:var(--bg3,#181c24);border:1px solid var(--border2,#2b323c);border-radius:10px;color:var(--text,#e8eaf0);font-size:15px;padding:11px 14px;outline:none"/>' +
+      '</div>' +
+      '<div style="margin-bottom:6px">' +
+        '<label style="display:block;font-size:13px;color:var(--text2,#8a8fa8);margin-bottom:6px">Вопрос *</label>' +
+        '<textarea id="sfText" maxlength="4000" placeholder="Опишите вопрос подробно..." style="width:100%;min-height:120px;background:var(--bg3,#181c24);border:1px solid var(--border2,#2b323c);border-radius:10px;color:var(--text,#e8eaf0);font-size:15px;padding:11px 14px;outline:none;resize:vertical"></textarea>' +
+      '</div>' +
+      '<div id="sfMsg" style="font-size:13px;min-height:18px;margin:4px 0 10px"></div>' +
+      '<div style="font-size:12px;color:var(--text3,#555c72);margin-bottom:14px">Поддержка ответит вам в личных сообщениях.</div>' +
+      '<button type="button" id="sfSend" style="width:100%;justify-content:center;padding:12px;border:none;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600;color:#04120a;background:var(--accent,#00e676)">Отправить</button>' +
+    '</div>';
+
+  document.body.appendChild(fab);
+  document.body.appendChild(overlay);
+
+  const open  = () => { overlay.style.display = 'flex'; setTimeout(() => { const s = document.getElementById('sfSubject'); if (s) s.focus(); }, 30); };
+  const close = () => { overlay.style.display = 'none'; };
+  fab.addEventListener('click', open);
+  document.getElementById('sfClose').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  document.getElementById('sfSend').addEventListener('click', async () => {
+    const subj = (document.getElementById('sfSubject').value || '').trim();
+    const text = (document.getElementById('sfText').value || '').trim();
+    const msg  = document.getElementById('sfMsg');
+    const btn  = document.getElementById('sfSend');
+    msg.style.color = 'var(--danger,#ff4757)';
+    if (!subj) { msg.textContent = 'Укажите тему'; return; }
+    if (!text) { msg.textContent = 'Опишите вопрос'; return; }
+    btn.disabled = true; btn.textContent = 'Отправка...';
+    try {
+      await api.post('/support', { subject: subj, text: text });
+      msg.style.color = 'var(--accent,#00e676)';
+      msg.textContent = '✓ Обращение отправлено! Поддержка ответит в личных сообщениях.';
+      document.getElementById('sfSubject').value = '';
+      document.getElementById('sfText').value = '';
+      setTimeout(close, 1600);
+    } catch (e) {
+      msg.textContent = 'Ошибка: ' + (e.message || 'не удалось отправить');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Отправить';
+    }
+  });
+}
 
 // ─────────────────────────────────────────────────────────
 // AUTH API
@@ -495,6 +571,7 @@ var ROLE_LABELS = {
   user:      'Специалист',
   admin:     'Администратор',
   moderator: 'Модератор',
+  support:   'Поддержка',
 };
 
 function renderNav(userData) {
