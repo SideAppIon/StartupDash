@@ -61,8 +61,8 @@
       <div id="profileActions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
     </div>
 
-    <!-- Заполненность профиля -->
-    <div id="profileCompleteness" style="margin:4px 0 24px">
+    <!-- Заполненность профиля (только на своём профиле) -->
+    <div id="profileCompleteness" style="margin:4px 0 24px;display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
         <span style="font-size:13px;color:var(--text2)">Профиль заполнен</span>
         <span id="complPercent" style="font-size:13px;font-weight:700;color:var(--accent)">0%</span>
@@ -487,9 +487,13 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// Заполненность профиля: каждое поле — равная доля от 100%
+// Заполненность профиля: каждое поле — равная доля от 100%.
+// Показываем ТОЛЬКО на своём профиле — чужую заполненность видеть незачем.
 function renderCompleteness() {
-  if (!profileData) return;
+  var box = document.getElementById('profileCompleteness');
+  var isSelf = pageViewer && pageViewer.uid === profileUid;
+  if (!isSelf || !profileData) { if (box) box.style.display = 'none'; return; }
+  if (box) box.style.display = '';
   var has = function(v){ return !!(v && String(v).trim()); };
   var fields = [
     has(profileData.name),                       // имя
