@@ -5,7 +5,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Участники — Атриум</title>
-  <link rel="stylesheet" href="styles.css?v=4"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
   <style>
     .member-card {
       background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);
@@ -51,6 +51,9 @@
         <option value="user">Специалисты</option>
         <option value="startup">Стартаперы</option>
         <option value="expert">Эксперты</option>
+        <option value="curator">Кураторы</option>
+        <option value="mentor">Менторы</option>
+        <option value="observer">Наблюдатели</option>
       </select>
     </div>
 
@@ -60,9 +63,9 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=4"></script>
+<script src="api-config.js?v=5"></script>
 <script>
-  var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',user:'badge--blue',admin:'badge--red',moderator:'badge--orange'};
+  var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',curator:'badge--purple',mentor:'badge--purple',observer:'badge--purple',user:'badge--blue',admin:'badge--red',moderator:'badge--orange'};
   let allMembers = [];
 
   onAuthReady(async (user, userData) => {

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Добро пожаловать — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=4"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px 16px; }
     .ob-wrap { width:100%; max-width:500px; }
@@ -128,7 +128,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=4"></script>
+<script src="api-config.js?v=5"></script>
 <script>
 requireAuth('login.html');
 
@@ -239,7 +239,7 @@ function updateProgress(step) {
 
 function fillStep2() {
   var role = myRole || 'user';
-  var data = ROLE_STEP2[role] || ROLE_STEP2['user'];
+  var data = ROLE_STEP2[role] || (isExpertRole(role) ? ROLE_STEP2.expert : ROLE_STEP2.user);
   document.getElementById('s2icon').textContent  = data.icon;
   document.getElementById('s2title').textContent = data.title;
   document.getElementById('s2sub').textContent   = data.sub;
@@ -253,7 +253,7 @@ function fillStep2() {
 
 function goStep3() {
   var role = myRole || 'user';
-  var actions = ROLE_ACTIONS[role] || ROLE_ACTIONS['user'];
+  var actions = ROLE_ACTIONS[role] || (isExpertRole(role) ? ROLE_ACTIONS.expert : ROLE_ACTIONS.user);
   document.getElementById('actionGrid').innerHTML = actions.map(function(a) {
     return '<a class="action-tile" href="'+a.href+'">'+
       '<div class="action-tile__icon">'+a.icon+'</div>'+

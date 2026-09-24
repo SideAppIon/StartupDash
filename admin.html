@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Админ-панель — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=4"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
   <style>
     .admin-header{background:linear-gradient(135deg,rgba(255,71,87,.08),rgba(255,71,87,.02));border-bottom:1px solid rgba(255,71,87,.2);padding:32px 0;margin-bottom:28px}
     .admin-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,71,87,.15);border:1px solid rgba(255,71,87,.3);color:var(--danger);font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:.5px;margin-bottom:12px}
@@ -62,6 +62,7 @@
   <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
   <a href="members.html">Участники</a>
+  <a href="verification.html">Модерация ролей</a>
   <div class="nav__user">
     <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
     <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=ff4757&name=A" onclick="goProfile()"/>
@@ -228,6 +229,9 @@
         <option value="user">Специалист</option>
         <option value="startup">Стартапер</option>
         <option value="expert">Эксперт</option>
+        <option value="curator">Куратор</option>
+        <option value="mentor">Ментор</option>
+        <option value="observer">Наблюдатель</option>
         <option value="moderator">Модератор (скрытая роль)</option>
         <option value="support">Поддержка</option>
         <option value="admin">Администратор</option>
@@ -362,6 +366,9 @@
         <option value="user">Специалист</option>
         <option value="startup">Стартапер</option>
         <option value="expert">Эксперт</option>
+        <option value="curator">Куратор</option>
+        <option value="mentor">Ментор</option>
+        <option value="observer">Наблюдатель</option>
         <option value="moderator">Модератор (скрытая роль)</option>
         <option value="support">Поддержка</option>
         <option value="admin">Администратор</option>
@@ -373,11 +380,11 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=4"></script>
+<script src="api-config.js?v=5"></script>
 <script>
 requireAuth('login.html');
 
-var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',user:'badge--blue',admin:'badge--red',moderator:'badge--orange'};
+var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',curator:'badge--purple',mentor:'badge--purple',observer:'badge--purple',user:'badge--blue',admin:'badge--red',moderator:'badge--orange'};
 var DEFAULT_CATS   = ['FinTech','EdTech','HealthTech','E-commerce','SaaS','AI / ML','Gaming','GreenTech','Marketplace','Другое'];
 var DEFAULT_STAGES = [
   {name:'Идея',icon:'💡'},{name:'MVP',icon:'⚡'},{name:'Бета',icon:'🔬'},
@@ -414,7 +421,7 @@ async function loadStats() {
     var startups = (sd.startups || []).filter(function(s){ return !(s.hidden===true||s.hidden==='true'); });
     document.getElementById('statUsers').textContent    = users.length;
     document.getElementById('statStartups').textContent = startups.length;
-    document.getElementById('statExperts').textContent  = users.filter(function(u){return u.role==='expert';}).length;
+    document.getElementById('statExperts').textContent  = users.filter(function(u){return isExpertRole(u.role);}).length;
     document.getElementById('statPublic').textContent   = startups.filter(function(s){return !s.privacy||s.privacy==='public';}).length;
   } catch(e) { console.warn('loadStats:', e.message); }
 }

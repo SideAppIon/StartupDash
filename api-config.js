@@ -169,7 +169,8 @@ const auth = {
     _currentUser     = { uid: data.user.uid, email: data.user.email };
     _currentUserData = data.user;
     _syncPublic();
-    return { user: _currentUser };
+    // pendingRole — роль, которая ждёт модерации (пока пользователь — наблюдатель)
+    return { user: _currentUser, pendingRole: data.pendingRole || null };
   },
   async signInWithEmailAndPassword(email, password) {
     const data = await api.post('/auth/login', { email, password });
@@ -568,11 +569,53 @@ async function fetchUsersByUids(uids) {
 var ROLE_LABELS = {
   startup:   'Стартапер',
   expert:    'Эксперт',
+  curator:   'Куратор',
+  mentor:    'Ментор',
+  observer:  'Наблюдатель',
   user:      'Специалист',
   admin:     'Администратор',
   moderator: 'Модератор',
   support:   'Поддержка',
 };
+
+// Эксперт, куратор, ментор и наблюдатель — одинаковые права, разные названия.
+// Наблюдателя нельзя пригласить в проект, и сам он не подаёт заявки.
+var EXPERT_ROLES = ['expert', 'curator', 'mentor', 'observer'];
+function isExpertRole(role)   { return EXPERT_ROLES.indexOf(role) !== -1; }
+function canJoinProject(role) { return role !== 'observer'; }
+
+// Эксперт, куратор и ментор проходят ручную модерацию с сертификатом.
+// До одобрения пользователь — наблюдатель.
+var MODERATED_ROLES = ['expert', 'curator', 'mentor'];
+function needsModeration(role) { return MODERATED_ROLES.indexOf(role) !== -1; }
+
+var CERT_TYPES   = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+var CERT_MAX_MB  = 2;
+var CERT_MAX_CNT = 5;
+
+// Проверка файла сертификата; возвращает текст ошибки или ''
+function validateCertificateFile(file) {
+  if (CERT_TYPES.indexOf(file.type) === -1) return '«' + file.name + '»: нужен PDF или изображение (jpg, png, webp)';
+  if (file.size > CERT_MAX_MB * 1024 * 1024) return '«' + file.name + '»: файл больше ' + CERT_MAX_MB + ' МБ';
+  return '';
+}
+
+// Загрузить сертификаты и отправить заявку на роль. files — массив File.
+async function submitRoleVerification(requestedRole, files, comment) {
+  var certs = [];
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    var b64 = await new Promise(function(resolve, reject) {
+      var r = new FileReader();
+      r.onload  = function(e) { resolve(String(e.target.result).split(',')[1]); };
+      r.onerror = function() { reject(new Error('Не удалось прочитать файл ' + f.name)); };
+      r.readAsDataURL(f);
+    });
+    var up = await api.post('/upload', { data: b64, contentType: f.type, folder: 'certificates', filename: f.name });
+    certs.push({ url: up.url, name: f.name });
+  }
+  return api.post('/verification', { requested_role: requestedRole, certificates: certs, comment: comment || '' });
+}
 
 function renderNav(userData) {
   if (!userData) return;

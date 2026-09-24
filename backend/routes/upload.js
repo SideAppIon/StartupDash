@@ -63,6 +63,10 @@ router.post('/', requireAuth, async (req, res) => {
     if (!ALLOWED_TYPES[contentType]) {
       return res.status(400).json({ error: 'Разрешены изображения, видео и документы (pdf, doc, docx, xls, xlsx, ppt, pptx, txt, csv, zip)' });
     }
+    // Сертификаты для модерации роли — только PDF и изображения
+    if (folder === 'certificates' && !IMAGE_TYPES[contentType] && contentType !== 'application/pdf') {
+      return res.status(400).json({ error: 'Сертификат: разрешены PDF или изображение (jpg, png, webp)' });
+    }
     const isVideo = !!VIDEO_TYPES[contentType];
     const isDoc   = !!DOC_TYPES[contentType];
     const maxB64  = isVideo ? MAX_VIDEO_B64 : isDoc ? MAX_DOC_B64 : MAX_IMAGE_B64;
@@ -76,7 +80,7 @@ router.post('/', requireAuth, async (req, res) => {
       });
     }
 
-    const allowed = ['avatars', 'chat', 'startups', 'updates', 'docs'];
+    const allowed = ['avatars', 'chat', 'startups', 'updates', 'docs', 'certificates'];
     const safeFolder = allowed.includes(folder) ? folder : 'chat';
     const ext = ALLOWED_TYPES[contentType];
     const key = `${safeFolder}/${uuidv4()}.${ext}`;
@@ -105,3 +109,4 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.BUCKET = BUCKET;

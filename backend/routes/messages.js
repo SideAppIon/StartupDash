@@ -4,6 +4,7 @@ const { query, queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { getUserGroupSettings } = require('./groups');
 const { checkCensor } = require('../lib/censor');
+const { isExpertRole, EXPERT_ROLES_SQL } = require('../lib/roles');
 
 const router = express.Router();
 
@@ -263,10 +264,10 @@ router.get('/available-users', requireAuth, async (req, res) => {
     const params = [req.user.uid];
 
     if (myRole === 'startup') {
-      // Стартапер: специалисты и эксперты
-      sql += ` AND role IN ('user','expert')`;
-    } else if (myRole === 'expert') {
-      // Эксперт: только стартаперы
+      // Стартапер: специалисты и эксперты (куратор, ментор, наблюдатель)
+      sql += ` AND role IN ('user',${EXPERT_ROLES_SQL})`;
+    } else if (isExpertRole(myRole)) {
+      // Эксперт / куратор / ментор / наблюдатель: только стартаперы
       sql += ` AND role = 'startup'`;
     } else if (myRole === 'user') {
       // Специалист: другие специалисты + команды

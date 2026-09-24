@@ -84,7 +84,10 @@ body {
   text-transform: uppercase; padding: 2px 8px; border-radius: 20px;
 }
 .nav__role--startup  { background: var(--accent-dim);   color: var(--accent); }
-.nav__role--expert { background: var(--expert-dim); color: var(--expert); }
+.nav__role--expert,
+.nav__role--curator,
+.nav__role--mentor,
+.nav__role--observer { background: var(--expert-dim); color: var(--expert); }
 .nav__role--user     { background: rgba(61,142,245,.12); color: var(--info); }
 .nav__role--admin    { background: rgba(255,71,87,.12);  color: var(--danger); }
 .nav__role--moderator{ background: rgba(255,159,67,.12); color: #ff9f43; }

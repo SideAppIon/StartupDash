@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { query, queryOne, queryAll } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { isExpertRole } = require('../lib/roles');
 
 const router = express.Router();
 
@@ -86,7 +87,7 @@ async function resultsFor(pollId, questions) {
 router.post('/', requireAuth, async (req, res) => {
   try {
     // Опросы доступны стартаперам, экспертам и специалистам (и админам)
-    const canCreatePolls = ['startup', 'expert', 'user', 'admin'].includes(req.user.role);
+    const canCreatePolls = ['startup', 'user', 'admin'].includes(req.user.role) || isExpertRole(req.user.role);
     if (!canCreatePolls) {
       return res.status(403).json({ error: 'Нет доступа к опросам' });
     }

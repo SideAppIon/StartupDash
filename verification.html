@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Модерация ролей — Атриум</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
+  <style>
+    .cmp-tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
+    .cmp-tab{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .2s}
+    .cmp-tab.active{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+    .vf-card{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--expert);border-radius:var(--radius-lg);padding:18px 20px;margin-bottom:14px}
+    .vf-card--approved{border-left-color:var(--accent);opacity:.85}
+    .vf-card--rejected{border-left-color:var(--danger);opacity:.75}
+    .vf-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+    .vf-ava{width:36px;height:36px;border-radius:50%;object-fit:cover;background:var(--bg3);border:1px solid var(--border2)}
+    .vf-link{text-decoration:none;color:inherit;font-weight:600;font-size:14px}
+    .vf-link:hover{color:var(--accent)}
+    .vf-sub{font-size:12px;color:var(--text3)}
+    .vf-block{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 14px;font-size:14px;color:var(--text);line-height:1.6;white-space:pre-wrap;word-break:break-word;margin-bottom:12px}
+    .vf-label{font-size:12px;color:var(--text3);margin-bottom:4px}
+    .vf-files{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .vf-file{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);text-decoration:none;font-size:13px}
+    .vf-file:hover{border-color:var(--accent);color:var(--accent)}
+    .vf-meta{font-size:12px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+    .vf-actions{display:flex;gap:8px;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="dashboard.html" class="nav__logo"><img src="assets/atrium-logo.png" alt="Атриум"/></a>
+  <a href="dashboard.html">Дашборд</a>
+  <a href="support.html">Поддержка</a>
+  <div class="nav__user">
+    <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
+    <span class="nav__role" id="navRole"></span>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="goProfile()"/>
+    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="container--md">
+    <div class="section-header" style="margin-bottom:24px">
+      <div>
+        <h1 class="page-title">🎓 Модерация ролей</h1>
+        <p class="page-subtitle">Заявки на роли Эксперт, Куратор и Ментор. Проверь сертификат и прими решение — пользователь получит личное сообщение.</p>
+      </div>
+    </div>
+    <div class="cmp-tabs">
+      <button class="cmp-tab active" data-st="pending" onclick="setTab('pending')">Ожидают</button>
+      <button class="cmp-tab" data-st="approved" onclick="setTab('approved')">Одобренные</button>
+      <button class="cmp-tab" data-st="rejected" onclick="setTab('rejected')">Отклонённые</button>
+      <button class="cmp-tab" data-st="" onclick="setTab('')">Все</button>
+    </div>
+    <div id="content"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- Отказ: причина обязательна -->
+<div class="modal-overlay" id="rejectModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal__header">
+      <div class="modal__title">Отклонить заявку</div>
+      <button class="modal__close" onclick="closeReject()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Причина отказа * <span style="color:var(--text3);font-weight:400">(увидит пользователь)</span></label>
+      <textarea class="form-textarea" id="rejectNote" style="min-height:100px" maxlength="2000"
+        placeholder="Например: сертификат нечитаемый / не подтверждает квалификацию..."></textarea>
+    </div>
+    <div id="rejectErr" class="form-error" style="display:none;margin-bottom:10px"></div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center;background:var(--danger)" onclick="confirmReject()">Отклонить</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="api-config.js?v=5"></script>
+<script>
+requireAuth('login.html');
+
+var allItems = [];
+var curTab = 'pending';
+var rejectId = null;
+
+onAuthReady(async function(user, userData) {
+  if (!user) return;
+  renderNav(userData);
+  // Только администратор / поддержка
+  if (!userData || (userData.role !== 'support' && userData.role !== 'admin')) {
+    window.location.href = 'dashboard.html';
+    return;
+  }
+  await loadItems();
+});
+
+async function loadItems() {
+  var el = document.getElementById('content');
+  el.innerHTML = '<div class="spinner"></div>';
+  try {
+    var data = await api.get('/verification');
+    allItems = data.verifications || [];
+    render();
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div>' +
+      '<div class="empty-state__title">Ошибка загрузки</div><p>'+esc(e.message)+'</p></div>';
+  }
+}
+
+function setTab(st) {
+  curTab = st;
+  document.querySelectorAll('.cmp-tab').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-st')===st); });
+  render();
+}
+
+function render() {
+  var el = document.getElementById('content');
+  var list = curTab ? allItems.filter(function(v){ return v.status===curTab; }) : allItems;
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">✅</div>' +
+      '<div class="empty-state__title">' + (curTab==='pending'?'Нет заявок на проверке':'Заявок нет') + '</div>' +
+      '<p style="font-size:14px">Здесь появятся заявки на роли с сертификатами</p></div>';
+    return;
+  }
+  el.innerHTML = list.map(buildCard).join('');
+}
+
+function buildCard(v) {
+  var av = v.userAvatar || 'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(v.userName||'U');
+  var roleName = ROLE_LABELS[v.requestedRole] || v.requestedRole;
+  var statusBadge = v.status==='pending'
+    ? '<span class="badge badge--purple" style="font-size:11px">⏳ На проверке</span>'
+    : v.status==='approved'
+    ? '<span class="badge badge--green" style="font-size:11px">✅ Одобрено</span>'
+    : '<span class="badge badge--red" style="font-size:11px">❌ Отклонено</span>';
+  var cardCls = 'vf-card' + (v.status==='approved'?' vf-card--approved':v.status==='rejected'?' vf-card--rejected':'');
+
+  var files = (v.certificates||[]).map(function(c){
+    var isPdf = /\.pdf$/i.test(c.url);
+    return '<a class="vf-file" target="_blank" rel="noopener" href="'+esc(c.url)+'">'+(isPdf?'📄':'🖼')+' '+esc(c.name||'Сертификат')+'</a>';
+  }).join('');
+
+  var actions = '';
+  if (v.status === 'pending') {
+    actions =
+      '<button class="btn btn--primary btn--sm" data-id="'+esc(v.id)+'" onclick="approve(this)">✅ Одобрить — сделать «'+esc(roleName)+'»</button>' +
+      '<button class="btn btn--outline btn--sm" data-id="'+esc(v.id)+'" onclick="openReject(this)">❌ Отклонить</button>';
+  }
+  actions += '<a class="btn btn--ghost btn--sm" href="messages.html?to='+encodeURIComponent(v.userUid||'')+'">💬 Написать</a>';
+
+  return '<div class="'+cardCls+'">' +
+    '<div class="vf-head">' +
+      '<img class="vf-ava" src="'+esc(av)+'"/>' +
+      '<div><a class="vf-link" href="member.html?uid='+esc(v.userUid||'')+'">'+esc(v.userName||'Пользователь')+'</a>' +
+        '<div class="vf-sub">'+esc(v.userEmail||'')+' · сейчас: '+esc(ROLE_LABELS[v.userRole]||v.userRole||'—')+'</div></div>' +
+      '<span style="margin-left:auto">'+statusBadge+'</span>' +
+    '</div>' +
+    '<div style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:10px">Хочет роль: '+esc(roleName)+'</div>' +
+    (v.userBio ? '<div class="vf-label">О себе</div><div class="vf-block">'+esc(v.userBio)+'</div>' : '') +
+    (v.userPortfolio ? '<div class="vf-label">Портфолио</div><div class="vf-block">'+esc(v.userPortfolio)+'</div>' : '') +
+    (v.comment ? '<div class="vf-label">Комментарий к заявке</div><div class="vf-block">'+esc(v.comment)+'</div>' : '') +
+    '<div class="vf-label">Сертификаты</div><div class="vf-files">'+(files||'<span class="vf-sub">нет файлов</span>')+'</div>' +
+    (v.status==='rejected' && v.reviewNote ? '<div class="vf-label">Причина отказа</div><div class="vf-block">'+esc(v.reviewNote)+'</div>' : '') +
+    '<div class="vf-meta"><span>Подана '+formatDate(v.createdAt)+'</span>' +
+      (v.reviewedAt ? '<span>· рассмотрена '+formatDate(v.reviewedAt)+'</span>' : '') + '</div>' +
+    '<div class="vf-actions">'+actions+'</div>' +
+  '</div>';
+}
+
+async function approve(btn) {
+  var id = btn.getAttribute('data-id');
+  if (!confirm('Одобрить заявку и сменить роль пользователю?')) return;
+  btn.disabled = true;
+  try {
+    await api.patch('/verification/'+id, { status: 'approved' });
+    showToast('✅ Роль выдана, пользователь уведомлён','success');
+    await loadItems();
+  } catch(e) {
+    btn.disabled = false;
+    showToast('Ошибка: '+(e.message||'не удалось'),'error');
+  }
+}
+
+function openReject(btn) {
+  rejectId = btn.getAttribute('data-id');
+  document.getElementById('rejectNote').value = '';
+  document.getElementById('rejectErr').style.display = 'none';
+  document.getElementById('rejectModal').classList.add('open');
+}
+function closeReject() { document.getElementById('rejectModal').classList.remove('open'); }
+
+async function confirmReject() {
+  var note  = document.getElementById('rejectNote').value.trim();
+  var errEl = document.getElementById('rejectErr');
+  if (!note) { errEl.textContent = 'Укажите причину'; errEl.style.display = 'block'; return; }
+  try {
+    await api.patch('/verification/'+rejectId, { status: 'rejected', note: note });
+    closeReject();
+    showToast('Заявка отклонена, пользователь уведомлён','success');
+    await loadItems();
+  } catch(e) {
+    errEl.textContent = 'Ошибка: '+(e.message||'не удалось');
+    errEl.style.display = 'block';
+  }
+}
+</script>
+</body>
+</html>

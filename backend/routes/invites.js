@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { query, queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { canJoinProject } = require('../lib/roles');
 
 const router = express.Router();
 
@@ -105,6 +106,17 @@ router.post('/', requireAuth, async (req, res) => {
     const { type, role, expert_area, message, applications } = b;
 
     if (!startup_id) return res.status(400).json({ error: 'startup_id обязателен' });
+
+    // Наблюдатель не вступает в проекты: ни сам (заявка), ни по приглашению
+    if (!to_uid && !canJoinProject(req.user.role)) {
+      return res.status(403).json({ error: 'Наблюдатель не может подавать заявки в проекты' });
+    }
+    if (to_uid) {
+      const target = await queryOne('SELECT role FROM users WHERE uid=$1', [to_uid]);
+      if (target && !canJoinProject(target.role)) {
+        return res.status(403).json({ error: 'Наблюдателя нельзя пригласить в проект' });
+      }
+    }
 
     // Проверяем дубль (pending/accepted от того же from_uid).
     // Для отклика на вакансию — дубль считаем по конкретной вакансии,

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Регистрация — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=4"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px 0; }
     .auth-box { width:100%; max-width:480px; padding:24px; }
@@ -23,6 +23,17 @@
     .role-btn.sel-user { border-color:var(--info); background:rgba(61,142,245,.12); }
     .role-btn.sel-startup { border-color:var(--accent); background:var(--accent-dim); }
     .role-btn.sel-expert { border-color:var(--expert); background:var(--expert-dim); }
+    .sub-roles { display:none; grid-template-columns:repeat(2,1fr); gap:8px; margin:-8px 0 20px; }
+    .sub-roles.open { display:grid; }
+    .sub-role { border:1.5px solid var(--border2); border-radius:var(--radius); padding:10px 12px; cursor:pointer; background:var(--bg3); transition:all .2s; }
+    .sub-role.sel { border-color:var(--expert); background:var(--expert-dim); }
+    .sub-role__name { font-size:13px; font-weight:600; }
+    .sub-role__desc { font-size:11px; color:var(--text3); margin-top:3px; line-height:1.3; }
+    .sub-role__tag { display:inline-block; font-size:10px; font-weight:600; padding:1px 7px; border-radius:10px; margin-top:6px; background:rgba(255,159,67,.12); color:#ff9f43; }
+    .sub-role__tag--free { background:var(--accent-dim); color:var(--accent); }
+    .cert-item { display:flex; align-items:center; gap:8px; background:var(--bg3); border:1px solid var(--border2); border-radius:8px; padding:7px 10px; font-size:13px; margin-top:6px; }
+    .cert-item span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .cert-item button { background:none; border:none; color:var(--text3); cursor:pointer; font-size:16px; line-height:1; padding:0; }
     .step { display:none; }
     .step.active { display:block; }
     .step-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
@@ -72,6 +83,30 @@
         <div class="role-btn__icon">🎓</div>
         <div class="role-btn__name">Эксперт</div>
         <div class="role-btn__desc">Консультирую и поддерживаю проекты</div>
+      </div>
+    </div>
+
+    <!-- Подвыбор для «Эксперт»: эксперт / куратор / ментор (модерация) и наблюдатель -->
+    <div class="sub-roles" id="subRoles">
+      <div class="sub-role" id="sub-expert" onclick="selectSubRole('expert')">
+        <div class="sub-role__name">🎓 Эксперт</div>
+        <div class="sub-role__desc">Консультирую по своей области</div>
+        <span class="sub-role__tag">Нужен сертификат</span>
+      </div>
+      <div class="sub-role" id="sub-curator" onclick="selectSubRole('curator')">
+        <div class="sub-role__name">🧭 Куратор</div>
+        <div class="sub-role__desc">Сопровождаю проекты</div>
+        <span class="sub-role__tag">Нужен сертификат</span>
+      </div>
+      <div class="sub-role" id="sub-mentor" onclick="selectSubRole('mentor')">
+        <div class="sub-role__name">🤝 Ментор</div>
+        <div class="sub-role__desc">Помогаю основателям расти</div>
+        <span class="sub-role__tag">Нужен сертификат</span>
+      </div>
+      <div class="sub-role" id="sub-observer" onclick="selectSubRole('observer')">
+        <div class="sub-role__name">👁 Наблюдатель</div>
+        <div class="sub-role__desc">Слежу за проектами, не вступаю в команды</div>
+        <span class="sub-role__tag sub-role__tag--free">Без проверки</span>
       </div>
     </div>
 
@@ -157,6 +192,26 @@
       </div>
     </div>
 
+    <!-- Сертификаты: только для ролей с ручной модерацией -->
+    <div class="card" id="certCard" style="display:none;margin-top:16px">
+      <div class="form-group">
+        <label class="form-label">Сертификат / подтверждение квалификации *</label>
+        <input type="file" class="form-input" id="certInput" style="padding:6px" multiple
+          accept="application/pdf,image/jpeg,image/png,image/webp" onchange="onCertFiles(this)"/>
+        <div class="form-hint">PDF или изображение, до 2 МБ каждый, максимум 5 файлов</div>
+        <div id="certList"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label">Комментарий для проверяющего <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
+        <textarea class="form-textarea" id="certComment" style="min-height:60px" maxlength="2000"
+          placeholder="Например: где получен сертификат, ссылка на реестр..."></textarea>
+      </div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.5">
+        ⏳ Профиль уйдёт на ручную проверку. Пока его не одобрят, вы будете на платформе
+        как <b>наблюдатель</b>. О решении придёт личное сообщение.
+      </div>
+    </div>
+
     <div style="margin-top:16px">
       <label class="checkbox-row">
         <input type="checkbox" id="policyCheck"/>
@@ -177,7 +232,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=4"></script>
+<script src="api-config.js?v=5"></script>
 <script>
 // Редирект только если уже авторизован при загрузке страницы (не во время регистрации)
 var registering = false;
@@ -192,17 +247,49 @@ db.collection('_config').doc('platform').get().then(function(snap) {
   }
 }).catch(function() {});
 
-var selectedRole = 'user';
+var selectedRole = 'user';   // итоговая роль, которую отправим на бэкенд
+var expertSubRole = 'expert'; // выбор внутри группы «Эксперт»
 var skills = [];
+var certFiles = [];
 var currentStep = 0;
 
-// Выбор роли
+// Выбор роли (карточка). Для «Эксперт» дополнительно показываем 4 варианта.
 function selectRole(role) {
-  selectedRole = role;
   document.querySelectorAll('.role-btn').forEach(function(b) {
     b.className = 'role-btn';
   });
   document.getElementById('btn-'+role).classList.add('sel-'+role);
+  var isExpertGroup = role === 'expert';
+  document.getElementById('subRoles').classList.toggle('open', isExpertGroup);
+  if (isExpertGroup) selectSubRole(expertSubRole);
+  else selectedRole = role;
+}
+function selectSubRole(sub) {
+  expertSubRole = sub;
+  selectedRole  = sub;
+  document.querySelectorAll('.sub-role').forEach(function(b) { b.classList.remove('sel'); });
+  document.getElementById('sub-'+sub).classList.add('sel');
+}
+
+// Сертификаты
+function onCertFiles(input) {
+  clearErr(2);
+  Array.prototype.forEach.call(input.files, function(f) {
+    var err = validateCertificateFile(f);
+    if (err) { showErr(2, err); return; }
+    if (certFiles.length >= CERT_MAX_CNT) { showErr(2, 'Максимум ' + CERT_MAX_CNT + ' файлов'); return; }
+    certFiles.push(f);
+  });
+  input.value = '';
+  renderCerts();
+}
+function removeCert(i) { certFiles.splice(i,1); renderCerts(); }
+function renderCerts() {
+  document.getElementById('certList').innerHTML = certFiles.map(function(f,i) {
+    return '<div class="cert-item">📄<span>' + esc(f.name) + '</span>' +
+      '<small style="color:var(--text3)">' + (f.size/1024).toFixed(0) + ' КБ</small>' +
+      '<button type="button" onclick="removeCert(' + i + ')">×</button></div>';
+  }).join('');
 }
 // По умолчанию выбираем user
 selectRole('user');
@@ -251,6 +338,7 @@ function goStep2() {
   if (!name)           { showErr(1,'Введи имя'); return; }
   if (bio.length < 20) { showErr(1,'Расскажи о себе подробнее (минимум 20 символов)'); return; }
   if (!skills.length)  { showErr(1,'Добавь хотя бы один навык'); return; }
+  document.getElementById('certCard').style.display = needsModeration(selectedRole) ? 'block' : 'none';
   goStep(2);
 }
 
@@ -277,6 +365,7 @@ async function doRegister() {
   clearErr(2);
   var policy = document.getElementById('policyCheck').checked;
   if (!policy) { showErr(2,'Необходимо принять политику конфиденциальности'); return; }
+  if (needsModeration(selectedRole) && !certFiles.length) { showErr(2,'Прикрепи сертификат — без него профиль не пройдёт проверку'); return; }
 
   var btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = 'Регистрация...';
@@ -291,8 +380,9 @@ async function doRegister() {
   var nickname  = document.getElementById('nickInput').value.trim();
   var roleToSave = selectedRole; // явная копия
 
+  var created = null;
   try {
-    await auth.createUserWithEmailAndPassword(email, pass, {
+    created = await auth.createUserWithEmailAndPassword(email, pass, {
       name:      name,
       role:      roleToSave,
       bio:       bio,
@@ -301,7 +391,6 @@ async function doRegister() {
       portfolio: portfolio,
       nickname:  nickname   // пусто → бэкенд сгенерирует уникальный
     });
-    window.location.href = 'onboarding.html';
   } catch(e) {
     var map = {
       'Этот email уже используется': 'Этот email уже используется',
@@ -311,7 +400,21 @@ async function doRegister() {
     };
     showErr(2, map[e.code] || 'Ошибка: ' + e.message);
     btn.disabled = false; btn.textContent = '✓ Зарегистрироваться';
+    return;
   }
+
+  // Аккаунт создан. Для ролей с модерацией — загружаем сертификаты и подаём заявку.
+  if (created && created.pendingRole) {
+    btn.textContent = 'Загрузка сертификатов...';
+    try {
+      await submitRoleVerification(created.pendingRole, certFiles, document.getElementById('certComment').value.trim());
+    } catch(e) {
+      // Аккаунт уже есть — повторить заявку можно в профиле
+      window.location.href = 'profile.html?verify=failed';
+      return;
+    }
+  }
+  window.location.href = 'onboarding.html';
 }
 </script>
 </body>

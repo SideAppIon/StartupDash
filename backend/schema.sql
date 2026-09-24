@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL DEFAULT '',
   name          TEXT NOT NULL DEFAULT '',
   role          TEXT NOT NULL DEFAULT 'user'
-                  CHECK (role IN ('user','startup','expert','admin','moderator','support')),
+                  CHECK (role IN ('user','startup','expert','curator','mentor','observer','admin','moderator','support')),
   bio           TEXT DEFAULT '',
   skills        TEXT DEFAULT '[]',       -- JSON array
   nickname      TEXT,                    -- ник (уникальный, пока нигде не используется — на будущее)
@@ -245,7 +245,7 @@ ON CONFLICT (key) DO NOTHING;
 -- Роль модератора (скрытая, назначается только из админки)
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check
-  CHECK (role IN ('user','startup','expert','admin','moderator','support'));
+  CHECK (role IN ('user','startup','expert','curator','mentor','observer','admin','moderator','support'));
 -- Запрет общения на форуме (пользователь может только читать)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS forum_banned BOOLEAN DEFAULT FALSE;
 -- Закрепление тем форума
@@ -340,3 +340,21 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 );
 CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status);
 CREATE INDEX IF NOT EXISTS idx_support_user   ON support_tickets(user_uid);
+
+-- ── Модерация ролей Эксперт / Куратор / Ментор ──────────
+-- Пока заявка не одобрена, пользователь — наблюдатель (users.role = 'observer')
+CREATE TABLE IF NOT EXISTS role_verifications (
+  id             TEXT PRIMARY KEY,
+  user_uid       TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  requested_role TEXT NOT NULL,
+  certificates   JSONB NOT NULL DEFAULT '[]',   -- [{url, name}]
+  comment        TEXT DEFAULT '',
+  status         TEXT NOT NULL DEFAULT 'pending'
+                   CHECK (status IN ('pending','approved','rejected')),
+  review_note    TEXT DEFAULT '',
+  reviewed_by    TEXT,
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  reviewed_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_role_verif_status ON role_verifications(status);
+CREATE INDEX IF NOT EXISTS idx_role_verif_user ON role_verifications(user_uid);

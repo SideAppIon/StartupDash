@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Поддержка — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=4"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
   <style>
     .cmp-tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
     .cmp-tab{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .2s}
@@ -27,6 +27,7 @@
 <nav class="nav">
   <a href="dashboard.html" class="nav__logo"><img src="assets/atrium-logo.png" alt="Атриум"/></a>
   <a href="dashboard.html">Дашборд</a>
+  <a href="verification.html">Модерация ролей</a>
   <div class="nav__user">
     <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
     <span class="nav__role" id="navRole"></span>
@@ -53,7 +54,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=4"></script>
+<script src="api-config.js?v=5"></script>
 <script>
 requireAuth('login.html');
 

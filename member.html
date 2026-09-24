@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Профиль участника — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=4"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
   <style>
     .profile-cover{height:180px;background:linear-gradient(135deg,rgba(0,230,118,.15),rgba(180,139,255,.1) 50%,rgba(61,142,245,.1));border-bottom:1px solid var(--border)}
     .profile-main{max-width:860px;margin:0 auto;padding:0 24px}
@@ -146,7 +146,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=4"></script>
+<script src="api-config.js?v=5"></script>
 <script>
 var profileUid = getUrlParam('uid');
 if (!profileUid) window.location.href = 'members.html';
@@ -201,7 +201,7 @@ onAuthReady(async function(user, userData) {
   roleEl.className   = 'nav__role nav__role--' + (profileData.role||'user');
 
   // Статус эксперта (только для роли «эксперт») — read-only
-  if (profileData.role === 'expert') {
+  if (isExpertRole(profileData.role)) {
     var eStatus = profileData.expertStatus || profileData.expert_status || 'available';
     var eBusy   = eStatus === 'busy';
     var eColor  = eBusy ? 'var(--danger)' : 'var(--accent)';
@@ -284,8 +284,8 @@ function renderActions(user, userData, inviteStatus) {
   if (!viewerIsMod) {
     btns += '<button class="btn btn--ghost" style="font-size:11px;padding:2px 7px;color:var(--text3)" onclick="openReport()" title="Пожаловаться">⚠️ Пожаловаться</button>';
   }
-  // Пригласить в команду — только стартаперы
-  if (userData && userData.role === 'startup') {
+  // Пригласить в команду — только стартаперы; наблюдателя пригласить нельзя
+  if (userData && userData.role === 'startup' && profileData && canJoinProject(profileData.role)) {
     if (inviteStatus === 'accepted') {
       btns += '<span class="badge badge--green" style="padding:7px 14px;font-size:13px">✅ В команде</span>';
     } else if (inviteStatus === 'pending') {

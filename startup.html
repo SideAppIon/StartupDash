@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Стартап — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=4"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
   <style>
     .startup-hero{background:var(--bg2);border-bottom:1px solid var(--border);padding:calc(var(--nav-h) + 40px) 0 32px}
     .startup-hero__inner{display:flex;gap:24px;align-items:flex-start}
@@ -227,7 +227,7 @@
 <div class="modal-overlay" id="expertModal">
   <div class="modal" style="max-width:520px">
     <div class="modal__header">
-      <div class="modal__title">🎓 Подать заявку как эксперт</div>
+      <div class="modal__title" id="expertModalTitle">🎓 Подать заявку как эксперт</div>
       <button class="modal__close" onclick="document.getElementById('expertModal').classList.remove('open')">×</button>
     </div>
     <div class="form-group">
@@ -354,7 +354,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=4"></script>
+<script src="api-config.js?v=5"></script>
 <script>
 var startupId = getUrlParam('id');
 if (!startupId) window.location.href = 'startups.html';
@@ -580,11 +580,17 @@ function renderActions(user, userData, inviteStatus, isTeamMember, memberPerms) 
     }
     el.innerHTML = btns.join('');
 
-  } else if (role === 'expert') {
-    if (inviteStatus === 'accepted') {
+  } else if (isExpertRole(role)) {
+    var roleName = (ROLE_LABELS[role] || 'Эксперт').toLowerCase();
+    if (!canJoinProject(role)) {
+      // Наблюдатель: смотрит и пишет, но в проект не вступает
+      el.innerHTML =
+        '<a href="roadmap.html?id=' + startupId + '" class="btn btn--ghost btn--sm">🗺 Roadmap</a>' +
+        '<button class="btn btn--expert" onclick="writeToFounder()">💬 Написать основателю</button>';
+    } else if (inviteStatus === 'accepted') {
       el.innerHTML =
         '<a href="roadmap.html?id=' + startupId + '" class="btn btn--outline btn--sm">🗺 Roadmap</a>' +
-        '<span class="badge badge--purple" style="padding:8px 16px;font-size:13px">✅ Ты эксперт проекта</span>' +
+        '<span class="badge badge--purple" style="padding:8px 16px;font-size:13px">✅ Ты ' + roleName + ' проекта</span>' +
         '<button class="btn btn--expert" onclick="writeToFounder()">💬 Написать основателю</button>';
     } else if (inviteStatus === 'pending') {
       el.innerHTML =
@@ -597,7 +603,7 @@ function renderActions(user, userData, inviteStatus, isTeamMember, memberPerms) 
     } else {
       el.innerHTML =
         '<a href="roadmap.html?id=' + startupId + '" class="btn btn--ghost btn--sm">🗺 Roadmap</a>' +
-        '<button class="btn btn--expert" onclick="openExpertModal()">🎓 Подать заявку как эксперт</button>' +
+        '<button class="btn btn--expert" onclick="openExpertModal()">🎓 Подать заявку как ' + roleName + '</button>' +
         '<button class="btn btn--outline btn--sm" onclick="writeToFounder()">💬 Написать основателю</button>';
     }
 
@@ -991,6 +997,8 @@ async function writeToFounder() {
 
 function openExpertModal() {
   if (!pageUser) { window.location.href = 'login.html'; return; }
+  var roleName = (ROLE_LABELS[pageUserData && pageUserData.role] || 'Эксперт').toLowerCase();
+  document.getElementById('expertModalTitle').textContent = '🎓 Подать заявку как ' + roleName;
   document.getElementById('expertArea').value = '';
   document.getElementById('expertMsg').value = '';
   document.getElementById('expertError').style.display = 'none';
@@ -1015,7 +1023,7 @@ async function sendExpertApplication() {
     });
     if (alreadyApplied) {
       var isAccepted = existing.docs.some(function(d){ return d.data().status === 'accepted'; });
-      showToast(isAccepted ? '✅ Ты уже эксперт этого проекта' : '⏳ Заявка уже отправлена', 'warn');
+      showToast(isAccepted ? '✅ Ты уже в этом проекте' : '⏳ Заявка уже отправлена', 'warn');
       document.getElementById('expertModal').classList.remove('open');
       return;
     }
@@ -1029,7 +1037,7 @@ async function sendExpertApplication() {
       startupName:  startupData.name,
       startupOwner: startupData.ownerUid,
       type:         'expert',
-      role:         'Эксперт',
+      role:         ROLE_LABELS[pageUserData && pageUserData.role] || 'Эксперт',
       expertArea:   area,
       message:      msg,
       status:       'pending',
@@ -1037,7 +1045,7 @@ async function sendExpertApplication() {
     });
 
     document.getElementById('expertModal').classList.remove('open');
-    showToast('✅ Заявка эксперта отправлена!', 'success');
+    showToast('✅ Заявка отправлена!', 'success');
     renderActions(pageUser, pageUserData, 'pending', false, {});
   } catch(e) {
     errEl.textContent = 'Ошибка: ' + e.message;

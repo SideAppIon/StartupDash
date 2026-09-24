@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Мои стартапы — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=4"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
   <style>
     .s-row{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px;margin-bottom:14px;transition:border-color .2s}
     .s-row:hover{border-color:var(--border2)}
@@ -114,7 +114,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=4"></script>
+<script src="api-config.js?v=5"></script>
 <script>
 requireAuth('login.html');
 
@@ -128,7 +128,7 @@ onAuthReady(async function(user, userData) {
   myRole = userData ? userData.role : 'user';
   // Кнопка "Создать" — только для стартапера и эксперта
   var cb = document.getElementById('createStartupBtn');
-  if (cb && (myRole === 'startup' || myRole === 'expert' || myRole === 'admin')) {
+  if (cb && (myRole === 'startup' || isExpertRole(myRole) || myRole === 'admin')) {
     cb.style.display = '';
   }
 
@@ -179,7 +179,7 @@ onAuthReady(async function(user, userData) {
     var allVisible = myStartups.concat(participatingStartups);
 
     if (!allVisible.length) {
-      var canCreate = myRole === 'startup' || myRole === 'expert' || myRole === 'admin';
+      var canCreate = myRole === 'startup' || isExpertRole(myRole) || myRole === 'admin';
       el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🚀</div>' +
         '<div class="empty-state__title">Нет стартапов</div>' +
         '<p style="font-size:14px;margin-bottom:24px">' +

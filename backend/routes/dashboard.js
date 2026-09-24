@@ -3,6 +3,7 @@
 const express = require('express');
 const { queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { isExpertRole, EXPERT_ROLES_SQL } = require('../lib/roles');
 const { getUserGroupSettings } = require('./groups');
 
 const router = express.Router();
@@ -108,7 +109,7 @@ router.get('/', requireAuth, async (req, res) => {
       });
     }
 
-    if (role === 'expert') {
+    if (isExpertRole(role)) {
       const [mine, recent] = await Promise.all([
         queryAll('SELECT * FROM startups WHERE owner_uid = $1 ORDER BY created_at DESC', [uid]),
         recentStartups(req.user, 10),
@@ -121,7 +122,7 @@ router.get('/', requireAuth, async (req, res) => {
       const [stats, startupCount] = await Promise.all([
         queryOne(
           `SELECT COUNT(*)::int AS users,
-                  COUNT(*) FILTER (WHERE role = 'expert')::int AS experts
+                  COUNT(*) FILTER (WHERE role IN (${EXPERT_ROLES_SQL}))::int AS experts
            FROM users WHERE hidden IS NOT TRUE`
         ),
         queryOne('SELECT COUNT(*)::int AS c FROM startups WHERE hidden IS NOT TRUE'),

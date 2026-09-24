@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Дашборд — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=4"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
   <style>
     .dash-grid{display:grid;grid-template-columns:280px 1fr;gap:24px}
     @media(max-width:900px){.dash-grid{grid-template-columns:1fr}}
@@ -79,7 +79,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=4"></script>
+<script src="api-config.js?v=5"></script>
 <script>
 requireAuth('login.html');
 
@@ -87,9 +87,9 @@ var NAV = {
   startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   expert:   [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'🧑‍🚀',l:'Мои стартаперы',h:'my-founders.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
-  admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'🎧',l:'Поддержка',h:'support.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}],
+  admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'🎧',l:'Поддержка',h:'support.html'},{i:'🎓',l:'Модерация ролей',h:'verification.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}],
   moderator:[{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'💬',l:'Форум',h:'forum.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'✉️',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
-  support:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'🎧',l:'Поддержка',h:'support.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}]
+  support:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'🎧',l:'Поддержка',h:'support.html'},{i:'🎓',l:'Модерация ролей',h:'verification.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}]
 };
 
 onAuthReady(async function(user, userData) {
@@ -119,7 +119,7 @@ onAuthReady(async function(user, userData) {
   var sr = document.getElementById('sideRole');
   sr.textContent = ROLE_LABELS[role]||role; sr.className='nav__role nav__role--'+role;
 
-  var links = NAV[role]||NAV.user;
+  var links = NAV[role]||(isExpertRole(role)?NAV.expert:NAV.user);
   document.getElementById('sideLinks').innerHTML = links.map(function(l){
     return '<a href="'+l.h+'" '+(l.h==='dashboard.html'?'class="active"':'')+'>'+l.i+' '+l.l+'</a>';
   }).join('');
@@ -133,11 +133,12 @@ onAuthReady(async function(user, userData) {
 
   try {
     if (role==='startup')  await renderStartup(main, user.uid, dash);
-    else if (role==='expert') await renderExpert(main, user.uid, dash);
+    else if (isExpertRole(role)) await renderExpert(main, user.uid, dash);
     else if (role==='admin')    await renderAdmin(main, dash);
     else if (role==='moderator') await renderModerator(main);
     else if (role==='support')   renderSupportDash(main);
     else                         await renderUser(main, user.uid, dash);
+    if (role === 'observer') await renderVerifyBanner(main);
   } catch(e) {
     main.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Ошибка загрузки</div><p style="font-size:14px">'+e.message+'</p><button class="btn btn--outline" onclick="location.reload()">Попробовать снова</button></div>';
   }
@@ -275,6 +276,22 @@ async function renderExpert(el, uid, dash) {
     }).join('');
 }
 
+// Плашка для наблюдателя: статус заявки на роль Эксперт / Куратор / Ментор
+async function renderVerifyBanner(el) {
+  var v = null;
+  try { v = (await api.get('/verification/me')).verification; } catch(e) { return; }
+  if (!v || v.status === 'approved') return;
+  var roleName = ROLE_LABELS[v.requestedRole] || v.requestedRole;
+  var html = v.status === 'pending'
+    ? '⏳ Профиль на модерации: заявка на роль <b>' + esc(roleName) + '</b> проверяется. Пока вы — наблюдатель.'
+    : '❌ Заявка на роль <b>' + esc(roleName) + '</b> отклонена. <a href="profile.html" style="color:var(--accent)">Подать заново →</a>';
+  var div = document.createElement('div');
+  div.className = 'card';
+  div.style.cssText = 'margin-bottom:18px;font-size:14px;border-left:3px solid ' + (v.status === 'pending' ? 'var(--expert)' : 'var(--danger)');
+  div.innerHTML = html;
+  el.insertBefore(div, el.firstChild);
+}
+
 function renderSupportDash(el) {
   el.innerHTML =
     '<div class="section-header" style="margin-bottom:16px"><div class="section-title">🎧 Поддержка</div>' +
@@ -283,6 +300,11 @@ function renderSupportDash(el) {
       '<div style="font-size:32px;margin-bottom:12px">🎧</div>' +
       '<div class="section-title" style="font-size:18px">Обращения пользователей</div>' +
       '<p style="font-size:14px;color:var(--text2);margin-top:6px">Отвечайте на вопросы — ответы уходят пользователю в личные сообщения.</p>' +
+    '</a>' +
+    '<a href="verification.html" class="card card--clickable" style="text-decoration:none;display:block;margin-top:14px">' +
+      '<div style="font-size:32px;margin-bottom:12px">🎓</div>' +
+      '<div class="section-title" style="font-size:18px">Модерация ролей</div>' +
+      '<p style="font-size:14px;color:var(--text2);margin-top:6px">Проверяйте сертификаты экспертов, кураторов и менторов.</p>' +
     '</a>';
 }
 
@@ -402,7 +424,7 @@ async function renderAdmin(el, dash) {
     var users    = res[0].docs.map(function(d){return d.data();}).filter(notHidden);
     var startups = res[1].docs.map(function(d){return d.data();}).filter(notHidden);
     nUsers = users.length; nStartups = startups.length;
-    nExperts = users.filter(function(x){return x.role==='expert';}).length;
+    nExperts = users.filter(function(x){return isExpertRole(x.role);}).length;
   }
 
   el.innerHTML = '<div class="stat-row"><div class="stat-box"><div class="stat-box__num">'+nUsers+'</div><div class="stat-box__lbl">Пользователей</div></div><div class="stat-box"><div class="stat-box__num">'+nStartups+'</div><div class="stat-box__lbl">Стартапов</div></div><div class="stat-box"><div class="stat-box__num">'+nExperts+'</div><div class="stat-box__lbl">Экспертов</div></div></div>' +

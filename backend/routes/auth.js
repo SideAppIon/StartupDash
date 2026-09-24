@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { queryOne } = require('../db');
 const { signToken, requireAuth } = require('../middleware/auth');
 const { resolveNicknameForCreate } = require('../lib/nickname');
+const { SELF_REGISTER_ROLES, needsModeration, ensureRoleConstraint } = require('../lib/roles');
 
 const router = express.Router();
 
@@ -18,8 +19,11 @@ router.post('/register', async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({ error: 'Пароль минимум 6 символов' });
     }
-    const validRoles = ['user', 'startup', 'expert'];
-    const userRole = validRoles.includes(role) ? role : 'user';
+    const wantedRole = SELF_REGISTER_ROLES.includes(role) ? role : 'user';
+    // Эксперт / куратор / ментор проходят ручную модерацию: до одобрения — наблюдатель.
+    // Заявку с сертификатом клиент отправляет следом в POST /verification.
+    const userRole = needsModeration(wantedRole) ? 'observer' : wantedRole;
+    await ensureRoleConstraint();
 
     // Ник: заданный — проверяем формат и занятость; пустой — генерируем уникальный
     const nick = await resolveNicknameForCreate(nickname);
@@ -45,7 +49,11 @@ router.post('/register', async (req, res) => {
     const user  = await queryOne('SELECT * FROM users WHERE uid = $1', [uid]);
     const token = signToken(user);
 
-    res.status(201).json({ token, user: sanitizeUser(user) });
+    res.status(201).json({
+      token,
+      user: sanitizeUser(user),
+      ...(needsModeration(wantedRole) ? { pendingRole: wantedRole } : {}),
+    });
   } catch (e) {
     // Гонка по уникальному индексу ника (Postgres unique_violation)
     if (e.code === '23505' && String(e.constraint || e.detail || '').includes('nickname')) {

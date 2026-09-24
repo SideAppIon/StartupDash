@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Мои опросы — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=4"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
 </head>
 <body>
 <nav class="nav">
@@ -60,14 +60,14 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=4"></script>
+<script src="api-config.js?v=5"></script>
 <script>
 requireAuth('login.html');
 
 onAuthReady(function(user, userData) {
   if (!user) return;
   renderNav(userData);
-  var canPolls = userData && ['startup', 'expert', 'user', 'admin'].indexOf(userData.role) !== -1;
+  var canPolls = userData && (['startup', 'user', 'admin'].indexOf(userData.role) !== -1 || isExpertRole(userData.role));
   if (!canPolls) {
     document.getElementById('pollsList').innerHTML =
       '<div class="empty-state"><div class="empty-state__icon">📊</div>'+

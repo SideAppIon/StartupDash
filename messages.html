@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Сообщения — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=4"/>
+  <link rel="stylesheet" href="styles.css?v=5"/>
   <style>
     html,body{height:100%;overflow:hidden}
     .chat-layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - var(--nav-h));margin-top:var(--nav-h)}
@@ -130,7 +130,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=4"></script>
+<script src="api-config.js?v=5"></script>
 <script>
 requireAuth('login.html');
 
@@ -160,8 +160,8 @@ onAuthReady(async function(user, userData) {
     if (allowedUids.size > 0) {
       document.getElementById('newConvBtn').classList.remove('hidden');
     }
-  } else if (myRole === 'expert') {
-    // Эксперт: только стартаперы
+  } else if (isExpertRole(myRole)) {
+    // Эксперт / куратор / ментор / наблюдатель: только стартаперы
     await computeExpertAllowedUids();
     if (allowedUids.size > 0) {
       document.getElementById('newConvBtn').classList.remove('hidden');
@@ -246,10 +246,10 @@ function canMessageUser(uid) {
   if (myRole === 'startup') {
     // Стартапер: пишет специалистам и экспертам
     var role = getUserRole(uid);
-    return role === 'user' || role === 'expert';
+    return role === 'user' || isExpertRole(role);
   }
-  if (myRole === 'expert') {
-    // Эксперт: пишет только стартаперам
+  if (isExpertRole(myRole)) {
+    // Эксперт и родственные роли: пишут только стартаперам
     return allowedUids.has(uid);
   }
   // Специалист: проверяем allowedUids
@@ -615,9 +615,9 @@ function openNewConvModal() {
   if (myRole==='user') {
     note.style.display='block';
     note.textContent='Вы можете писать другим специалистам и участникам ваших команд';
-  } else if (myRole==='expert') {
+  } else if (isExpertRole(myRole)) {
     note.style.display='block';
-    note.textContent='Эксперты могут писать стартаперам';
+    note.textContent=(ROLE_LABELS[myRole]||'Эксперт')+': можно писать стартаперам';
   } else if (myRole==='startup') {
     note.style.display='block';
     note.textContent='Вы можете писать специалистам и экспертам';

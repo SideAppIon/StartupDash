@@ -4,6 +4,7 @@ const { query, queryOne, queryAll } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { getUserGroupSettings } = require('./groups');
 const { checkCensor } = require('../lib/censor');
+const { isExpertRole, canJoinProject } = require('../lib/roles');
 
 const router = express.Router();
 
@@ -299,8 +300,8 @@ router.delete('/:id/like', requireAuth, async (req, res) => {
 // POST /startups — создать
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const allowedCreators = ['startup', 'expert', 'admin'];
-    if (!allowedCreators.includes(req.user.role)) {
+    const canCreate = ['startup', 'admin'].includes(req.user.role) || isExpertRole(req.user.role);
+    if (!canCreate) {
       return res.status(403).json({ error: 'Только стартапер или эксперт могут создавать проекты' });
     }
 
@@ -463,6 +464,10 @@ router.post('/:id/team', requireAuth, async (req, res) => {
   try {
     await assertOwnerOrAdmin(req.params.id, req.user);
     const { user_uid, role, permissions } = req.body;
+    const target = await queryOne('SELECT role FROM users WHERE uid=$1', [user_uid]);
+    if (target && !canJoinProject(target.role)) {
+      return res.status(403).json({ error: 'Наблюдателя нельзя добавить в команду проекта' });
+    }
     await queryOne(
       `INSERT INTO startup_team (startup_id, user_uid, role, permissions)
        VALUES ($1, $2, $3, $4)
