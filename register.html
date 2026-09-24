@@ -25,12 +25,8 @@
     .role-btn.sel-expert { border-color:var(--expert); background:var(--expert-dim); }
     .sub-roles { display:none; grid-template-columns:repeat(2,1fr); gap:8px; margin:-8px 0 20px; }
     .sub-roles.open { display:grid; }
-    .sub-role { border:1.5px solid var(--border2); border-radius:var(--radius); padding:10px 12px; cursor:pointer; background:var(--bg3); transition:all .2s; }
+    .sub-role { border:1.5px solid var(--border2); border-radius:var(--radius); padding:10px 12px; cursor:pointer; background:var(--bg3); transition:all .2s; font-size:13px; font-weight:600; text-align:center; }
     .sub-role.sel { border-color:var(--expert); background:var(--expert-dim); }
-    .sub-role__name { font-size:13px; font-weight:600; }
-    .sub-role__desc { font-size:11px; color:var(--text3); margin-top:3px; line-height:1.3; }
-    .sub-role__tag { display:inline-block; font-size:10px; font-weight:600; padding:1px 7px; border-radius:10px; margin-top:6px; background:rgba(255,159,67,.12); color:#ff9f43; }
-    .sub-role__tag--free { background:var(--accent-dim); color:var(--accent); }
     .cert-item { display:flex; align-items:center; gap:8px; background:var(--bg3); border:1px solid var(--border2); border-radius:8px; padding:7px 10px; font-size:13px; margin-top:6px; }
     .cert-item span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .cert-item button { background:none; border:none; color:var(--text3); cursor:pointer; font-size:16px; line-height:1; padding:0; }
@@ -86,28 +82,12 @@
       </div>
     </div>
 
-    <!-- Подвыбор для «Эксперт»: эксперт / куратор / ментор (модерация) и наблюдатель -->
+    <!-- Подвыбор для «Эксперт»: эксперт / куратор / ментор (с модерацией) и наблюдатель -->
     <div class="sub-roles" id="subRoles">
-      <div class="sub-role" id="sub-expert" onclick="selectSubRole('expert')">
-        <div class="sub-role__name">🎓 Эксперт</div>
-        <div class="sub-role__desc">Консультирую по своей области</div>
-        <span class="sub-role__tag">Нужен сертификат</span>
-      </div>
-      <div class="sub-role" id="sub-curator" onclick="selectSubRole('curator')">
-        <div class="sub-role__name">🧭 Куратор</div>
-        <div class="sub-role__desc">Сопровождаю проекты</div>
-        <span class="sub-role__tag">Нужен сертификат</span>
-      </div>
-      <div class="sub-role" id="sub-mentor" onclick="selectSubRole('mentor')">
-        <div class="sub-role__name">🤝 Ментор</div>
-        <div class="sub-role__desc">Помогаю основателям расти</div>
-        <span class="sub-role__tag">Нужен сертификат</span>
-      </div>
-      <div class="sub-role" id="sub-observer" onclick="selectSubRole('observer')">
-        <div class="sub-role__name">👁 Наблюдатель</div>
-        <div class="sub-role__desc">Слежу за проектами, не вступаю в команды</div>
-        <span class="sub-role__tag sub-role__tag--free">Без проверки</span>
-      </div>
+      <div class="sub-role" id="sub-expert" onclick="selectSubRole('expert')">🎓 Эксперт</div>
+      <div class="sub-role" id="sub-curator" onclick="selectSubRole('curator')">🧭 Куратор</div>
+      <div class="sub-role" id="sub-mentor" onclick="selectSubRole('mentor')">🤝 Ментор</div>
+      <div class="sub-role" id="sub-observer" onclick="selectSubRole('observer')">👁 Наблюдатель</div>
     </div>
 
     <div class="card">
