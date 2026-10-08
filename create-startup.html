@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Создать стартап — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=5"/>
+  <link rel="stylesheet" href="styles.css?v=6"/>
   <style>
     .emoji-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
     .emoji-opt{width:42px;height:42px;border-radius:10px;background:var(--bg3);border:2px solid var(--border2);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
@@ -42,6 +42,7 @@
   <a href="startups.html">Стартапы</a>
   <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
+  <a href="ideas.html">Идеи</a>
   <a href="members.html">Участники</a>
   <div class="nav__user">
     <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
@@ -201,7 +202,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=5"></script>
+<script src="api-config.js?v=6"></script>
 <script>
 requireAuth('login.html');
 
@@ -211,6 +212,7 @@ var tags=[];
 var blocks=[]; // [{type,content}]
 var selectedPrivacy='public';
 var editId=getUrlParam('edit');
+var ideaId=editId ? null : getUrlParam('idea'); // создание стартапа по идее из банка идей
 
 // Emoji grid
 var grid=document.getElementById('emojiGrid');
@@ -632,6 +634,22 @@ onAuthReady(async function(user, userData){
       // Форум
       document.getElementById('forumEnabled').checked = (d.forumEnabled !== false && d.forum_enabled !== false);
     }
+  } else if (ideaId) {
+    // Стартап по идее: подставляем название, категорию и описание
+    try {
+      var idea=(await api.get('/ideas/'+encodeURIComponent(ideaId))).idea;
+      if (idea.takenBy!==currentUser.uid){ ideaId=null; }
+      else {
+        document.getElementById('pageTitle').textContent='Стартап по идее';
+        document.getElementById('name').value=idea.title.slice(0,60);
+        if (idea.category) {
+          fillCategorySelect('category', idea.category);
+          setTimeout(function(){ document.getElementById('category').value=idea.category; }, 200);
+        }
+        blocks.push({id:'block-'+(blockId++), type:'text', content:idea.description, extra:''});
+        renderBlocks();
+      }
+    } catch(e){ ideaId=null; }
   }
   renderAttachments();
 });
@@ -680,6 +698,8 @@ async function save(){
       data.createdAt=firebase.firestore.FieldValue.serverTimestamp();
       var ref=await db.collection('startups').add(data);
       id=ref.id;
+      // Привязываем стартап к идее, на основе которой он создан
+      if (ideaId) { try { await api.post('/ideas/'+encodeURIComponent(ideaId)+'/startup', { startup_id: id }); } catch(e){} }
     }
     showToast('Стартап сохранен!','success');
     setTimeout(function(){window.location.href='startup.html?id='+id;},800);

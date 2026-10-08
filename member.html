@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Профиль участника — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=5"/>
+  <link rel="stylesheet" href="styles.css?v=6"/>
   <style>
     .profile-cover{height:180px;background:linear-gradient(135deg,rgba(0,230,118,.15),rgba(180,139,255,.1) 50%,rgba(61,142,245,.1));border-bottom:1px solid var(--border)}
     .profile-main{max-width:860px;margin:0 auto;padding:0 24px}
@@ -32,6 +32,7 @@
   <a href="startups.html">Стартапы</a>
   <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
+  <a href="ideas.html">Идеи</a>
   <a href="members.html">Участники</a>
   <div class="nav__user" id="navUser">
     <a href="login.html" class="btn btn--outline btn--sm">Войти</a>
@@ -146,7 +147,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=5"></script>
+<script src="api-config.js?v=6"></script>
 <script>
 var profileUid = getUrlParam('uid');
 if (!profileUid) window.location.href = 'members.html';
@@ -201,7 +202,7 @@ onAuthReady(async function(user, userData) {
   roleEl.className   = 'nav__role nav__role--' + (profileData.role||'user');
 
   // Статус эксперта (только для роли «эксперт») — read-only
-  if (isExpertRole(profileData.role)) {
+  if (showsExpertStatus(profileData.role)) {
     var eStatus = profileData.expertStatus || profileData.expert_status || 'available';
     var eBusy   = eStatus === 'busy';
     var eColor  = eBusy ? 'var(--danger)' : 'var(--accent)';

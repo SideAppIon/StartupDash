@@ -18,6 +18,7 @@ const complaintsRoutes = require('./routes/complaints');
 const dashboardRoutes  = require('./routes/dashboard');
 const supportRoutes    = require('./routes/support');
 const verificationRoutes = require('./routes/verification');
+const ideasRoutes        = require('./routes/ideas');
 
 const app = express();
 
@@ -92,6 +93,7 @@ app.use('/complaints',      complaintsRoutes);
 app.use('/polls',           pollsRoutes);
 app.use('/support',         supportRoutes);
 app.use('/verification',    verificationRoutes);
+app.use('/ideas',           ideasRoutes);
 app.use('/dashboard',       dashboardRoutes);
 
 // ── 404 ───────────────────────────────────────────────────

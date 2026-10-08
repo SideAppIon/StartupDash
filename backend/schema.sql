@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL DEFAULT '',
   name          TEXT NOT NULL DEFAULT '',
   role          TEXT NOT NULL DEFAULT 'user'
-                  CHECK (role IN ('user','startup','expert','curator','mentor','observer','admin','moderator','support')),
+                  CHECK (role IN ('user','startup','expert','curator','mentor','boost_partner','observer','admin','moderator','support')),
   bio           TEXT DEFAULT '',
   skills        TEXT DEFAULT '[]',       -- JSON array
   nickname      TEXT,                    -- ник (уникальный, пока нигде не используется — на будущее)
@@ -245,7 +245,7 @@ ON CONFLICT (key) DO NOTHING;
 -- Роль модератора (скрытая, назначается только из админки)
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check
-  CHECK (role IN ('user','startup','expert','curator','mentor','observer','admin','moderator','support'));
+  CHECK (role IN ('user','startup','expert','curator','mentor','boost_partner','observer','admin','moderator','support'));
 -- Запрет общения на форуме (пользователь может только читать)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS forum_banned BOOLEAN DEFAULT FALSE;
 -- Закрепление тем форума
@@ -341,7 +341,7 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status);
 CREATE INDEX IF NOT EXISTS idx_support_user   ON support_tickets(user_uid);
 
--- ── Модерация ролей Эксперт / Куратор / Ментор ──────────
+-- ── Модерация ролей Эксперт / Куратор / Ментор / Буст-партнёр ──
 -- Пока заявка не одобрена, пользователь — наблюдатель (users.role = 'observer')
 CREATE TABLE IF NOT EXISTS role_verifications (
   id             TEXT PRIMARY KEY,
@@ -349,6 +349,7 @@ CREATE TABLE IF NOT EXISTS role_verifications (
   requested_role TEXT NOT NULL,
   certificates   JSONB NOT NULL DEFAULT '[]',   -- [{url, name}]
   comment        TEXT DEFAULT '',
+  inn            TEXT DEFAULT '',               -- ИНН буст-партнёра
   status         TEXT NOT NULL DEFAULT 'pending'
                    CHECK (status IN ('pending','approved','rejected')),
   review_note    TEXT DEFAULT '',
@@ -358,3 +359,22 @@ CREATE TABLE IF NOT EXISTS role_verifications (
 );
 CREATE INDEX IF NOT EXISTS idx_role_verif_status ON role_verifications(status);
 CREATE INDEX IF NOT EXISTS idx_role_verif_user ON role_verifications(user_uid);
+ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS inn TEXT DEFAULT '';
+
+-- ── Банк идей: буст-партнёры публикуют, стартаперы забирают ──
+CREATE TABLE IF NOT EXISTS ideas (
+  id          TEXT PRIMARY KEY,
+  author_uid  TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  category    TEXT DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','taken')),
+  taken_by    TEXT REFERENCES users(uid) ON DELETE SET NULL,   -- стартапер, забравший идею
+  taken_at    TIMESTAMPTZ,
+  startup_id  TEXT REFERENCES startups(id) ON DELETE SET NULL,  -- стартап, созданный по идее
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ideas_author ON ideas(author_uid);
+CREATE INDEX IF NOT EXISTS idx_ideas_taken  ON ideas(taken_by);

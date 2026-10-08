@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Регистрация — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=5"/>
+  <link rel="stylesheet" href="styles.css?v=6"/>
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px 0; }
     .auth-box { width:100%; max-width:480px; padding:24px; }
@@ -15,7 +15,7 @@
     .auth-sub { color:var(--text2); font-size:14px; text-align:center; margin-bottom:24px; }
     .auth-link { text-align:center; font-size:14px; color:var(--text2); margin-top:16px; }
     .auth-link a { color:var(--accent); text-decoration:none; font-weight:500; }
-    .role-selector { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px; }
+    .role-selector { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:20px; }
     .role-btn { border:2px solid var(--border2); border-radius:var(--radius); padding:14px 8px; text-align:center; cursor:pointer; transition:all .2s; background:var(--bg3); }
     .role-btn__icon { font-size:26px; margin-bottom:6px; }
     .role-btn__name { font-size:13px; font-weight:600; }
@@ -23,6 +23,7 @@
     .role-btn.sel-user { border-color:var(--info); background:rgba(61,142,245,.12); }
     .role-btn.sel-startup { border-color:var(--accent); background:var(--accent-dim); }
     .role-btn.sel-expert { border-color:var(--expert); background:var(--expert-dim); }
+    .role-btn.sel-boost_partner { border-color:var(--expert); background:var(--expert-dim); }
     .sub-roles { display:none; grid-template-columns:repeat(2,1fr); gap:8px; margin:-8px 0 20px; }
     .sub-roles.open { display:grid; }
     .sub-role { border:1.5px solid var(--border2); border-radius:var(--radius); padding:10px 12px; cursor:pointer; background:var(--bg3); transition:all .2s; font-size:13px; font-weight:600; text-align:center; }
@@ -79,6 +80,11 @@
         <div class="role-btn__icon">🎓</div>
         <div class="role-btn__name">Эксперт</div>
         <div class="role-btn__desc">Консультирую и поддерживаю проекты</div>
+      </div>
+      <div class="role-btn" id="btn-boost_partner" onclick="selectRole('boost_partner')">
+        <div class="role-btn__icon">📈</div>
+        <div class="role-btn__name">Буст-партнёр</div>
+        <div class="role-btn__desc">Представляю бизнес, помогаю стартапам расти</div>
       </div>
     </div>
 
@@ -172,10 +178,15 @@
       </div>
     </div>
 
-    <!-- Сертификаты: только для ролей с ручной модерацией -->
+    <!-- Данные для ручной модерации: сертификат (эксперт/куратор/ментор) или ИНН (буст-партнёр) -->
     <div class="card" id="certCard" style="display:none;margin-top:16px">
+      <div class="form-group" id="innGroup" style="display:none">
+        <label class="form-label">ИНН *</label>
+        <input type="text" class="form-input" id="innInput" inputmode="numeric" maxlength="12" placeholder="10 цифр — компания, 12 — ИП"/>
+        <div class="form-hint">ИНН компании или ИП, которую вы представляете</div>
+      </div>
       <div class="form-group">
-        <label class="form-label">Сертификат / подтверждение квалификации *</label>
+        <label class="form-label" id="certLabel">Сертификат / подтверждение квалификации *</label>
         <input type="file" class="form-input" id="certInput" style="padding:6px" multiple
           accept="application/pdf,image/jpeg,image/png,image/webp" onchange="onCertFiles(this)"/>
         <div class="form-hint">PDF или изображение, до 2 МБ каждый, максимум 5 файлов</div>
@@ -212,7 +223,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=5"></script>
+<script src="api-config.js?v=6"></script>
 <script>
 // Редирект только если уже авторизован при загрузке страницы (не во время регистрации)
 var registering = false;
@@ -319,6 +330,12 @@ function goStep2() {
   if (bio.length < 20) { showErr(1,'Расскажи о себе подробнее (минимум 20 символов)'); return; }
   if (!skills.length)  { showErr(1,'Добавь хотя бы один навык'); return; }
   document.getElementById('certCard').style.display = needsModeration(selectedRole) ? 'block' : 'none';
+  // Буст-партнёру — ИНН обязателен, документы по желанию
+  var inn = needsInn(selectedRole);
+  document.getElementById('innGroup').style.display = inn ? 'block' : 'none';
+  document.getElementById('certLabel').innerHTML = inn
+    ? 'Документы <span style="color:var(--text3);font-weight:400">(необязательно)</span>'
+    : 'Сертификат / подтверждение квалификации *';
   goStep(2);
 }
 
@@ -345,7 +362,9 @@ async function doRegister() {
   clearErr(2);
   var policy = document.getElementById('policyCheck').checked;
   if (!policy) { showErr(2,'Необходимо принять политику конфиденциальности'); return; }
-  if (needsModeration(selectedRole) && !certFiles.length) { showErr(2,'Прикрепи сертификат — без него профиль не пройдёт проверку'); return; }
+  if (needsInn(selectedRole)) {
+    if (!isValidInn(document.getElementById('innInput').value.replace(/\s/g,''))) { showErr(2,'Проверь ИНН: 10 цифр для компании или 12 для ИП'); return; }
+  } else if (needsModeration(selectedRole) && !certFiles.length) { showErr(2,'Прикрепи сертификат — без него профиль не пройдёт проверку'); return; }
 
   var btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = 'Регистрация...';
@@ -387,7 +406,8 @@ async function doRegister() {
   if (created && created.pendingRole) {
     btn.textContent = 'Загрузка сертификатов...';
     try {
-      await submitRoleVerification(created.pendingRole, certFiles, document.getElementById('certComment').value.trim());
+      await submitRoleVerification(created.pendingRole, certFiles, document.getElementById('certComment').value.trim(),
+        document.getElementById('innInput').value.replace(/\s/g,''));
     } catch(e) {
       // Аккаунт уже есть — повторить заявку можно в профиле
       window.location.href = 'profile.html?verify=failed';

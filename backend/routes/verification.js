@@ -1,18 +1,19 @@
-// Модерация ролей Эксперт / Куратор / Ментор.
-// При регистрации такие пользователи получают роль «наблюдатель» и отправляют заявку
-// с сертификатами. Админ или поддержка проверяет её: при одобрении роль меняется
+// Модерация ролей Эксперт / Куратор / Ментор / Буст-партнёр.
+// При регистрации такие пользователи получают роль «наблюдатель» и отправляют заявку:
+// эксперт / куратор / ментор — с сертификатами, буст-партнёр — с ИНН (документы по желанию). Админ или поддержка проверяет её: при одобрении роль меняется
 // на запрошенную, при отказе пользователь видит причину и может подать заново.
 // О решении пользователь узнаёт из личного сообщения от проверяющего.
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { query, queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { MODERATED_ROLES, needsModeration, ensureRoleConstraint } = require('../lib/roles');
+const { MODERATED_ROLES, needsModeration, needsInn, isValidInn, ensureRoleConstraint } = require('../lib/roles');
 const { BUCKET } = require('./upload');
+const { sendDirectMessage } = require('../lib/dm');
 
 const router = express.Router();
 
-const ROLE_NAMES = { expert: 'Эксперт', curator: 'Куратор', mentor: 'Ментор' };
+const ROLE_NAMES = { expert: 'Эксперт', curator: 'Куратор', mentor: 'Ментор', boost_partner: 'Буст-партнёр' };
 const MAX_CERTIFICATES = 5;
 // Принимаем только файлы, загруженные через POST /upload в папку certificates
 const CERT_URL_PREFIX = `https://storage.yandexcloud.net/${BUCKET}/certificates/`;
@@ -41,6 +42,7 @@ async function ensureVerificationSchema() {
     )`);
     await query('CREATE INDEX IF NOT EXISTS idx_role_verif_status ON role_verifications(status)');
     await query('CREATE INDEX IF NOT EXISTS idx_role_verif_user ON role_verifications(user_uid)');
+    await query("ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS inn TEXT DEFAULT ''");
     schemaEnsured = true;
   } catch (e) {
     console.error('ensureVerificationSchema error:', e.message);
@@ -59,6 +61,7 @@ function shape(r) {
     requestedRole: r.requested_role,
     certificates:  parseCerts(r.certificates),
     comment:       r.comment || '',
+    inn:           r.inn || '',
     status:        r.status,
     reviewNote:    r.review_note || '',
     reviewedBy:    r.reviewed_by,
@@ -76,43 +79,6 @@ function shape(r) {
   };
 }
 
-// Личное сообщение от проверяющего пользователю (без проверок ограничений переписки:
-// это служебное уведомление, как ответы поддержки)
-async function sendDirectMessage(fromUid, toUid, text) {
-  let conv = await queryOne(
-    `SELECT c.id FROM conversations c
-     JOIN conversation_participants cp1 ON cp1.conv_id = c.id AND cp1.user_uid = $1
-     JOIN conversation_participants cp2 ON cp2.conv_id = c.id AND cp2.user_uid = $2
-     WHERE c.is_group IS NOT TRUE LIMIT 1`,
-    [fromUid, toUid]
-  );
-  if (!conv) {
-    const [me, other] = await Promise.all([
-      queryOne('SELECT uid, name, avatar, role FROM users WHERE uid=$1', [fromUid]),
-      queryOne('SELECT uid, name, avatar, role FROM users WHERE uid=$1', [toUid]),
-    ]);
-    if (!me || !other) return;
-    const id = uuidv4();
-    conv = await queryOne(
-      `INSERT INTO conversations (id, participant_names, participant_avatars, participant_roles, last_message, last_at, created_at)
-       VALUES ($1,$2,$3,$4,'',NOW(),NOW()) RETURNING id`,
-      [id,
-       JSON.stringify({ [fromUid]: me.name, [toUid]: other.name }),
-       JSON.stringify({ [fromUid]: me.avatar || '', [toUid]: other.avatar || '' }),
-       JSON.stringify({ [fromUid]: me.role, [toUid]: other.role })]
-    );
-    await queryOne('INSERT INTO conversation_participants (conv_id, user_uid) VALUES ($1,$2)', [id, fromUid]);
-    await queryOne('INSERT INTO conversation_participants (conv_id, user_uid) VALUES ($1,$2)', [id, toUid]);
-  }
-  await queryOne(
-    `INSERT INTO messages (id, conv_id, sender_uid, text, type, created_at)
-     VALUES ($1,$2,$3,$4,'user',NOW())`,
-    [uuidv4(), conv.id, fromUid, text]
-  );
-  await queryOne('UPDATE conversations SET last_message=$1, last_at=NOW() WHERE id=$2',
-    [text.substring(0, 80), conv.id]);
-}
-
 // GET /verification/me — последняя заявка текущего пользователя (или null)
 router.get('/me', requireAuth, async (req, res) => {
   try {
@@ -128,7 +94,7 @@ router.get('/me', requireAuth, async (req, res) => {
 });
 
 // POST /verification — подать заявку на роль (только наблюдатель)
-// Body: { requested_role, certificates: [{ url, name }], comment }
+// Body: { requested_role, certificates: [{ url, name }], comment, inn }
 router.post('/', requireAuth, async (req, res) => {
   try {
     await ensureVerificationSchema();
@@ -147,7 +113,14 @@ router.post('/', requireAuth, async (req, res) => {
       .filter(c => c && typeof c.url === 'string' && c.url.startsWith(CERT_URL_PREFIX))
       .slice(0, MAX_CERTIFICATES)
       .map(c => ({ url: c.url, name: String(c.name || 'Сертификат').slice(0, 200) }));
-    if (!certs.length) return res.status(400).json({ error: 'Прикрепите хотя бы один сертификат' });
+    // Буст-партнёру обязателен ИНН (документы — по желанию), остальным — сертификат
+    let inn = '';
+    if (needsInn(requestedRole)) {
+      inn = String(req.body.inn || '').replace(/\s/g, '');
+      if (!isValidInn(inn)) return res.status(400).json({ error: 'Укажите корректный ИНН (10 или 12 цифр)' });
+    } else if (!certs.length) {
+      return res.status(400).json({ error: 'Прикрепите хотя бы один сертификат' });
+    }
 
     const pending = await queryOne(
       "SELECT id FROM role_verifications WHERE user_uid=$1 AND status='pending'",
@@ -156,10 +129,10 @@ router.post('/', requireAuth, async (req, res) => {
     if (pending) return res.status(409).json({ error: 'Заявка уже на модерации' });
 
     const row = await queryOne(
-      `INSERT INTO role_verifications (id, user_uid, requested_role, certificates, comment, status, created_at)
-       VALUES ($1,$2,$3,$4,$5,'pending',NOW()) RETURNING *`,
+      `INSERT INTO role_verifications (id, user_uid, requested_role, certificates, comment, inn, status, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,'pending',NOW()) RETURNING *`,
       [uuidv4(), req.user.uid, requestedRole, JSON.stringify(certs),
-       String(req.body.comment || '').trim().slice(0, 2000)]
+       String(req.body.comment || '').trim().slice(0, 2000), inn]
     );
     res.status(201).json({ verification: shape(row) });
   } catch (e) {
@@ -219,7 +192,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       ? `✅ Ваша заявка на роль «${roleName}» одобрена. Роль уже активна — обновите страницу.` +
         (note ? `\nКомментарий: ${note}` : '')
       : `❌ Заявка на роль «${roleName}» отклонена.\nПричина: ${note}\n` +
-        'Вы можете загрузить другой сертификат и подать заявку заново в своём профиле.';
+        'Вы можете исправить данные и подать заявку заново в своём профиле.';
     try { await sendDirectMessage(req.user.uid, row.user_uid, text); }
     catch (e) { console.error('verification DM error:', e.message); }
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Командный чат — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=5"/>
+  <link rel="stylesheet" href="styles.css?v=6"/>
   <style>
     html,body{height:100%;overflow:hidden}
     .chat-layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - var(--nav-h));margin-top:var(--nav-h)}
@@ -68,6 +68,7 @@
   <a href="startups.html">Стартапы</a>
   <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
+  <a href="ideas.html">Идеи</a>
   <a href="members.html">Участники</a>
   <div class="nav__user">
     <a href="messages.html" class="btn btn--ghost btn--sm">← Сообщения</a>
@@ -119,7 +120,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=5"></script>
+<script src="api-config.js?v=6"></script>
 <script>
 requireAuth('login.html');
 
@@ -275,7 +276,7 @@ function roleBadge(role) {
   var cls = 'role-badge';
   if (role === 'startup') cls += ' role-badge--startup';
   if (isExpertRole(role)) cls += ' role-badge--expert';
-  var labels = {startup:'Стартапер',expert:'Эксперт',curator:'Куратор',mentor:'Ментор',observer:'Наблюдатель',user:'Участник',admin:'Админ'};
+  var labels = {startup:'Стартапер',expert:'Эксперт',curator:'Куратор',mentor:'Ментор',boost_partner:'Буст-партнёр',observer:'Наблюдатель',user:'Участник',admin:'Админ'};
   var label = labels[role] || role;
   return '<span class="'+cls+'">'+esc(label)+'</span>';
 }

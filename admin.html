@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Админ-панель — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=5"/>
+  <link rel="stylesheet" href="styles.css?v=6"/>
   <style>
     .admin-header{background:linear-gradient(135deg,rgba(255,71,87,.08),rgba(255,71,87,.02));border-bottom:1px solid rgba(255,71,87,.2);padding:32px 0;margin-bottom:28px}
     .admin-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,71,87,.15);border:1px solid rgba(255,71,87,.3);color:var(--danger);font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:.5px;margin-bottom:12px}
@@ -61,6 +61,7 @@
   <a href="startups.html">Стартапы</a>
   <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
+  <a href="ideas.html">Идеи</a>
   <a href="members.html">Участники</a>
   <a href="verification.html">Модерация ролей</a>
   <div class="nav__user">
@@ -231,6 +232,7 @@
         <option value="expert">Эксперт</option>
         <option value="curator">Куратор</option>
         <option value="mentor">Ментор</option>
+        <option value="boost_partner">Буст-партнёр</option>
         <option value="observer">Наблюдатель</option>
         <option value="moderator">Модератор (скрытая роль)</option>
         <option value="support">Поддержка</option>
@@ -368,6 +370,7 @@
         <option value="expert">Эксперт</option>
         <option value="curator">Куратор</option>
         <option value="mentor">Ментор</option>
+        <option value="boost_partner">Буст-партнёр</option>
         <option value="observer">Наблюдатель</option>
         <option value="moderator">Модератор (скрытая роль)</option>
         <option value="support">Поддержка</option>
@@ -380,11 +383,11 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=5"></script>
+<script src="api-config.js?v=6"></script>
 <script>
 requireAuth('login.html');
 
-var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',curator:'badge--purple',mentor:'badge--purple',observer:'badge--purple',user:'badge--blue',admin:'badge--red',moderator:'badge--orange'};
+var ROLE_CLASSES = {startup:'badge--green',expert:'badge--purple',curator:'badge--purple',mentor:'badge--purple',boost_partner:'badge--purple',observer:'badge--purple',user:'badge--blue',admin:'badge--red',moderator:'badge--orange'};
 var DEFAULT_CATS   = ['FinTech','EdTech','HealthTech','E-commerce','SaaS','AI / ML','Gaming','GreenTech','Marketplace','Другое'];
 var DEFAULT_STAGES = [
   {name:'Идея',icon:'💡'},{name:'MVP',icon:'⚡'},{name:'Бета',icon:'🔬'},

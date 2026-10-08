@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Мой профиль — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=5"/>
+  <link rel="stylesheet" href="styles.css?v=6"/>
   <style>
     .profile-cover{height:180px;background:linear-gradient(135deg,rgba(0,230,118,.15),rgba(180,139,255,.1) 50%,rgba(61,142,245,.1));border-bottom:1px solid var(--border)}
     .profile-wrap{max-width:860px;margin:0 auto;padding:0 24px}
@@ -31,6 +31,7 @@
   <a href="startups.html">Стартапы</a>
   <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
+  <a href="ideas.html">Идеи</a>
   <a href="members.html">Участники</a>
   <div class="nav__user">
     <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
@@ -184,7 +185,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=5"></script>
+<script src="api-config.js?v=6"></script>
 <script>
 requireAuth('login.html');
 
@@ -293,12 +294,12 @@ function expertStatusPillHtml(status) {
 }
 function renderExpertStatus(status) {
   var box = document.getElementById('expertStatusBox');
-  if (!uData || !isExpertRole(uData.role)) { box.style.display = 'none'; return; }
+  if (!uData || !showsExpertStatus(uData.role)) { box.style.display = 'none'; return; }
   uData.expertStatus = status;
   box.innerHTML = expertStatusPillHtml(status);
   box.style.display = 'block';
 }
-// ── Модерация роли Эксперт / Куратор / Ментор ─────────
+// ── Модерация роли Эксперт / Куратор / Ментор / Буст-партнёр ──
 var verifyFiles = [];
 
 async function loadVerification() {
@@ -319,20 +320,22 @@ async function loadVerification() {
     var head;
     if (v && v.status === 'rejected') {
       head = '<div style="font-weight:700;margin-bottom:6px;color:var(--danger)">❌ Заявка на роль «' + esc(ROLE_LABELS[v.requestedRole]||v.requestedRole) + '» отклонена</div>' +
-        '<div style="font-size:14px;color:var(--text2);margin-bottom:14px">Причина: ' + esc(v.reviewNote) + '<br/>Можно прикрепить другой сертификат и подать заявку заново.</div>';
+        '<div style="font-size:14px;color:var(--text2);margin-bottom:14px">Причина: ' + esc(v.reviewNote) + '<br/>Можно исправить данные и подать заявку заново.</div>';
     } else if (failed) {
-      head = '<div style="font-weight:700;margin-bottom:6px;color:var(--danger)">⚠️ Сертификат не загрузился</div>' +
-        '<div style="font-size:14px;color:var(--text2);margin-bottom:14px">Аккаунт создан, но заявка на роль не отправлена. Прикрепите сертификат ещё раз.</div>';
+      head = '<div style="font-weight:700;margin-bottom:6px;color:var(--danger)">⚠️ Заявка не отправилась</div>' +
+        '<div style="font-size:14px;color:var(--text2);margin-bottom:14px">Аккаунт создан, но заявка на роль не дошла до проверки. Заполните её ещё раз.</div>';
     } else {
-      head = '<div style="font-weight:700;margin-bottom:6px">🎓 Стать экспертом, куратором или ментором</div>' +
-        '<div style="font-size:14px;color:var(--text2);margin-bottom:14px">Прикрепите сертификат — поддержка проверит его и сменит вам роль.</div>';
+      head = '<div style="font-weight:700;margin-bottom:6px">🎓 Сменить роль</div>' +
+        '<div style="font-size:14px;color:var(--text2);margin-bottom:14px">Эксперт, куратор, ментор — прикрепите сертификат; буст-партнёр — укажите ИНН. Поддержка проверит заявку и сменит вам роль.</div>';
     }
     var preRole = v ? v.requestedRole : 'expert';
     box.innerHTML = head +
-      '<div class="form-group"><label class="form-label">Роль *</label><select class="form-select" id="vRole">' +
+      '<div class="form-group"><label class="form-label">Роль *</label><select class="form-select" id="vRole" onchange="onVerifyRole()">' +
         MODERATED_ROLES.map(function(r){ return '<option value="'+r+'"'+(r===preRole?' selected':'')+'>'+ROLE_LABELS[r]+'</option>'; }).join('') +
       '</select></div>' +
-      '<div class="form-group"><label class="form-label">Сертификат *</label>' +
+      '<div class="form-group" id="vInnGroup"><label class="form-label">ИНН *</label>' +
+        '<input type="text" class="form-input" id="vInn" inputmode="numeric" maxlength="12" placeholder="10 цифр — компания, 12 — ИП" value="' + esc(v && v.inn || '') + '"/></div>' +
+      '<div class="form-group"><label class="form-label" id="vCertLabel">Сертификат *</label>' +
         '<input type="file" class="form-input" style="padding:6px" multiple accept="application/pdf,image/jpeg,image/png,image/webp" onchange="onVerifyFiles(this)"/>' +
         '<div class="form-hint">PDF или изображение, до ' + CERT_MAX_MB + ' МБ каждый, максимум ' + CERT_MAX_CNT + ' файлов</div>' +
         '<div id="vFiles"></div></div>' +
@@ -342,6 +345,16 @@ async function loadVerification() {
       '<button class="btn btn--primary" id="vSend" onclick="sendVerification()">Отправить на проверку</button>';
   }
   box.style.display = 'block';
+  if (document.getElementById('vRole')) onVerifyRole();
+}
+
+// Буст-партнёру — ИНН обязателен, документы по желанию; остальным — сертификат
+function onVerifyRole() {
+  var inn = needsInn(document.getElementById('vRole').value);
+  document.getElementById('vInnGroup').style.display = inn ? 'block' : 'none';
+  document.getElementById('vCertLabel').innerHTML = inn
+    ? 'Документы <span style="color:var(--text3);font-weight:400">(необязательно)</span>'
+    : 'Сертификат *';
 }
 
 function onVerifyFiles(input) {
@@ -369,10 +382,14 @@ async function sendVerification() {
   var errEl = document.getElementById('vErr');
   var btn   = document.getElementById('vSend');
   errEl.style.display = 'none';
-  if (!verifyFiles.length) { errEl.textContent = 'Прикрепите хотя бы один сертификат'; errEl.style.display = 'block'; return; }
+  var role = document.getElementById('vRole').value;
+  var inn  = document.getElementById('vInn').value.replace(/\s/g, '');
+  if (needsInn(role)) {
+    if (!isValidInn(inn)) { errEl.textContent = 'Проверьте ИНН: 10 цифр для компании или 12 для ИП'; errEl.style.display = 'block'; return; }
+  } else if (!verifyFiles.length) { errEl.textContent = 'Прикрепите хотя бы один сертификат'; errEl.style.display = 'block'; return; }
   btn.disabled = true; btn.textContent = 'Отправка...';
   try {
-    await submitRoleVerification(document.getElementById('vRole').value, verifyFiles, document.getElementById('vComment').value.trim());
+    await submitRoleVerification(role, verifyFiles, document.getElementById('vComment').value.trim(), needsInn(role) ? inn : '');
     verifyFiles = [];
     history.replaceState(null, '', 'profile.html');
     showToast('✅ Заявка отправлена на проверку', 'success');

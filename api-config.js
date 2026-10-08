@@ -571,6 +571,7 @@ var ROLE_LABELS = {
   expert:    'Эксперт',
   curator:   'Куратор',
   mentor:    'Ментор',
+  boost_partner: 'Буст-партнёр',
   observer:  'Наблюдатель',
   user:      'Специалист',
   admin:     'Администратор',
@@ -578,16 +579,31 @@ var ROLE_LABELS = {
   support:   'Поддержка',
 };
 
-// Эксперт, куратор, ментор и наблюдатель — одинаковые права, разные названия.
+// Эксперт, куратор, ментор, буст-партнёр и наблюдатель — одинаковые права, разные названия.
 // Наблюдателя нельзя пригласить в проект, и сам он не подаёт заявки.
-var EXPERT_ROLES = ['expert', 'curator', 'mentor', 'observer'];
+var EXPERT_ROLES = ['expert', 'curator', 'mentor', 'boost_partner', 'observer'];
 function isExpertRole(role)   { return EXPERT_ROLES.indexOf(role) !== -1; }
 function canJoinProject(role) { return role !== 'observer'; }
+// Статус «Готов помочь / Занят» — только у одобренных ролей группы (не у наблюдателя)
+function showsExpertStatus(role) { return isExpertRole(role) && role !== 'observer'; }
 
-// Эксперт, куратор и ментор проходят ручную модерацию с сертификатом.
+// Эксперт, куратор, ментор и буст-партнёр проходят ручную модерацию.
+// Первые три прикладывают сертификат, буст-партнёр (человек из бизнеса) — ИНН.
 // До одобрения пользователь — наблюдатель.
-var MODERATED_ROLES = ['expert', 'curator', 'mentor'];
+var MODERATED_ROLES = ['expert', 'curator', 'mentor', 'boost_partner'];
 function needsModeration(role) { return MODERATED_ROLES.indexOf(role) !== -1; }
+function needsInn(role)        { return role === 'boost_partner'; }
+
+// Проверка ИНН по контрольным цифрам: 10 цифр — юрлицо, 12 — ИП / физлицо
+function isValidInn(inn) {
+  var s = String(inn || '');
+  if (!/^(\d{10}|\d{12})$/.test(s)) return false;
+  var d = s.split('').map(Number);
+  function check(coefs) { return coefs.reduce(function(sum, c, i) { return sum + c * d[i]; }, 0) % 11 % 10; }
+  if (d.length === 10) return check([2, 4, 10, 3, 5, 9, 4, 6, 8]) === d[9];
+  return check([7, 2, 4, 10, 3, 5, 9, 4, 6, 8]) === d[10] &&
+         check([3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8]) === d[11];
+}
 
 var CERT_TYPES   = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 var CERT_MAX_MB  = 2;
@@ -600,8 +616,8 @@ function validateCertificateFile(file) {
   return '';
 }
 
-// Загрузить сертификаты и отправить заявку на роль. files — массив File.
-async function submitRoleVerification(requestedRole, files, comment) {
+// Загрузить сертификаты и отправить заявку на роль. files — массив File, inn — для буст-партнёра.
+async function submitRoleVerification(requestedRole, files, comment, inn) {
   var certs = [];
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
@@ -614,7 +630,7 @@ async function submitRoleVerification(requestedRole, files, comment) {
     var up = await api.post('/upload', { data: b64, contentType: f.type, folder: 'certificates', filename: f.name });
     certs.push({ url: up.url, name: f.name });
   }
-  return api.post('/verification', { requested_role: requestedRole, certificates: certs, comment: comment || '' });
+  return api.post('/verification', { requested_role: requestedRole, certificates: certs, comment: comment || '', inn: inn || '' });
 }
 
 function renderNav(userData) {

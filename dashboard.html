@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Дашборд — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=5"/>
+  <link rel="stylesheet" href="styles.css?v=6"/>
   <style>
     .dash-grid{display:grid;grid-template-columns:280px 1fr;gap:24px}
     @media(max-width:900px){.dash-grid{grid-template-columns:1fr}}
@@ -45,6 +45,7 @@
   <a href="startups.html">Стартапы</a>
   <a href="feed.html">Лента</a>
   <a href="forum.html">Форум</a>
+  <a href="ideas.html">Идеи</a>
   <a href="members.html">Участники</a>
   <div class="nav__user">
     <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
@@ -79,13 +80,13 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=5"></script>
+<script src="api-config.js?v=6"></script>
 <script>
 requireAuth('login.html');
 
 var NAV = {
-  startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
-  expert:   [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'🧑‍🚀',l:'Мои стартаперы',h:'my-founders.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
+  startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'💡',l:'Идеи',h:'ideas.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
+  expert:   [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'💡',l:'Идеи',h:'ideas.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'🧑‍🚀',l:'Мои стартаперы',h:'my-founders.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'🎧',l:'Поддержка',h:'support.html'},{i:'🎓',l:'Модерация ролей',h:'verification.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}],
   moderator:[{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'💬',l:'Форум',h:'forum.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'✉️',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
@@ -304,7 +305,7 @@ function renderSupportDash(el) {
     '<a href="verification.html" class="card card--clickable" style="text-decoration:none;display:block;margin-top:14px">' +
       '<div style="font-size:32px;margin-bottom:12px">🎓</div>' +
       '<div class="section-title" style="font-size:18px">Модерация ролей</div>' +
-      '<p style="font-size:14px;color:var(--text2);margin-top:6px">Проверяйте сертификаты экспертов, кураторов и менторов.</p>' +
+      '<p style="font-size:14px;color:var(--text2);margin-top:6px">Проверяйте заявки экспертов, кураторов, менторов и буст-партнёров.</p>' +
     '</a>';
 }
 

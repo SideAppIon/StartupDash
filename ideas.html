@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Идеи — Атриум</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="stylesheet" href="styles.css?v=6"/>
+  <style>
+    .idea-tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap;align-items:center}
+    .idea-tab{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .2s}
+    .idea-tab.active{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+    .idea-filter{margin-left:auto;max-width:200px}
+    .idea-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+    .idea-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;display:flex;flex-direction:column;gap:12px;transition:border-color .2s}
+    .idea-card:hover{border-color:var(--border2)}
+    .idea-card--taken{opacity:.8}
+    .idea-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .idea-title{font-family:var(--font-head);font-size:18px;font-weight:700;line-height:1.3;word-break:break-word}
+    .idea-desc{font-size:14px;color:var(--text2);line-height:1.6;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+    .idea-desc.open{display:block}
+    .idea-more{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:0;align-self:flex-start}
+    .idea-author{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);margin-top:auto}
+    .idea-author img{width:26px;height:26px;border-radius:50%;object-fit:cover;background:var(--bg3)}
+    .idea-author a{color:inherit;text-decoration:none;font-weight:600}
+    .idea-author a:hover{color:var(--accent)}
+    .idea-taken{font-size:13px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 12px;color:var(--text2)}
+    .idea-taken a{color:var(--accent);text-decoration:none}
+    .idea-actions{display:flex;gap:8px;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="dashboard.html" class="nav__logo"><img src="assets/atrium-logo.png" alt="Атриум"/></a>
+  <a href="startups.html">Стартапы</a>
+  <a href="feed.html">Лента</a>
+  <a href="forum.html">Форум</a>
+  <a href="ideas.html" class="active">Идеи</a>
+  <a href="members.html">Участники</a>
+  <div class="nav__user">
+    <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
+    <span class="nav__role" id="navRole"></span>
+    <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U" onclick="goProfile()"/>
+    <button class="btn btn--ghost btn--sm" onclick="auth.signOut().then(function(){window.location.href='index.html'})">Выйти</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="container">
+    <div class="section-header" style="margin-bottom:20px">
+      <div>
+        <h1 class="page-title">💡 Идеи</h1>
+        <p class="page-subtitle" id="pageSub">Идеи от буст-партнёров — забирай и запускай на их основе свой стартап</p>
+      </div>
+      <button class="btn btn--primary" id="newIdeaBtn" style="display:none" onclick="openIdeaModal()">+ Предложить идею</button>
+    </div>
+
+    <div class="idea-tabs">
+      <button class="idea-tab active" data-tab="open" onclick="setTab('open')">Свободные</button>
+      <button class="idea-tab" data-tab="taken" onclick="setTab('taken')">Забранные</button>
+      <button class="idea-tab" data-tab="mine" id="mineTab" style="display:none" onclick="setTab('mine')">Мои</button>
+      <select class="form-select idea-filter" id="catFilter" onchange="render()"></select>
+    </div>
+
+    <div id="content"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- Создание / редактирование идеи -->
+<div class="modal-overlay" id="ideaModal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal__header">
+      <div class="modal__title" id="ideaModalTitle">Новая идея</div>
+      <button class="modal__close" onclick="closeIdeaModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Название *</label>
+      <input type="text" class="form-input" id="ideaTitle" maxlength="120" placeholder="Например: Сервис аренды спецтехники для фермеров"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Категория</label>
+      <select class="form-select" id="ideaCategory"></select>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Описание *</label>
+      <textarea class="form-textarea" id="ideaDesc" style="min-height:160px" maxlength="5000"
+        placeholder="Какую проблему решает, для кого, почему сейчас, чем вы как партнёр можете помочь..."></textarea>
+    </div>
+    <div id="ideaErr" class="form-error" style="display:none;margin-top:10px"></div>
+    <button class="btn btn--primary" id="ideaSave" style="width:100%;justify-content:center;margin-top:16px" onclick="saveIdea()">Опубликовать</button>
+  </div>
+</div>
+
+<!-- После того как идею забрали -->
+<div class="modal-overlay" id="takenModal">
+  <div class="modal" style="max-width:440px;text-align:center">
+    <div style="font-size:44px;margin-bottom:10px">🎉</div>
+    <div class="modal__title" style="margin-bottom:8px">Идея твоя!</div>
+    <p style="font-size:14px;color:var(--text2);margin-bottom:18px">Автор получил уведомление. Создай стартап — название и описание подставятся из идеи.</p>
+    <a class="btn btn--primary" id="takenCreate" style="width:100%;justify-content:center" href="#">🚀 Создать стартап по идее</a>
+    <button class="btn btn--ghost" style="width:100%;justify-content:center;margin-top:8px" onclick="document.getElementById('takenModal').classList.remove('open')">Позже</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="api-config.js?v=6"></script>
+<script>
+requireAuth('login.html');
+
+var me = null, meData = null;
+var ideas = [];
+var curTab = 'open';
+var editingId = null;
+
+onAuthReady(async function(user, userData) {
+  if (!user) return;
+  me = user; meData = userData || {};
+  renderNav(meData);
+
+  var role = meData.role;
+  if (canPublishIdeas()) {
+    document.getElementById('newIdeaBtn').style.display = '';
+    document.getElementById('pageSub').textContent = 'Публикуй идеи — стартаперы заберут их и запустят на их основе проекты';
+  }
+  if (canPublishIdeas() || role === 'startup') document.getElementById('mineTab').style.display = '';
+
+  loadPlatformConfig().then(function(cfg) {
+    document.getElementById('catFilter').innerHTML = '<option value="">Все категории</option>' +
+      cfg.categories.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
+  });
+  await loadIdeas();
+});
+
+function canPublishIdeas() { return meData && (meData.role === 'boost_partner' || meData.role === 'admin'); }
+function canTakeIdeas()    { return meData && meData.role === 'startup'; }
+
+async function loadIdeas() {
+  var el = document.getElementById('content');
+  el.innerHTML = '<div class="spinner"></div>';
+  try {
+    ideas = (await api.get('/ideas')).ideas || [];
+    render();
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div>' +
+      '<div class="empty-state__title">Ошибка загрузки</div><p>'+esc(e.message)+'</p></div>';
+  }
+}
+
+function setTab(t) {
+  curTab = t;
+  document.querySelectorAll('.idea-tab').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-tab')===t); });
+  render();
+}
+
+function render() {
+  var el  = document.getElementById('content');
+  var cat = document.getElementById('catFilter').value;
+  var list = ideas.filter(function(i) {
+    if (cat && i.category !== cat) return false;
+    if (curTab === 'mine') return i.authorUid === me.uid || i.takenBy === me.uid;
+    return i.status === curTab;
+  });
+  if (!list.length) {
+    var msg = curTab === 'open' ? 'Свободных идей пока нет'
+            : curTab === 'taken' ? 'Пока никто не забрал идеи'
+            : (canPublishIdeas() ? 'Вы ещё не публиковали идеи' : 'Вы ещё не забирали идеи');
+    var hint = curTab === 'open' && canPublishIdeas()
+      ? '<button class="btn btn--primary" style="margin-top:14px" onclick="openIdeaModal()">+ Предложить идею</button>'
+      : '<p style="font-size:14px">Буст-партнёры публикуют здесь идеи для новых стартапов</p>';
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">💡</div><div class="empty-state__title">'+msg+'</div>'+hint+'</div>';
+    return;
+  }
+  el.innerHTML = '<div class="idea-grid">' + list.map(buildCard).join('') + '</div>';
+  // «Читать полностью» — только если текст действительно обрезан
+  document.querySelectorAll('.idea-desc').forEach(function(d) {
+    if (d.scrollHeight > d.clientHeight + 2) d.nextElementSibling.style.display = '';
+  });
+}
+
+function buildCard(i) {
+  var isAuthor = i.authorUid === me.uid;
+  var isTaker  = i.takenBy === me.uid;
+  var isAdmin  = meData.role === 'admin';
+  var av = i.authorAvatar || 'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(i.authorName||'U');
+
+  var badges = (i.category ? '<span class="badge badge--gray">'+esc(i.category)+'</span>' : '') +
+    (i.status === 'open'
+      ? '<span class="badge badge--green">Свободна</span>'
+      : '<span class="badge badge--purple">Забрана</span>');
+
+  var taken = '';
+  if (i.status === 'taken') {
+    taken = '<div class="idea-taken">🚀 Забрал(а) <a href="member.html?uid='+esc(i.takenBy||'')+'">'+esc(i.takerName||'стартапер')+'</a>' +
+      (i.takenAt ? ' · '+formatDate(i.takenAt) : '') +
+      (i.startupId ? '<br/>Стартап: <a href="startup.html?id='+esc(i.startupId)+'">'+esc(i.startupName||'открыть')+'</a>' : '') +
+    '</div>';
+  }
+
+  var actions = [];
+  if (i.status === 'open' && canTakeIdeas() && !isAuthor) {
+    actions.push('<button class="btn btn--primary btn--sm" data-id="'+esc(i.id)+'" onclick="takeIdea(this)">✋ Забрать себе</button>');
+  }
+  if (isTaker && !i.startupId) {
+    actions.push('<a class="btn btn--primary btn--sm" href="create-startup.html?idea='+encodeURIComponent(i.id)+'">🚀 Создать стартап</a>');
+  }
+  if (isTaker || (isAdmin && i.status === 'taken')) {
+    actions.push('<button class="btn btn--ghost btn--sm" data-id="'+esc(i.id)+'" onclick="releaseIdea(this)">Вернуть идею</button>');
+  }
+  if ((isAuthor && i.status === 'open') || isAdmin) {
+    actions.push('<button class="btn btn--outline btn--sm" data-id="'+esc(i.id)+'" onclick="openIdeaModal(this.getAttribute(\'data-id\'))">✏️</button>');
+    actions.push('<button class="btn btn--ghost btn--sm" style="color:var(--danger)" data-id="'+esc(i.id)+'" onclick="deleteIdea(this)">🗑</button>');
+  }
+  if (!isAuthor && i.status === 'open') {
+    actions.push('<a class="btn btn--ghost btn--sm" href="messages.html?to='+encodeURIComponent(i.authorUid)+'">💬 Обсудить с автором</a>');
+  }
+
+  return '<div class="idea-card'+(i.status==='taken'?' idea-card--taken':'')+'">' +
+    '<div class="idea-top">'+badges+'</div>' +
+    '<div class="idea-title">'+esc(i.title)+'</div>' +
+    '<div class="idea-desc">'+esc(i.description)+'</div>' +
+    '<button class="idea-more" style="display:none" onclick="this.previousElementSibling.classList.toggle(\'open\');this.textContent=this.previousElementSibling.classList.contains(\'open\')?\'Свернуть\':\'Читать полностью\'">Читать полностью</button>' +
+    taken +
+    '<div class="idea-author"><img src="'+esc(av)+'"/><a href="member.html?uid='+esc(i.authorUid)+'">'+esc(i.authorName||'Автор')+'</a>' +
+      '<span>· '+formatDate(i.createdAt)+'</span></div>' +
+    (actions.length ? '<div class="idea-actions">'+actions.join('')+'</div>' : '') +
+  '</div>';
+}
+
+// ── Публикация / редактирование ───────────────────────
+function openIdeaModal(id) {
+  editingId = id || null;
+  var idea = id ? ideas.find(function(x){ return x.id === id; }) : null;
+  document.getElementById('ideaModalTitle').textContent = idea ? 'Редактировать идею' : 'Новая идея';
+  document.getElementById('ideaSave').textContent = idea ? '💾 Сохранить' : 'Опубликовать';
+  document.getElementById('ideaTitle').value = idea ? idea.title : '';
+  document.getElementById('ideaDesc').value  = idea ? idea.description : '';
+  document.getElementById('ideaErr').style.display = 'none';
+  fillCategorySelect('ideaCategory', idea ? idea.category : '');
+  document.getElementById('ideaModal').classList.add('open');
+}
+function closeIdeaModal() { document.getElementById('ideaModal').classList.remove('open'); }
+
+async function saveIdea() {
+  var errEl = document.getElementById('ideaErr');
+  var btn   = document.getElementById('ideaSave');
+  var body = {
+    title:       document.getElementById('ideaTitle').value.trim(),
+    category:    document.getElementById('ideaCategory').value,
+    description: document.getElementById('ideaDesc').value.trim(),
+  };
+  errEl.style.display = 'none';
+  if (!body.title) { errEl.textContent = 'Укажи название'; errEl.style.display = 'block'; return; }
+  if (body.description.length < 30) { errEl.textContent = 'Опиши идею подробнее (минимум 30 символов)'; errEl.style.display = 'block'; return; }
+  btn.disabled = true;
+  try {
+    if (editingId) await api.patch('/ideas/' + editingId, body);
+    else await api.post('/ideas', body);
+    closeIdeaModal();
+    showToast(editingId ? 'Идея обновлена' : '💡 Идея опубликована', 'success');
+    await loadIdeas();
+  } catch(e) {
+    errEl.textContent = 'Ошибка: ' + (e.message || 'не удалось сохранить');
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteIdea(btn) {
+  if (!confirm('Удалить идею?')) return;
+  try {
+    await api.delete('/ideas/' + btn.getAttribute('data-id'));
+    showToast('Идея удалена', 'success');
+    await loadIdeas();
+  } catch(e) { showToast('Ошибка: ' + (e.message || 'не удалось удалить'), 'error'); }
+}
+
+// ── Забрать / вернуть ─────────────────────────────────
+async function takeIdea(btn) {
+  if (!confirm('Забрать идею себе? Она пропадёт из свободных, а автор получит уведомление.')) return;
+  var id = btn.getAttribute('data-id');
+  btn.disabled = true;
+  try {
+    await api.post('/ideas/' + id + '/take', {});
+    document.getElementById('takenCreate').href = 'create-startup.html?idea=' + encodeURIComponent(id);
+    document.getElementById('takenModal').classList.add('open');
+    await loadIdeas();
+  } catch(e) {
+    btn.disabled = false;
+    showToast(e.message || 'Не удалось забрать идею', 'error');
+    await loadIdeas();
+  }
+}
+
+async function releaseIdea(btn) {
+  if (!confirm('Вернуть идею в свободные? Привязка к стартапу снимется.')) return;
+  try {
+    await api.post('/ideas/' + btn.getAttribute('data-id') + '/release', {});
+    showToast('Идея снова свободна', 'success');
+    await loadIdeas();
+  } catch(e) { showToast('Ошибка: ' + (e.message || 'не удалось'), 'error'); }
+}
+</script>
+</body>
+</html>
