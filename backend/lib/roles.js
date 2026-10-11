@@ -1,7 +1,9 @@
 // Справочник ролей платформы.
-// Эксперт, куратор, ментор, буст-партнёр и наблюдатель — одна группа с одинаковыми
-// правами, отличаются только названием. Исключение: наблюдателя нельзя пригласить в проект,
-// и сам он не может подать заявку в проект.
+// Эксперт, куратор, ментор и буст-партнёр — одна группа с одинаковыми правами,
+// отличаются только названием.
+// Наблюдатель входит в группу, но только смотрит: не вступает в проекты, не создаёт
+// стартапы и опросы, не пишет в личку (кроме поддержки / админов / модераторов).
+// Наблюдатель — это и роль всех, кто ждёт модерации.
 const { queryOne } = require('../db');
 
 const EXPERT_ROLES = ['expert', 'curator', 'mentor', 'boost_partner', 'observer'];
@@ -15,7 +17,17 @@ const INN_ROLES       = ['boost_partner'];
 // Роли, которые можно выбрать при регистрации
 const SELF_REGISTER_ROLES = ['user', 'startup', ...EXPERT_ROLES];
 
+const STAFF_ROLES  = ['admin', 'support', 'moderator'];
+const ACTIVE_EXPERT_ROLES = EXPERT_ROLES.filter(r => r !== 'observer');
+
 const isExpertRole   = (role) => EXPERT_ROLES.includes(role);
+// Роль группы экспертов с полными правами (всё, кроме наблюдателя)
+const isActiveExpert = (role) => ACTIVE_EXPERT_ROLES.includes(role);
+const isStaff        = (role) => STAFF_ROLES.includes(role);
+const isObserver     = (role) => role === 'observer';
+// Предлагать задачи в канбан стартапа могут эксперты и менторы из его команды
+// (членство в команде проверяется в роуте)
+const canSuggestTasks = (role) => role === 'expert' || role === 'mentor';
 const canJoinProject = (role) => role !== 'observer';
 const needsModeration = (role) => MODERATED_ROLES.includes(role);
 const needsInn        = (role) => INN_ROLES.includes(role);
@@ -33,6 +45,7 @@ function isValidInn(inn) {
 
 // Для вставки в SQL: 'expert','curator',...
 const EXPERT_ROLES_SQL = EXPERT_ROLES.map(r => `'${r}'`).join(',');
+const ACTIVE_EXPERT_ROLES_SQL = ACTIVE_EXPERT_ROLES.map(r => `'${r}'`).join(',');
 const ALL_ROLES_SQL    = ALL_ROLES.map(r => `'${r}'`).join(',');
 
 // Приводим CHECK-констрейнт users.role к актуальному списку ролей
@@ -52,7 +65,7 @@ async function ensureRoleConstraint() {
 
 module.exports = {
   EXPERT_ROLES, ALL_ROLES, MODERATED_ROLES, SELF_REGISTER_ROLES,
-  EXPERT_ROLES_SQL, ALL_ROLES_SQL,
-  isExpertRole, canJoinProject, needsModeration, needsInn, isValidInn,
+  EXPERT_ROLES_SQL, ACTIVE_EXPERT_ROLES_SQL, ALL_ROLES_SQL,
+  isExpertRole, isActiveExpert, isStaff, isObserver, canJoinProject, canSuggestTasks, needsModeration, needsInn, isValidInn,
   ensureRoleConstraint,
 };

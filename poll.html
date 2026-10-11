@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Опрос — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .poll-wrap{max-width:560px;margin:0 auto;padding:0 20px}
     .poll-opt{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--border2);border-radius:var(--radius);margin-bottom:10px;cursor:pointer;transition:border-color .2s,background .2s;font-size:15px}
@@ -49,7 +49,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 var pollId = getUrlParam('id');
 var poll = null;
@@ -156,7 +156,7 @@ async function vote() {
   var qs = poll.questions || [];
   var votes = [];
   for (var qi = 0; qi < qs.length; qi++) {
-    if (selected[qi] === undefined) { showToast('Ответь на все вопросы','warn'); return; }
+    if (selected[qi] === undefined) { showToast(tv('Ответь на все вопросы','Ответьте на все вопросы'),'warn'); return; }
     votes.push({ question: qi, option: selected[qi] });
   }
   try {
@@ -224,7 +224,7 @@ async function deletePoll() {
 function copyLink() {
   var url = window.location.href;
   navigator.clipboard.writeText(url).then(function(){ showToast('🔗 Ссылка скопирована','success'); },
-    function(){ showToast('Скопируй ссылку из адресной строки','warn'); });
+    function(){ showToast(tv('Скопируй ссылку из адресной строки','Скопируйте ссылку из адресной строки'),'warn'); });
 }
 
 function showErr(t) {

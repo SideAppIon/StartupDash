@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Регистрация — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px 0; }
     .auth-box { width:100%; max-width:480px; padding:24px; }
@@ -50,7 +50,7 @@
 <div class="auth-box">
   <a href="index.html" class="auth-logo"><img src="assets/atrium-logo.png" alt="Атриум"/></a>
   <h1 class="auth-title">Создать аккаунт</h1>
-  <p class="auth-sub">Заполни информацию в 3 шага</p>
+  <p class="auth-sub">Заполните информацию в 3 шага</p>
 
   <div class="step-dots">
     <div class="step-dot active" id="dot0"></div>
@@ -62,7 +62,7 @@
   <div class="step active" id="step0">
     <div class="step-header">
       <div class="step-num">1</div>
-      <div class="step-title">Выбери роль</div>
+      <div class="step-title">Выберите роль</div>
     </div>
 
     <div class="role-selector">
@@ -106,8 +106,8 @@
         <input type="password" class="form-input" id="passInput" placeholder="Минимум 6 символов"/>
       </div>
       <div class="form-group">
-        <label class="form-label">Повтори пароль *</label>
-        <input type="password" class="form-input" id="pass2Input" placeholder="Повтори пароль"/>
+        <label class="form-label" data-ty="Повтори пароль *">Повторите пароль *</label>
+        <input type="password" class="form-input" id="pass2Input" placeholder="Повторите пароль" data-ty-placeholder="Повтори пароль"/>
       </div>
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label">Ник <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
@@ -124,7 +124,7 @@
   <div class="step" id="step1">
     <div class="step-header">
       <div class="step-num">2</div>
-      <div class="step-title">Расскажи о себе</div>
+      <div class="step-title" data-ty="Расскажи о себе">О себе</div>
     </div>
 
     <div class="card">
@@ -133,7 +133,7 @@
         <input type="text" class="form-input" id="nameInput" placeholder="Иван Петров" maxlength="80"/>
       </div>
       <div class="form-group">
-        <label class="form-label">Чем занимаешься *</label>
+        <label class="form-label" id="bioLabel">Чем вы занимаетесь *</label>
         <textarea class="form-textarea" id="bioInput" style="min-height:90px"
           placeholder="Кратко о себе: опыт, специализация, цели..."></textarea>
       </div>
@@ -145,7 +145,7 @@
           <button class="btn btn--outline" type="button" onclick="addSkill()">+</button>
         </div>
         <div id="skillsList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
-        <div class="form-hint">Добавь хотя бы 1 навык</div>
+        <div class="form-hint" data-ty="Добавь хотя бы 1 навык">Добавьте хотя бы 1 навык</div>
       </div>
     </div>
 
@@ -167,7 +167,7 @@
       <div class="form-group">
         <label class="form-label">Контакты <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
         <input type="text" class="form-input" id="contactsInput"
-          placeholder="Telegram: @username, WhatsApp: +7..."/>
+          placeholder="Email, телефон или ник в мессенджере"/>
         <div class="form-hint">Любой удобный способ связи</div>
       </div>
       <div class="form-group" style="margin-bottom:0">
@@ -178,12 +178,34 @@
       </div>
     </div>
 
-    <!-- Данные для ручной модерации: сертификат (эксперт/куратор/ментор) или ИНН (буст-партнёр) -->
+    <!-- Данные для ручной модерации: сертификат (эксперт/куратор/ментор) или реквизиты организации (буст-партнёр) -->
     <div class="card" id="certCard" style="display:none;margin-top:16px">
-      <div class="form-group" id="innGroup" style="display:none">
-        <label class="form-label">ИНН *</label>
-        <input type="text" class="form-input" id="innInput" inputmode="numeric" maxlength="12" placeholder="10 цифр — компания, 12 — ИП"/>
-        <div class="form-hint">ИНН компании или ИП, которую вы представляете</div>
+      <div id="innGroup" style="display:none">
+        <div style="font-weight:700;margin-bottom:12px">Организация</div>
+        <div class="form-group">
+          <label class="form-label">Логотип организации *</label>
+          <div style="display:flex;gap:12px;align-items:center">
+            <img id="orgLogoPreview" alt="" style="display:none;width:56px;height:56px;border-radius:12px;object-fit:contain;background:var(--bg3);border:1px solid var(--border2);flex-shrink:0"/>
+            <input type="file" class="form-input" id="orgLogoInput" style="padding:6px;flex:1" accept="image/jpeg,image/png,image/webp,image/gif" onchange="onOrgLogo(this)"/>
+          </div>
+          <div class="form-hint">Изображение до 2 МБ</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">ИНН *</label>
+          <input type="text" class="form-input" id="innInput" inputmode="numeric" maxlength="12" placeholder="10 цифр — компания, 12 — ИП"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Юридический адрес *</label>
+          <input type="text" class="form-input" id="orgAddressInput" maxlength="500" placeholder="123456, г. Москва, ул. Примерная, д. 1, офис 10"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">ФИО руководителя *</label>
+          <input type="text" class="form-input" id="orgDirectorInput" maxlength="200" placeholder="Иванов Иван Иванович"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Рабочий телефон руководителя *</label>
+          <input type="tel" class="form-input" id="orgPhoneInput" maxlength="40" placeholder="+7 (495) 123-45-67"/>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label" id="certLabel">Сертификат / подтверждение квалификации *</label>
@@ -223,7 +245,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 // Редирект только если уже авторизован при загрузке страницы (не во время регистрации)
 var registering = false;
@@ -253,11 +275,24 @@ function selectRole(role) {
   var isExpertGroup = role === 'expert';
   document.getElementById('subRoles').classList.toggle('open', isExpertGroup);
   if (isExpertGroup) selectSubRole(expertSubRole);
-  else selectedRole = role;
+  else { selectedRole = role; updateRoleTexts(); }
+}
+
+// Обращение и формулировки зависят от роли: стартаперу — на «ты», остальным — на «Вы»;
+// буст-партнёру — деловые формулировки про организацию
+function updateRoleTexts() {
+  applyAddressForm(selectedRole);
+  var boost = selectedRole === 'boost_partner';
+  document.getElementById('bioLabel').textContent = boost ? 'Должность и деятельность организации *'
+    : tv('Чем занимаешься *', 'Чем вы занимаетесь *', selectedRole);
+  document.getElementById('bioInput').placeholder = boost
+    ? 'Например: директор по развитию агрохолдинга, ищем стартапы для пилотных проектов'
+    : 'Кратко о себе: опыт, специализация, цели...';
 }
 function selectSubRole(sub) {
   expertSubRole = sub;
   selectedRole  = sub;
+  updateRoleTexts();
   document.querySelectorAll('.sub-role').forEach(function(b) { b.classList.remove('sel'); });
   document.getElementById('sub-'+sub).classList.add('sel');
 }
@@ -309,7 +344,7 @@ function goStep1() {
   var email = document.getElementById('emailInput').value.trim();
   var pass  = document.getElementById('passInput').value;
   var pass2 = document.getElementById('pass2Input').value;
-  if (!email)          { showErr(0,'Введи email'); return; }
+  if (!email)          { showErr(0, tv('Введи email', 'Введите email', selectedRole)); return; }
   if (pass.length < 6) { showErr(0,'Пароль минимум 6 символов'); return; }
   if (pass !== pass2)  { showErr(0,'Пароли не совпадают'); return; }
   // Ник необязателен, но если задан — проверяем формат сразу
@@ -326,11 +361,16 @@ function goStep2() {
   clearErr(1);
   var name = document.getElementById('nameInput').value.trim();
   var bio  = document.getElementById('bioInput').value.trim();
-  if (!name)           { showErr(1,'Введи имя'); return; }
-  if (bio.length < 20) { showErr(1,'Расскажи о себе подробнее (минимум 20 символов)'); return; }
-  if (!skills.length)  { showErr(1,'Добавь хотя бы один навык'); return; }
+  var r = selectedRole;
+  if (!name)           { showErr(1, tv('Введи имя', 'Введите имя', r)); return; }
+  if (bio.length < 20) {
+    showErr(1, r === 'boost_partner' ? 'Описание должности и деятельности: не менее 20 символов'
+                                     : tv('Расскажи о себе подробнее (минимум 20 символов)', 'Описание: не менее 20 символов', r));
+    return;
+  }
+  if (!skills.length)  { showErr(1, tv('Добавь хотя бы один навык', 'Добавьте хотя бы один навык', r)); return; }
   document.getElementById('certCard').style.display = needsModeration(selectedRole) ? 'block' : 'none';
-  // Буст-партнёру — ИНН обязателен, документы по желанию
+  // Буст-партнёру — реквизиты организации обязательны, документы по желанию
   var inn = needsInn(selectedRole);
   document.getElementById('innGroup').style.display = inn ? 'block' : 'none';
   document.getElementById('certLabel').innerHTML = inn
@@ -357,14 +397,39 @@ function renderSkills() {
   }).join('');
 }
 
+// Реквизиты организации буст-партнёра
+var orgLogoFile = null;
+function onOrgLogo(input) {
+  clearErr(2);
+  var f = input.files[0];
+  if (!f) return;
+  var err = LOGO_TYPES.indexOf(f.type) === -1 ? 'Логотип: нужно изображение (jpg, png, webp)'
+          : f.size > 2 * 1024 * 1024        ? 'Логотип: файл больше 2 МБ' : '';
+  if (err) { showErr(2, err); orgLogoFile = null; input.value = ''; return; }
+  orgLogoFile = f;
+  var prev = document.getElementById('orgLogoPreview');
+  prev.src = URL.createObjectURL(f);
+  prev.style.display = 'block';
+}
+function readOrgForm() {
+  return {
+    inn:           document.getElementById('innInput').value.replace(/\s/g,''),
+    legalAddress:  document.getElementById('orgAddressInput').value,
+    directorName:  document.getElementById('orgDirectorInput').value,
+    directorPhone: document.getElementById('orgPhoneInput').value,
+    logoFile:      orgLogoFile,
+  };
+}
+
 // Финальная регистрация
 async function doRegister() {
   clearErr(2);
   var policy = document.getElementById('policyCheck').checked;
   if (!policy) { showErr(2,'Необходимо принять политику конфиденциальности'); return; }
   if (needsInn(selectedRole)) {
-    if (!isValidInn(document.getElementById('innInput').value.replace(/\s/g,''))) { showErr(2,'Проверь ИНН: 10 цифр для компании или 12 для ИП'); return; }
-  } else if (needsModeration(selectedRole) && !certFiles.length) { showErr(2,'Прикрепи сертификат — без него профиль не пройдёт проверку'); return; }
+    var orgErr = validateOrgInfo(readOrgForm());
+    if (orgErr) { showErr(2, orgErr); return; }
+  } else if (needsModeration(selectedRole) && !certFiles.length) { showErr(2,'Прикрепите сертификат — без него профиль не пройдёт проверку'); return; }
 
   var btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = 'Регистрация...';
@@ -404,10 +469,10 @@ async function doRegister() {
 
   // Аккаунт создан. Для ролей с модерацией — загружаем сертификаты и подаём заявку.
   if (created && created.pendingRole) {
-    btn.textContent = 'Загрузка сертификатов...';
+    btn.textContent = 'Отправка на проверку...';
     try {
       await submitRoleVerification(created.pendingRole, certFiles, document.getElementById('certComment').value.trim(),
-        document.getElementById('innInput').value.replace(/\s/g,''));
+        needsInn(created.pendingRole) ? readOrgForm() : null);
     } catch(e) {
       // Аккаунт уже есть — повторить заявку можно в профиле
       window.location.href = 'profile.html?verify=failed';

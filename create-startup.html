@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Создать стартап — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .emoji-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
     .emoji-opt{width:42px;height:42px;border-radius:10px;background:var(--bg3);border:2px solid var(--border2);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
@@ -123,7 +123,7 @@
       <div class="form-group">
         <label class="form-label">Теги</label>
         <div class="tag-input-wrap">
-          <input type="text" class="form-input" id="tagInput" placeholder="Введи тег и нажми Enter"
+          <input type="text" class="form-input" id="tagInput" placeholder="Введите тег и нажмите Enter" data-ty-placeholder="Введи тег и нажми Enter"
             onkeydown="if(event.key==='Enter'){event.preventDefault();addTag()}"/>
           <button class="btn btn--outline" type="button" onclick="addTag()">+</button>
         </div>
@@ -140,7 +140,7 @@
     <!-- БЛОКИ КОНТЕНТА -->
     <div class="card" style="margin-bottom:20px">
       <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:6px">Описание проекта</h3>
-      <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Добавляй блоки текста, картинки и видео в любом порядке</p>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px" data-ty="Добавляй блоки текста, картинки и видео в любом порядке">Добавляйте блоки текста, картинки и видео в любом порядке</p>
 
       <div id="contentBlocks"></div>
 
@@ -202,7 +202,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
@@ -444,7 +444,7 @@ function renderBlocks(){
       inp=document.createElement('textarea');
       inp.className='form-textarea';
       inp.style.minHeight='100px';
-      inp.placeholder='Опиши идею, проблему, решение...';
+      inp.placeholder=tv('Опиши идею, проблему, решение...','Опишите идею, проблему, решение...');
       inp.value=b.content||'';
       inp.setAttribute('data-bid', b.id);
       inp.addEventListener('input', function(){ updateBlock(this.getAttribute('data-bid'),'content',this.value); });
@@ -578,6 +578,8 @@ renderBlocks(); // показываем пустое состояние
 // Load for edit
 onAuthReady(async function(user, userData){
   if (!user) return;
+  // Наблюдатель только смотрит — стартапы не создаёт
+  if (userData && userData.role === 'observer') { window.location.href = 'dashboard.html'; return; }
   renderNav(userData);
   var av=userData&&userData.avatar||'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U';
   document.getElementById('navAvatar').src=av;
@@ -657,11 +659,11 @@ onAuthReady(async function(user, userData){
 async function save(){
   var name=document.getElementById('name').value.trim();
   var tagline=document.getElementById('tagline').value.trim();
-  if (!name){showFormErr('Введи название');return;}
-  if (!tagline){showFormErr('Введи слоган');return;}
+  if (!name){showFormErr(tv('Введи название','Введите название'));return;}
+  if (!tagline){showFormErr(tv('Введи слоган','Введите слоган'));return;}
   // Проверяем что есть хотя бы один заполненный текстовый блок
   var hasText = blocks.some(function(b){ return b.type==='text' && b.content && b.content.trim().length > 0; });
-  if (!hasText){showFormErr('Добавь хотя бы один текстовый блок с описанием проекта');return;}
+  if (!hasText){showFormErr(tv('Добавь хотя бы один текстовый блок с описанием проекта','Добавьте хотя бы один текстовый блок с описанием проекта'));return;}
   var btn=document.getElementById('submitBtn');
   btn.disabled=true; btn.textContent='Сохранение...';
 

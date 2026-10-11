@@ -148,18 +148,23 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
-// PATCH /ideas/:id — редактировать (автор, пока идею не забрали; админ — всегда)
+// PATCH /ideas/:id — редактировать (автор, пока идею не забрали; админ — всегда).
+// Частичное обновление: не переданные поля остаются прежними (например, админ меняет только title).
 router.patch('/:id', requireAuth, async (req, res) => {
   try {
     await ensureIdeasSchema();
-    const idea = await queryOne('SELECT author_uid, status FROM ideas WHERE id=$1', [req.params.id]);
+    const idea = await queryOne('SELECT author_uid, status, title, description, category FROM ideas WHERE id=$1', [req.params.id]);
     if (!idea) return res.status(404).json({ error: 'Идея не найдена' });
     const isAuthor = idea.author_uid === req.user.uid;
     if (!isAuthor && !isAdmin(req.user)) return res.status(403).json({ error: 'Нет доступа' });
     if (!isAdmin(req.user) && idea.status !== 'open') {
       return res.status(409).json({ error: 'Идею уже забрали — редактировать её нельзя' });
     }
-    const f = readFields(req.body);
+    const f = readFields({
+      title:       req.body.title       !== undefined ? req.body.title       : idea.title,
+      description: req.body.description !== undefined ? req.body.description : idea.description,
+      category:    req.body.category    !== undefined ? req.body.category    : idea.category,
+    });
     if (!f.title) return res.status(400).json({ error: 'Укажите название идеи' });
     if (f.description.length < 30) return res.status(400).json({ error: 'Опишите идею подробнее (минимум 30 символов)' });
     const cen = await checkCensor(f.title + ' ' + f.description, 'forum');

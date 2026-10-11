@@ -5,7 +5,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Вход — Атриум</title>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
     .auth-box { width:100%; max-width:420px; padding:24px; }
@@ -50,7 +50,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
   redirectIfAuth('dashboard.html');
 
@@ -61,7 +61,7 @@
     const err   = document.getElementById('formError');
 
     err.style.display = 'none';
-    if (!email || !pass) { showErr('Заполни все поля'); return; }
+    if (!email || !pass) { showErr('Заполните все поля'); return; }
 
     btn.disabled = true; btn.textContent = 'Вход...';
     try {
@@ -87,12 +87,12 @@
 
   async function resetPassword() {
     const email = document.getElementById('emailInput').value.trim();
-    if (!email) { showErr('Введи email для сброса пароля'); return; }
+    if (!email) { showErr('Введите email для сброса пароля'); return; }
     try {
       await auth.sendPasswordResetEmail(email);
       showToast('Письмо отправлено на ' + email, 'success');
     } catch(e) {
-      showToast('Ошибка. Проверь email.', 'error');
+      showToast('Ошибка. Проверьте email.', 'error');
     }
   }
 </script>

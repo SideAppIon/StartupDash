@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Мой профиль — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .profile-cover{height:180px;background:linear-gradient(135deg,rgba(0,230,118,.15),rgba(180,139,255,.1) 50%,rgba(61,142,245,.1));border-bottom:1px solid var(--border)}
     .profile-wrap{max-width:860px;margin:0 auto;padding:0 24px}
@@ -119,7 +119,7 @@
             <div class="form-group">
               <label class="form-label">Контакты</label>
               <input type="text" class="form-input" id="editContacts"
-                placeholder="Telegram: @username, Email: you@mail.com, WhatsApp: +7..."/>
+                placeholder="Email, телефон или ник в мессенджере"/>
               <div class="form-hint">Любой способ связи в свободной форме</div>
             </div>
 
@@ -171,7 +171,7 @@
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:20px">
       <img id="avatarPreview" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);background:var(--bg3);flex-shrink:0" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
       <div style="flex:1">
-        <label class="form-label">Выбери фото (макс. 2 МБ)</label>
+        <label class="form-label" data-ty="Выбери фото (макс. 2 МБ)">Выберите фото (макс. 2 МБ)</label>
         <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" id="avatarFileInput"
           class="form-input" style="padding:6px" onchange="onAvatarFileChange(this)"/>
         <div id="avatarUploadStatus" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
@@ -185,7 +185,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
@@ -286,7 +286,7 @@ function expertStatusPillHtml(status) {
   var color = busy ? 'var(--danger)' : 'var(--accent)';
   var bg    = busy ? 'rgba(255,77,79,.10)' : 'rgba(0,230,118,.10)';
   var label = busy ? 'Занят' : 'Готов помочь';
-  return '<span onclick="toggleExpertStatus()" title="Нажми, чтобы переключить статус" '+
+  return '<span onclick="toggleExpertStatus()" title="Нажмите, чтобы переключить статус" '+
     'style="display:inline-flex;align-items:center;gap:9px;padding:8px 16px;border:1.5px solid '+color+';'+
     'border-radius:999px;font-size:13px;font-weight:600;color:'+color+';background:'+bg+';cursor:pointer">'+
     '<span style="width:9px;height:9px;border-radius:50%;background:'+color+';display:inline-block"></span>'+
@@ -301,18 +301,35 @@ function renderExpertStatus(status) {
 }
 // ── Модерация роли Эксперт / Куратор / Ментор / Буст-партнёр ──
 var verifyFiles = [];
+var verifyLogoFile = null;   // новый логотип организации (буст-партнёр)
+var verifyPrevLogo = '';     // логотип из прошлой заявки — можно не загружать заново
+
+function onVerifyLogo(input) {
+  var errEl = document.getElementById('vErr');
+  var f = input.files[0];
+  errEl.style.display = 'none';
+  if (!f) return;
+  var err = LOGO_TYPES.indexOf(f.type) === -1 ? 'Логотип: нужно изображение (jpg, png, webp)'
+          : f.size > 2 * 1024 * 1024        ? 'Логотип: файл больше 2 МБ' : '';
+  if (err) { errEl.textContent = err; errEl.style.display = 'block'; input.value = ''; return; }
+  verifyLogoFile = f;
+  var prev = document.getElementById('vLogoPreview');
+  prev.src = URL.createObjectURL(f);
+  prev.style.display = 'block';
+}
 
 async function loadVerification() {
   var box = document.getElementById('verifyBox');
   var v = null;
   try { v = (await api.get('/verification/me')).verification; } catch(e) {}
   var failed = getUrlParam('verify') === 'failed';
+  verifyPrevLogo = (v && v.orgLogo) || '';
 
   if (v && v.status === 'pending') {
     box.innerHTML =
       '<div style="font-weight:700;margin-bottom:6px">⏳ Профиль на модерации</div>' +
       '<div style="font-size:14px;color:var(--text2);line-height:1.6">Заявка на роль <b>' + esc(ROLE_LABELS[v.requestedRole]||v.requestedRole) +
-      '</b> отправлена ' + formatDate(v.createdAt) + '. Пока её проверяют, вы — наблюдатель. О решении придёт личное сообщение.</div>' +
+      '</b> отправлена ' + formatDate(v.createdAt).replace(/\.$/, '') + '. Пока её проверяют, вы — наблюдатель. О решении придёт личное сообщение.</div>' +
       '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' + v.certificates.map(function(c){
         return '<a class="badge badge--gray" style="text-decoration:none" target="_blank" rel="noopener" href="' + esc(c.url) + '">📄 ' + esc(c.name) + '</a>';
       }).join('') + '</div>';
@@ -326,15 +343,29 @@ async function loadVerification() {
         '<div style="font-size:14px;color:var(--text2);margin-bottom:14px">Аккаунт создан, но заявка на роль не дошла до проверки. Заполните её ещё раз.</div>';
     } else {
       head = '<div style="font-weight:700;margin-bottom:6px">🎓 Сменить роль</div>' +
-        '<div style="font-size:14px;color:var(--text2);margin-bottom:14px">Эксперт, куратор, ментор — прикрепите сертификат; буст-партнёр — укажите ИНН. Поддержка проверит заявку и сменит вам роль.</div>';
+        '<div style="font-size:14px;color:var(--text2);margin-bottom:14px">Эксперт, куратор, ментор — прикрепите сертификат; буст-партнёр — укажите реквизиты организации. Поддержка проверит заявку и сменит вам роль.</div>';
     }
     var preRole = v ? v.requestedRole : 'expert';
     box.innerHTML = head +
       '<div class="form-group"><label class="form-label">Роль *</label><select class="form-select" id="vRole" onchange="onVerifyRole()">' +
         MODERATED_ROLES.map(function(r){ return '<option value="'+r+'"'+(r===preRole?' selected':'')+'>'+ROLE_LABELS[r]+'</option>'; }).join('') +
       '</select></div>' +
-      '<div class="form-group" id="vInnGroup"><label class="form-label">ИНН *</label>' +
-        '<input type="text" class="form-input" id="vInn" inputmode="numeric" maxlength="12" placeholder="10 цифр — компания, 12 — ИП" value="' + esc(v && v.inn || '') + '"/></div>' +
+      '<div id="vInnGroup">' +
+        '<div class="form-group"><label class="form-label">Логотип организации *</label>' +
+          '<div style="display:flex;gap:12px;align-items:center">' +
+            '<img id="vLogoPreview" alt="" src="' + esc(v && v.orgLogo || '') + '" style="' + (v && v.orgLogo ? '' : 'display:none;') + 'width:56px;height:56px;border-radius:12px;object-fit:contain;background:var(--bg3);border:1px solid var(--border2);flex-shrink:0"/>' +
+            '<input type="file" class="form-input" style="padding:6px;flex:1" accept="image/jpeg,image/png,image/webp,image/gif" onchange="onVerifyLogo(this)"/>' +
+          '</div>' +
+          (v && v.orgLogo ? '<div class="form-hint">Можно оставить прежний логотип</div>' : '<div class="form-hint">Изображение до 2 МБ</div>') + '</div>' +
+        '<div class="form-group"><label class="form-label">ИНН *</label>' +
+          '<input type="text" class="form-input" id="vInn" inputmode="numeric" maxlength="12" placeholder="10 цифр — компания, 12 — ИП" value="' + esc(v && v.inn || '') + '"/></div>' +
+        '<div class="form-group"><label class="form-label">Юридический адрес *</label>' +
+          '<input type="text" class="form-input" id="vAddress" maxlength="500" value="' + esc(v && v.legalAddress || '') + '"/></div>' +
+        '<div class="form-group"><label class="form-label">ФИО руководителя *</label>' +
+          '<input type="text" class="form-input" id="vDirector" maxlength="200" value="' + esc(v && v.directorName || '') + '"/></div>' +
+        '<div class="form-group"><label class="form-label">Рабочий телефон руководителя *</label>' +
+          '<input type="tel" class="form-input" id="vPhone" maxlength="40" value="' + esc(v && v.directorPhone || '') + '"/></div>' +
+      '</div>' +
       '<div class="form-group"><label class="form-label" id="vCertLabel">Сертификат *</label>' +
         '<input type="file" class="form-input" style="padding:6px" multiple accept="application/pdf,image/jpeg,image/png,image/webp" onchange="onVerifyFiles(this)"/>' +
         '<div class="form-hint">PDF или изображение, до ' + CERT_MAX_MB + ' МБ каждый, максимум ' + CERT_MAX_CNT + ' файлов</div>' +
@@ -383,14 +414,22 @@ async function sendVerification() {
   var btn   = document.getElementById('vSend');
   errEl.style.display = 'none';
   var role = document.getElementById('vRole').value;
-  var inn  = document.getElementById('vInn').value.replace(/\s/g, '');
-  if (needsInn(role)) {
-    if (!isValidInn(inn)) { errEl.textContent = 'Проверьте ИНН: 10 цифр для компании или 12 для ИП'; errEl.style.display = 'block'; return; }
+  var org  = needsInn(role) ? {
+    inn:           document.getElementById('vInn').value.replace(/\s/g, ''),
+    legalAddress:  document.getElementById('vAddress').value,
+    directorName:  document.getElementById('vDirector').value,
+    directorPhone: document.getElementById('vPhone').value,
+    logoFile:      verifyLogoFile,
+    logoUrl:       verifyLogoFile ? '' : verifyPrevLogo,   // прежний логотип из прошлой заявки
+  } : null;
+  if (org) {
+    var orgErr = validateOrgInfo(org);
+    if (orgErr) { errEl.textContent = orgErr; errEl.style.display = 'block'; return; }
   } else if (!verifyFiles.length) { errEl.textContent = 'Прикрепите хотя бы один сертификат'; errEl.style.display = 'block'; return; }
   btn.disabled = true; btn.textContent = 'Отправка...';
   try {
-    await submitRoleVerification(role, verifyFiles, document.getElementById('vComment').value.trim(), needsInn(role) ? inn : '');
-    verifyFiles = [];
+    await submitRoleVerification(role, verifyFiles, document.getElementById('vComment').value.trim(), org);
+    verifyFiles = []; verifyLogoFile = null;
     history.replaceState(null, '', 'profile.html');
     showToast('✅ Заявка отправлена на проверку', 'success');
     await loadVerification();
@@ -450,7 +489,7 @@ function renderEditSkills() {
 
 async function saveProfile() {
   var name = document.getElementById('editName').value.trim();
-  if (!name) { showToast('Введи имя','error'); return; }
+  if (!name) { showToast(tv('Введи имя','Введите имя'),'error'); return; }
   var newRole = uData.role || 'user';
   var upd = {
     name, role:newRole,
@@ -529,7 +568,7 @@ function onAvatarFileChange(input) {
 }
 
 async function doSaveAvatar() {
-  if (!_avatarBase64) { showToast('Выбери файл', 'error'); return; }
+  if (!_avatarBase64) { showToast(tv('Выбери файл','Выберите файл'), 'error'); return; }
   try {
     document.getElementById('avatarUploadStatus').textContent = 'Загружаю...';
     var res = await api.post('/upload', { data: _avatarBase64, contentType: _avatarContentType, folder: 'avatars' });

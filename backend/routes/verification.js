@@ -1,6 +1,7 @@
 // Модерация ролей Эксперт / Куратор / Ментор / Буст-партнёр.
 // При регистрации такие пользователи получают роль «наблюдатель» и отправляют заявку:
-// эксперт / куратор / ментор — с сертификатами, буст-партнёр — с ИНН (документы по желанию). Админ или поддержка проверяет её: при одобрении роль меняется
+// эксперт / куратор / ментор — с сертификатами, буст-партнёр — с реквизитами организации
+// (ИНН, юридический адрес, ФИО и рабочий телефон руководителя, логотип; документы по желанию). Админ или поддержка проверяет её: при одобрении роль меняется
 // на запрошенную, при отказе пользователь видит причину и может подать заново.
 // О решении пользователь узнаёт из личного сообщения от проверяющего.
 const express = require('express');
@@ -8,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const { query, queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { MODERATED_ROLES, needsModeration, needsInn, isValidInn, ensureRoleConstraint } = require('../lib/roles');
-const { BUCKET } = require('./upload');
+const { fileUrl } = require('./upload');
 const { sendDirectMessage } = require('../lib/dm');
 
 const router = express.Router();
@@ -16,7 +17,26 @@ const router = express.Router();
 const ROLE_NAMES = { expert: 'Эксперт', curator: 'Куратор', mentor: 'Ментор', boost_partner: 'Буст-партнёр' };
 const MAX_CERTIFICATES = 5;
 // Принимаем только файлы, загруженные через POST /upload в папку certificates
-const CERT_URL_PREFIX = `https://storage.yandexcloud.net/${BUCKET}/certificates/`;
+const CERT_URL_PREFIX = fileUrl('certificates/');
+const LOGO_URL_PREFIX = fileUrl('org-logos/');
+
+// Реквизиты организации буст-партнёра: возвращает { org } или { error }
+function readOrgInfo(body) {
+  const org = {
+    inn:            String(body.inn || '').replace(/\s/g, ''),
+    legal_address:  String(body.legal_address  || body.legalAddress  || '').trim().slice(0, 500),
+    director_name:  String(body.director_name  || body.directorName  || '').trim().replace(/\s+/g, ' ').slice(0, 200),
+    director_phone: String(body.director_phone || body.directorPhone || '').trim().slice(0, 40),
+    org_logo:       String(body.org_logo       || body.orgLogo       || ''),
+  };
+  if (!isValidInn(org.inn))                          return { error: 'Укажите корректный ИНН (10 или 12 цифр)' };
+  if (org.legal_address.length < 10)                 return { error: 'Укажите юридический адрес полностью' };
+  if (org.director_name.split(' ').length < 2)       return { error: 'Укажите ФИО руководителя (минимум фамилию и имя)' };
+  const digits = org.director_phone.replace(/\D/g, '');
+  if (digits.length < 10 || digits.length > 15)      return { error: 'Укажите рабочий телефон руководителя' };
+  if (!org.org_logo.startsWith(LOGO_URL_PREFIX))     return { error: 'Загрузите логотип организации' };
+  return { org };
+}
 
 function isReviewer(user) {
   return user && (user.role === 'admin' || user.role === 'support');
@@ -43,6 +63,11 @@ async function ensureVerificationSchema() {
     await query('CREATE INDEX IF NOT EXISTS idx_role_verif_status ON role_verifications(status)');
     await query('CREATE INDEX IF NOT EXISTS idx_role_verif_user ON role_verifications(user_uid)');
     await query("ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS inn TEXT DEFAULT ''");
+    // Реквизиты организации буст-партнёра
+    await query("ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS legal_address  TEXT DEFAULT ''");
+    await query("ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS director_name  TEXT DEFAULT ''");
+    await query("ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS director_phone TEXT DEFAULT ''");
+    await query("ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS org_logo       TEXT DEFAULT ''");
     schemaEnsured = true;
   } catch (e) {
     console.error('ensureVerificationSchema error:', e.message);
@@ -62,6 +87,10 @@ function shape(r) {
     certificates:  parseCerts(r.certificates),
     comment:       r.comment || '',
     inn:           r.inn || '',
+    legalAddress:  r.legal_address || '',
+    directorName:  r.director_name || '',
+    directorPhone: r.director_phone || '',
+    orgLogo:       r.org_logo || '',
     status:        r.status,
     reviewNote:    r.review_note || '',
     reviewedBy:    r.reviewed_by,
@@ -94,7 +123,8 @@ router.get('/me', requireAuth, async (req, res) => {
 });
 
 // POST /verification — подать заявку на роль (только наблюдатель)
-// Body: { requested_role, certificates: [{ url, name }], comment, inn }
+// Body: { requested_role, certificates: [{ url, name }], comment,
+//         inn, legal_address, director_name, director_phone, org_logo }  ← реквизиты для буст-партнёра
 router.post('/', requireAuth, async (req, res) => {
   try {
     await ensureVerificationSchema();
@@ -113,11 +143,12 @@ router.post('/', requireAuth, async (req, res) => {
       .filter(c => c && typeof c.url === 'string' && c.url.startsWith(CERT_URL_PREFIX))
       .slice(0, MAX_CERTIFICATES)
       .map(c => ({ url: c.url, name: String(c.name || 'Сертификат').slice(0, 200) }));
-    // Буст-партнёру обязателен ИНН (документы — по желанию), остальным — сертификат
-    let inn = '';
+    // Буст-партнёру обязательны реквизиты организации (документы — по желанию), остальным — сертификат
+    let org = { inn: '', legal_address: '', director_name: '', director_phone: '', org_logo: '' };
     if (needsInn(requestedRole)) {
-      inn = String(req.body.inn || '').replace(/\s/g, '');
-      if (!isValidInn(inn)) return res.status(400).json({ error: 'Укажите корректный ИНН (10 или 12 цифр)' });
+      const r = readOrgInfo(req.body);
+      if (r.error) return res.status(400).json({ error: r.error });
+      org = r.org;
     } else if (!certs.length) {
       return res.status(400).json({ error: 'Прикрепите хотя бы один сертификат' });
     }
@@ -129,10 +160,12 @@ router.post('/', requireAuth, async (req, res) => {
     if (pending) return res.status(409).json({ error: 'Заявка уже на модерации' });
 
     const row = await queryOne(
-      `INSERT INTO role_verifications (id, user_uid, requested_role, certificates, comment, inn, status, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,'pending',NOW()) RETURNING *`,
+      `INSERT INTO role_verifications (id, user_uid, requested_role, certificates, comment,
+         inn, legal_address, director_name, director_phone, org_logo, status, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',NOW()) RETURNING *`,
       [uuidv4(), req.user.uid, requestedRole, JSON.stringify(certs),
-       String(req.body.comment || '').trim().slice(0, 2000), inn]
+       String(req.body.comment || '').trim().slice(0, 2000),
+       org.inn, org.legal_address, org.director_name, org.director_phone, org.org_logo]
     );
     res.status(201).json({ verification: shape(row) });
   } catch (e) {

@@ -1,6 +1,8 @@
 const express = require('express');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { v4: uuidv4 } = require('uuid');
+const fs   = require('fs');
+const path = require('path');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -15,6 +17,19 @@ const s3 = new S3Client({
 });
 
 const BUCKET  = process.env.S3_BUCKET || 'startuphelper-files';
+
+// Локальный стенд (LOCAL_UPLOADS=true): файлы пишутся на диск и отдаются бэкендом по /uploads,
+// чтобы не нужны были ключи от боевого S3. В проде флаг не задан — всё как раньше.
+const LOCAL_UPLOADS    = process.env.LOCAL_UPLOADS === 'true';
+const LOCAL_UPLOAD_DIR = path.join(__dirname, '..', 'local-uploads');
+const PUBLIC_API_URL   = process.env.PUBLIC_API_URL || 'http://localhost:3000';
+
+// Публичный URL загруженного файла по ключу вида 'certificates/<uuid>.pdf'
+function fileUrl(key) {
+  return LOCAL_UPLOADS
+    ? `${PUBLIC_API_URL}/uploads/${key}`
+    : `https://storage.yandexcloud.net/${BUCKET}/${key}`;
+}
 
 const IMAGE_TYPES = {
   'image/jpeg': 'jpg',
@@ -63,6 +78,10 @@ router.post('/', requireAuth, async (req, res) => {
     if (!ALLOWED_TYPES[contentType]) {
       return res.status(400).json({ error: 'Разрешены изображения, видео и документы (pdf, doc, docx, xls, xlsx, ppt, pptx, txt, csv, zip)' });
     }
+    // Логотип организации буст-партнёра — только изображения
+    if (folder === 'org-logos' && !IMAGE_TYPES[contentType]) {
+      return res.status(400).json({ error: 'Логотип: разрешены изображения (jpg, png, webp, gif)' });
+    }
     // Сертификаты для модерации роли — только PDF и изображения
     if (folder === 'certificates' && !IMAGE_TYPES[contentType] && contentType !== 'application/pdf') {
       return res.status(400).json({ error: 'Сертификат: разрешены PDF или изображение (jpg, png, webp)' });
@@ -80,7 +99,7 @@ router.post('/', requireAuth, async (req, res) => {
       });
     }
 
-    const allowed = ['avatars', 'chat', 'startups', 'updates', 'docs', 'certificates'];
+    const allowed = ['avatars', 'chat', 'startups', 'updates', 'docs', 'certificates', 'org-logos'];
     const safeFolder = allowed.includes(folder) ? folder : 'chat';
     const ext = ALLOWED_TYPES[contentType];
     const key = `${safeFolder}/${uuidv4()}.${ext}`;
@@ -98,10 +117,14 @@ router.post('/', requireAuth, async (req, res) => {
       putParams.ContentDisposition = `attachment; filename*=UTF-8''${encodeURIComponent(rawName)}`;
     }
 
-    await s3.send(new PutObjectCommand(putParams));
+    if (LOCAL_UPLOADS) {
+      fs.mkdirSync(path.join(LOCAL_UPLOAD_DIR, safeFolder), { recursive: true });
+      fs.writeFileSync(path.join(LOCAL_UPLOAD_DIR, key), buffer);
+    } else {
+      await s3.send(new PutObjectCommand(putParams));
+    }
 
-    const url = `https://storage.yandexcloud.net/${BUCKET}/${key}`;
-    res.json({ url });
+    res.json({ url: fileUrl(key) });
   } catch (e) {
     console.error('[upload]', e);
     res.status(500).json({ error: 'Ошибка загрузки файла' });
@@ -109,4 +132,6 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 module.exports = router;
-module.exports.BUCKET = BUCKET;
+module.exports.fileUrl = fileUrl;
+module.exports.LOCAL_UPLOADS = LOCAL_UPLOADS;
+module.exports.LOCAL_UPLOAD_DIR = LOCAL_UPLOAD_DIR;

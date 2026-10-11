@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Дорожная карта — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .roadmap-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:calc(var(--nav-h) + 32px) 0 28px}
     .rm-title{font-family:var(--font-head);font-size:24px;font-weight:800;letter-spacing:-.5px}
@@ -38,9 +38,23 @@
     .col__toggle{font-size:12px;color:var(--text3);transition:transform .2s}
     .col__body{padding:8px;display:flex;flex-direction:column;gap:7px}
     .col__body.collapsed{display:none}
+    /* Перетаскивание задач между колонками */
+    .task-card[draggable="true"]{cursor:grab}
+    .task-card[draggable="true"]:active{cursor:grabbing}
+    .task-card.dragging{opacity:.4}
+    .col.drop-target{outline:2px dashed var(--accent);outline-offset:-2px;background:var(--accent-dim)}
     .col__add{margin:0 8px 8px;border:1px dashed var(--border2);border-radius:var(--radius);padding:7px;text-align:center;font-size:12px;color:var(--text3);cursor:pointer;transition:all .2s;display:none}
     .col__add:hover{border-color:var(--accent);color:var(--accent)}
     .col__add.visible{display:block}
+    /* Предложенные задачи (эксперты и менторы) */
+    .sug-panel{background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--expert);border-radius:var(--radius-lg);padding:14px 16px;margin-top:4px}
+    .sug-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .sug-title{font-weight:700;font-size:15px}
+    .sug-hint{font-size:12px;color:var(--text3);margin:4px 0 0}
+    .sug-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:12px}
+    .sug-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+    .sug-card__by{font-size:11px;color:var(--text3)}
+    .sug-card__actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
     /* Task card */
     .task-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;position:relative;transition:border-color .2s}
     .task-card:hover{border-color:var(--border2)}
@@ -137,6 +151,16 @@
       <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
         <button class="btn btn--outline btn--sm" onclick="shareRoadmap()">🔗 Поделиться</button>
       </div>
+      <!-- Предложенные задачи: эксперты и менторы предлагают, команда принимает в Backlog или отклоняет -->
+      <div class="sug-panel" id="sugPanel" style="display:none">
+        <div class="sug-head">
+          <span class="sug-title">💡 Предложенные задачи <span class="col__count" id="sugCount">0</span></span>
+          <button class="btn btn--expert btn--sm" id="sugAddBtn" style="display:none;margin-left:auto" onclick="openSuggestForm()">+ Предложить задачу</button>
+        </div>
+        <p class="sug-hint" id="sugHint"></p>
+        <div id="sugFormSlot"></div>
+        <div class="sug-list" id="sugList"></div>
+      </div>
       <div class="board">
         <div class="col col--backlog" id="colWrap-backlog">
           <div class="col__head" onclick="toggleCol('backlog')">
@@ -186,7 +210,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
@@ -216,7 +240,7 @@ async function shareRoadmap() {
     ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
     document.body.appendChild(ta); ta.focus(); ta.select();
     try { document.execCommand('copy'); showToast('🔗 Ссылка скопирована', 'success'); }
-    catch(e2) { showToast('Скопируй ссылку из адресной строки', 'warn'); }
+    catch(e2) { showToast(tv('Скопируй ссылку из адресной строки','Скопируйте ссылку из адресной строки'), 'warn'); }
     document.body.removeChild(ta);
   }
 }
@@ -281,7 +305,8 @@ onAuthReady(async function(user, userData) {
       .onSnapshot(function(snap) {
         allTasks = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
         if (!isOwner && !isMember) {
-          allTasks = allTasks.filter(function(t){ return t.isPublic !== false; });
+          // Приватные задачи прячем, но свои предложения автор видит (сервер отдаёт только их)
+          allTasks = allTasks.filter(function(t){ return t.isPublic !== false || t.status === 'suggested'; });
         }
         // Показываем кнопку архива
         var archivedCount = allTasks.filter(function(t){return t.archived;}).length;
@@ -291,14 +316,14 @@ onAuthReady(async function(user, userData) {
           document.getElementById('archiveCount').textContent = archivedCount;
         }
         // Не перерисовываем доску пока открыта форма задачи или редактор комментария
-        if (!formCol && !document.getElementById('active-task-form') && !document.querySelector('.task-cmt__input')) {
+        if (!dragTaskId && !formCol && !document.getElementById('active-task-form') && !document.querySelector('.task-cmt__input')) {
           renderBoard(canEdit);
         }
       }, function() {
         db.collection('startups').doc(startupId).collection('tasks').get().then(function(snap){
           allTasks = snap.docs.map(function(d){ return Object.assign({id:d.id},d.data()); });
-          if (!isOwner && !isMember) allTasks = allTasks.filter(function(t){ return t.isPublic !== false; });
-          if (!formCol && !document.getElementById('active-task-form') && !document.querySelector('.task-cmt__input')) renderBoard(canEdit);
+          if (!isOwner && !isMember) allTasks = allTasks.filter(function(t){ return t.isPublic !== false || t.status === 'suggested'; });
+          if (!dragTaskId && !formCol && !document.getElementById('active-task-form') && !document.querySelector('.task-cmt__input')) renderBoard(canEdit);
         });
       });
 
@@ -372,7 +397,8 @@ function renderBoard(canEdit) {
 
       // Заблокированную задачу может редактировать только основатель
       var showActions = canEdit && (isOwner || !t.locked);
-      return '<div class="task-card '+pr.cls+(priv?' private-task':'')+(col==='done'?' task-card--done':'')+'" id="tc-'+t.id+'">' +
+      return '<div class="task-card '+pr.cls+(priv?' private-task':'')+(col==='done'?' task-card--done':'')+'" id="tc-'+t.id+'"' +
+        (showActions ? ' draggable="true" data-id="'+esc(t.id)+'" ondragstart="onTaskDragStart(event)" ondragend="onTaskDragEnd(event)"' : '') + '>' +
         (showActions ? '<div class="task-card__actions">'+
           '<select class="task-btn" onchange="moveTask(this)" data-id="'+esc(t.id)+'" title="Переместить">'+moveOpts+'</select>'+
           '<button class="task-btn" data-id="'+esc(t.id)+'" onclick="editTask(this)" title="Редактировать">✏️</button>'+
@@ -392,10 +418,123 @@ function renderBoard(canEdit) {
   });
 
   updateStats(byCol);
+  renderSuggestions();
+}
+
+// ── ПРЕДЛОЖЕННЫЕ ЗАДАЧИ ───────────────────────────────
+// Предлагают эксперты и менторы из команды без доступа к канбану; принимает или отклоняет основатель / участник с правом «канбан»
+function canReviewSuggestions() { return isOwner || memberPerms.kanban === true; }
+function canSuggestTask() {
+  var r = pageUserData && pageUserData.role;
+  return !canReviewSuggestions() && isMember && (r === 'expert' || r === 'mentor');
+}
+
+function renderSuggestions() {
+  var panel = document.getElementById('sugPanel');
+  if (!panel || !pageUser) return;
+  var list = allTasks.filter(function(t){ return t.status === 'suggested'; });
+  var review = canReviewSuggestions(), suggest = canSuggestTask();
+  if (!list.length && !suggest) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  document.getElementById('sugCount').textContent = list.length;
+  document.getElementById('sugAddBtn').style.display = suggest ? '' : 'none';
+  document.getElementById('sugHint').textContent = review
+    ? tv('Эксперты и менторы предлагают задачи — прими их в Backlog или отклони.',
+         'Эксперты и менторы предлагают задачи — примите их в Backlog или отклоните.')
+    : 'Предложите задачу команде — основатель примет её в роадмап или отклонит. Ваши предложения видны только вам и команде.';
+  if (!list.length) {
+    document.getElementById('sugList').innerHTML = '<div class="empty-col" style="grid-column:1/-1">Пока нет предложений</div>';
+    return;
+  }
+  document.getElementById('sugList').innerHTML = list.map(function(t) {
+    var pr = PRIORITY[t.priority] || PRIORITY.med;
+    var mine = t.suggestedBy === pageUser.uid;
+    var actions = '';
+    if (review) {
+      actions = '<button class="tf-btn tf-btn--save" data-id="'+esc(t.id)+'" onclick="acceptSuggestion(this)">✓ Принять в Backlog</button>' +
+                '<button class="tf-btn tf-btn--cancel" data-id="'+esc(t.id)+'" onclick="rejectSuggestion(this)">Отклонить</button>';
+    } else if (mine) {
+      actions = '<button class="tf-btn tf-btn--cancel" data-id="'+esc(t.id)+'" onclick="openSuggestForm(this.getAttribute(\'data-id\'))">✏️ Изменить</button>' +
+                '<button class="tf-btn tf-btn--cancel" data-id="'+esc(t.id)+'" onclick="rejectSuggestion(this)">Отозвать</button>';
+    }
+    return '<div class="sug-card">' +
+      '<div class="task-card__title">'+esc(t.title||'')+'</div>' +
+      (t.description ? '<div class="task-card__desc">'+esc(t.description)+'</div>' : '') +
+      '<div class="task-card__meta"><span class="badge '+pr.badge+'" style="font-size:11px">'+pr.label+'</span></div>' +
+      '<div class="sug-card__by">💡 '+(mine ? 'Ваше предложение' : 'Предложил(а) '+esc(t.suggestedByName||'эксперт'))+
+        (t.createdAt ? ' · '+formatDate(t.createdAt) : '')+'</div>' +
+      (actions ? '<div class="sug-card__actions">'+actions+'</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function openSuggestForm(taskId) {
+  var t = taskId ? allTasks.find(function(x){ return x.id === taskId; }) : null;
+  var slot = document.getElementById('sugFormSlot');
+  slot.innerHTML = '<div class="task-form" style="margin-top:12px;max-width:520px">' +
+    '<input id="sf-title" placeholder="Название задачи *" maxlength="120" value="'+esc(t ? t.title : '')+'"/>' +
+    '<textarea id="sf-desc" placeholder="Что сделать и зачем (необязательно)" maxlength="2000">'+esc(t ? t.description || '' : '')+'</textarea>' +
+    '<select id="sf-priority">' +
+      ['med','high','low'].map(function(p){ return '<option value="'+p+'"'+((t ? t.priority : 'med')===p?' selected':'')+'>'+
+        ({med:'🟡 Приоритет: Средний', high:'🔴 Высокий', low:'🔵 Низкий'})[p]+'</option>'; }).join('') +
+    '</select>' +
+    '<div class="task-form__btns">' +
+      '<button class="tf-btn tf-btn--save" data-id="'+esc(taskId||'')+'" onclick="saveSuggestion(this)">'+(t ? 'Сохранить' : 'Предложить')+'</button>' +
+      '<button class="tf-btn tf-btn--cancel" onclick="document.getElementById(\'sugFormSlot\').innerHTML=\'\'">Отмена</button>' +
+    '</div></div>';
+  document.getElementById('sf-title').focus();
+}
+
+async function saveSuggestion(btn) {
+  var id = btn.getAttribute('data-id');
+  var data = {
+    title:       document.getElementById('sf-title').value.trim(),
+    description: document.getElementById('sf-desc').value.trim(),
+    priority:    document.getElementById('sf-priority').value,
+  };
+  if (!data.title) { showToast('Введите название задачи','error'); return; }
+  btn.disabled = true;
+  try {
+    if (id) {
+      var upd = (await api.patch('/startups/'+startupId+'/tasks/'+id, data)).task;
+      var i = allTasks.findIndex(function(x){ return x.id === id; });
+      if (i !== -1) allTasks[i] = Object.assign({}, allTasks[i], _toCamel(upd));
+    } else {
+      var created = (await api.post('/startups/'+startupId+'/tasks', data)).task;
+      allTasks.push(Object.assign({ id: created.id }, _toCamel(created)));
+    }
+    document.getElementById('sugFormSlot').innerHTML = '';
+    renderSuggestions();
+    showToast(id ? 'Предложение обновлено' : '💡 Задача предложена — основатель получил уведомление','success');
+  } catch(e) { btn.disabled = false; showToast('Ошибка: '+e.message,'error'); }
+}
+
+async function acceptSuggestion(btn) {
+  var id = btn.getAttribute('data-id');
+  try {
+    await api.patch('/startups/'+startupId+'/tasks/'+id, { status: 'backlog', is_public: true });
+    var t = allTasks.find(function(x){ return x.id === id; });
+    if (t) { t.status = 'backlog'; t.isPublic = true; t.is_public = true; }
+    renderBoard(isOwner || memberPerms.kanban === true);
+    showToast('Задача принята в Backlog','success');
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+}
+
+async function rejectSuggestion(btn) {
+  var id = btn.getAttribute('data-id');
+  var t = allTasks.find(function(x){ return x.id === id; });
+  var mine = t && t.suggestedBy === pageUser.uid;
+  if (!confirm(mine ? 'Отозвать предложение?' : 'Отклонить предложенную задачу? Автор получит уведомление.')) return;
+  try {
+    await api.delete('/startups/'+startupId+'/tasks/'+id);
+    allTasks = allTasks.filter(function(x){ return x.id !== id; });
+    renderSuggestions();
+    showToast(mine ? 'Предложение отозвано' : 'Предложение отклонено','success');
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
 function updateStats(byCol) {
-  var total = allTasks.length;
+  var total = allTasks.filter(function(t){ return t.status !== 'suggested'; }).length;
   var done  = (byCol&&byCol.done) ? byCol.done.length : allTasks.filter(function(t){return t.status==='done';}).length;
   var doing = allTasks.filter(function(t){return t.status==='doing';}).length;
   var todo  = allTasks.filter(function(t){return t.status==='todo';}).length;
@@ -466,7 +605,7 @@ async function saveTask(btn) {
   var canEdit = isOwner || (memberPerms && memberPerms.kanban === true);
   if (!canEdit) return;
   var title = (document.getElementById('tf-title').value||'').trim();
-  if (!title) { showToast('Введи название','error'); return; }
+  if (!title) { showToast(tv('Введи название','Введите название'),'error'); return; }
 
   var assigneeUid  = document.getElementById('tf-assignee').value || '';
   var assigneeName = '';
@@ -548,14 +687,70 @@ function editTask(btn) { var taskId=btn.getAttribute("data-id");
   document.getElementById('tf-title').focus();
 }
 
-async function moveTask(sel) { var taskId=sel.getAttribute("data-id"); var newStatus=sel.value;
-  if (!isOwner) return;
+async function moveTask(sel) { await moveTaskTo(sel.getAttribute("data-id"), sel.value); }
+
+// Перенос задачи в колонку (выпадающий список или перетаскивание).
+// Двигать может основатель / админ и участник с правом «канбан»; заблокированную — только основатель.
+function canMoveTask(t) {
+  var canEdit = isOwner || memberPerms.kanban === true;
+  return !!t && canEdit && (isOwner || !t.locked);
+}
+async function moveTaskTo(taskId, newStatus) {
+  var t = allTasks.find(function(x){ return x.id === taskId; });
+  if (!canMoveTask(t) || !COLS[newStatus] || t.status === newStatus) return;
+  var prevStatus = t.status;
+  t.status = newStatus;                              // сразу показываем на новом месте
+  renderBoard(isOwner || memberPerms.kanban === true);
   try {
     await db.collection('startups').doc(startupId).collection('tasks').doc(taskId).update({
       status: newStatus, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
+  } catch(e) {
+    t.status = prevStatus;                           // откат, если сервер отказал
+    renderBoard(isOwner || memberPerms.kanban === true);
+    showToast('Ошибка: '+e.message,'error');
+  }
 }
+
+// ── ПЕРЕТАСКИВАНИЕ (drag & drop) ──────────────────────
+var dragTaskId = null;
+function onTaskDragStart(e) {
+  // Не начинаем drag с элементов управления внутри карточки
+  if (e.target.closest && e.target.closest('select,button,textarea,input,a')) { e.preventDefault(); return; }
+  dragTaskId = e.currentTarget.getAttribute('data-id');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragTaskId);
+  e.currentTarget.classList.add('dragging');
+}
+function onTaskDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.col.drop-target').forEach(function(c){ c.classList.remove('drop-target'); });
+  dragTaskId = null;
+}
+// Колонка целиком (вместе с заголовком) принимает задачу — можно бросить и в свёрнутую
+function initColumnDrop() {
+  Object.keys(COLS).forEach(function(col) {
+    var wrap = document.getElementById('colWrap-'+col);
+    if (!wrap) return;
+    wrap.addEventListener('dragover', function(e) {
+      if (!dragTaskId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      wrap.classList.add('drop-target');
+    });
+    wrap.addEventListener('dragleave', function(e) {
+      if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('drop-target');
+    });
+    wrap.addEventListener('drop', function(e) {
+      e.preventDefault();
+      wrap.classList.remove('drop-target');
+      var id = dragTaskId || e.dataTransfer.getData('text/plain');
+      dragTaskId = null;
+      if (id) moveTaskTo(id, col);
+    });
+  });
+}
+initColumnDrop();
 
 async function deleteTask(btn) { var taskId=btn.getAttribute("data-id");
   if (!isOwner || !confirm('Удалить задачу?')) return;

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Командный чат — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     html,body{height:100%;overflow:hidden}
     .chat-layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - var(--nav-h));margin-top:var(--nav-h)}
@@ -94,7 +94,7 @@
   <div class="chat-main">
     <div class="empty-chat" id="emptyState">
       <div class="empty-chat__icon">💬</div>
-      <div style="font-size:15px;font-weight:600">Выбери стартап</div>
+      <div style="font-size:15px;font-weight:600" data-ty="Выбери стартап">Выберите стартап</div>
       <div style="font-size:13px;color:var(--text3)">Командный чат доступен участникам стартапа</div>
     </div>
 
@@ -110,7 +110,7 @@
       <div class="chat-input-area">
         <input type="file" id="photoFileInput" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="sendPhoto(this)"/>
         <button class="send-btn" style="background:var(--bg3);color:var(--text2);font-size:20px" title="Прикрепить фото" onclick="document.getElementById('photoFileInput').click()">📎</button>
-        <textarea class="chat-textarea" id="msgInput" placeholder="Напиши сообщение команде..." rows="1"
+        <textarea class="chat-textarea" id="msgInput" placeholder="Напишите сообщение команде..." data-ty-placeholder="Напиши сообщение команде..." rows="1"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
           oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
         <button class="send-btn" id="sendBtn" onclick="send()">→</button>
@@ -120,7 +120,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
@@ -157,7 +157,7 @@ async function loadStartups() {
 function renderSidebar(startups) {
   var list = document.getElementById('convList');
   if (!startups.length) {
-    list.innerHTML = '<div class="sidebar-empty">Ты не состоишь ни в одном стартапе.<br>Вступи в стартап или создай свой.</div>';
+    list.innerHTML = '<div class="sidebar-empty">'+tv('Ты не состоишь ни в одном стартапе.<br>Вступи в стартап или создай свой.','Вы не состоите ни в одном стартапе.<br>Вступите в стартап или создайте свой.')+'</div>';
     return;
   }
   list.innerHTML = startups.map(function(s) {
@@ -232,7 +232,7 @@ async function loadMessages() {
 function renderMessages(msgs) {
   var el = document.getElementById('chatMessages');
   if (!msgs.length) {
-    el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;margin-top:40px">Напиши первое сообщение команде 👋</div>';
+    el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;margin-top:40px">'+tv('Напиши первое сообщение команде 👋','Напишите первое сообщение команде 👋')+'</div>';
     return;
   }
   var html = '', lastDate = '';

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Форум — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .forum-layout{display:grid;grid-template-columns:1fr 260px;gap:24px}
     @media(max-width:860px){.forum-layout{grid-template-columns:1fr}}
@@ -157,7 +157,7 @@
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">Первое сообщение *</label>
-          <textarea class="form-textarea" id="newTopicBody" style="min-height:160px" placeholder="Расскажи подробнее..."></textarea>
+          <textarea class="form-textarea" id="newTopicBody" style="min-height:160px" placeholder="Расскажите подробнее..." data-ty-placeholder="Расскажи подробнее..."></textarea>
         </div>
         <div id="newTopicErr" class="form-error" style="display:none;margin-top:10px"></div>
         <div style="display:flex;gap:10px;margin-top:16px">
@@ -188,7 +188,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 var currentView    = 'list';
 var currentCat     = '';
@@ -465,7 +465,7 @@ function renderPosts(posts) {
     var reportBtn = canReport
       ? '<button class="btn btn--ghost" style="font-size:11px;padding:2px 7px;color:var(--text3)" '+
         'data-uid="'+esc(p.authorUid)+'" data-name="'+esc((p.authorName||'').replace(/"/g,''))+'" data-pid="'+esc(p.id||'')+'" '+
-        'onclick="openReport(this)" title="Пожаловаться">⚠️ Пожаловаться</button>'
+        'onclick="openReport(this)" title="Пожаловаться">Пожаловаться</button>'
       : '';
     return '<div class="post-card'+(isOp?' op':'')+'">'+
       '<div class="post-card__header">'+
@@ -495,7 +495,7 @@ function buildReplyBox() {
   return '<div class="reply-box">'+
     '<h3>Ответить в теме</h3>'+
     '<div class="form-group" style="margin-bottom:0">'+
-      '<textarea class="form-textarea" id="replyText" style="min-height:120px" placeholder="Напиши ответ..."></textarea>'+
+      '<textarea class="form-textarea" id="replyText" style="min-height:120px" placeholder="'+tv('Напиши ответ...','Напишите ответ...')+'"></textarea>'+
     '</div>'+
     '<div id="replyErr" class="form-error" style="display:none;margin-top:8px"></div>'+
     '<div style="margin-top:12px;display:flex;gap:10px">'+
@@ -522,8 +522,8 @@ async function createTopic() {
   var cat   = document.getElementById('newTopicCat').value;
   var err   = document.getElementById('newTopicErr');
   err.style.display = 'none';
-  if (!title) { err.textContent='Введи заголовок темы'; err.style.display='block'; return; }
-  if (body.length < 10) { err.textContent='Напиши первое сообщение (минимум 10 символов)'; err.style.display='block'; return; }
+  if (!title) { err.textContent=tv('Введи заголовок темы','Введите заголовок темы'); err.style.display='block'; return; }
+  if (body.length < 10) { err.textContent=tv('Напиши первое сообщение (минимум 10 символов)','Напишите первое сообщение (минимум 10 символов)'); err.style.display='block'; return; }
 
   try {
     var ref = await db.collection('forum_topics').add({
@@ -546,7 +546,7 @@ async function sendReply() {
   var ta  = document.getElementById('replyText');
   var err = document.getElementById('replyErr');
   var body = ta ? ta.value.trim() : '';
-  if (!body) { err.textContent='Напиши сообщение'; err.style.display='block'; return; }
+  if (!body) { err.textContent=tv('Напиши сообщение','Напишите сообщение'); err.style.display='block'; return; }
   err.style.display = 'none';
   try {
     await db.collection('forum_topics').doc(currentTopicId).collection('posts').add({

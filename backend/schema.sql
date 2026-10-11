@@ -99,6 +99,9 @@ CREATE TABLE IF NOT EXISTS startup_tasks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_startup ON startup_tasks(startup_id);
+-- Предложенные задачи (status='suggested'): эксперт или ментор предлагает, команда принимает или отклоняет
+ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS suggested_by      TEXT;
+ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS suggested_by_name TEXT DEFAULT '';
 
 -- ── Вакансии ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS startup_vacancies (
@@ -360,6 +363,11 @@ CREATE TABLE IF NOT EXISTS role_verifications (
 CREATE INDEX IF NOT EXISTS idx_role_verif_status ON role_verifications(status);
 CREATE INDEX IF NOT EXISTS idx_role_verif_user ON role_verifications(user_uid);
 ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS inn TEXT DEFAULT '';
+-- Реквизиты организации буст-партнёра
+ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS legal_address  TEXT DEFAULT '';
+ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS director_name  TEXT DEFAULT '';
+ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS director_phone TEXT DEFAULT '';
+ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS org_logo       TEXT DEFAULT '';
 
 -- ── Банк идей: буст-партнёры публикуют, стартаперы забирают ──
 CREATE TABLE IF NOT EXISTS ideas (
@@ -378,3 +386,26 @@ CREATE TABLE IF NOT EXISTS ideas (
 CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ideas_author ON ideas(author_uid);
 CREATE INDEX IF NOT EXISTS idx_ideas_taken  ON ideas(taken_by);
+
+-- ── Группы пользователей (ограничения видимости стартапов и переписки) ──
+-- В проде создавались вручную; здесь — чтобы схему можно было поднять с нуля
+CREATE TABLE IF NOT EXISTS groups (
+  id                    UUID PRIMARY KEY,
+  name                  TEXT NOT NULL,
+  startup_visibility    TEXT DEFAULT 'all',
+  messaging_restriction BOOLEAN DEFAULT FALSE,
+  created_at            TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS user_groups (
+  user_uid TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_uid, group_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_groups_group ON user_groups(group_id);
+
+-- Групповые чаты команд стартапов
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS is_group   BOOLEAN DEFAULT FALSE;
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS startup_id TEXT REFERENCES startups(id) ON DELETE CASCADE;
+
+-- Пройден ли онбординг (заполняется при регистрации)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_done BOOLEAN DEFAULT FALSE;

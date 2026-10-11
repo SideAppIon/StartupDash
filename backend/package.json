@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "deploy": "zip -r function.zip . --exclude '*.git*' --exclude 'node_modules/.cache/*' && echo 'Upload function.zip to Yandex Cloud Functions'"
+    "deploy": "zip -r function.zip . --exclude '*.git*' --exclude 'node_modules/.cache/*' && echo 'Upload function.zip to Yandex Cloud Functions'",
+    "local": "node --env-file=.env index.js",
+    "seed": "node --env-file=.env seed-local.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1063.0",

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Админ-панель — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .admin-header{background:linear-gradient(135deg,rgba(255,71,87,.08),rgba(255,71,87,.02));border-bottom:1px solid rgba(255,71,87,.2);padding:32px 0;margin-bottom:28px}
     .admin-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,71,87,.15);border:1px solid rgba(255,71,87,.3);color:var(--danger);font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:.5px;margin-bottom:12px}
@@ -93,6 +93,7 @@
       <button class="tab-a" onclick="showTab('settings',this)">⚙️ Настройки</button>
       <button class="tab-a" onclick="showTab('forum',this)">💬 Форум</button>
       <button class="tab-a" onclick="showTab('polls',this)">📊 Опросы</button>
+      <button class="tab-a" onclick="showTab('ideas',this)">💡 Идеи</button>
     </div>
     </div>
 
@@ -130,6 +131,19 @@
     <!-- POLLS -->
     <div id="tab-polls" style="display:none">
       <div id="adminPollsList"><div class="spinner"></div></div>
+    </div>
+
+    <!-- IDEAS -->
+    <div id="tab-ideas" style="display:none">
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        <input type="text" class="search-bar" id="ideaAdminSearch" placeholder="🔍 Поиск по названию или автору..." oninput="renderAdminIdeas()" style="margin-bottom:0;flex:1;min-width:200px"/>
+        <select class="form-select" id="ideaAdminStatus" onchange="renderAdminIdeas()" style="max-width:180px">
+          <option value="">Все идеи</option>
+          <option value="open">Свободные</option>
+          <option value="taken">Забранные</option>
+        </select>
+      </div>
+      <div id="adminIdeasList"><div class="spinner"></div></div>
     </div>
 
     <!-- SETTINGS -->
@@ -197,7 +211,7 @@
         <!-- Стадии -->
         <div class="settings-card">
           <h3>📊 Стадии проекта</h3>
-          <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Нажми на иконку стадии чтобы изменить ее</p>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Нажмите на иконку стадии, чтобы изменить её</p>
           <ul class="item-list" id="stageList"></ul>
           <div class="add-row">
             <input type="text" id="stageInput" placeholder="Название стадии..." maxlength="40"
@@ -206,7 +220,7 @@
           </div>
           <!-- Выбор иконки -->
           <div id="iconPickerWrap" style="display:none;margin-top:12px">
-            <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Выбери иконку для стадии:</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Выберите иконку для стадии:</div>
             <div class="emoji-pick-row" id="emojiPicker"></div>
           </div>
         </div>
@@ -217,6 +231,23 @@
 </div>
 
 <!-- Role modal -->
+<!-- Переименование идеи -->
+<div class="modal-overlay" id="ideaRenameModal">
+  <div class="modal">
+    <div class="modal__header">
+      <div class="modal__title">Переименовать идею</div>
+      <button class="modal__close" onclick="closeIdeaRename()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Название</label>
+      <input type="text" class="form-input" id="ideaRenameInput" maxlength="120"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();applyIdeaRename()}"/>
+    </div>
+    <div id="ideaRenameErr" class="form-error" style="display:none;margin-bottom:10px"></div>
+    <button class="btn btn--primary" style="width:100%;justify-content:center" onclick="applyIdeaRename()">💾 Сохранить</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="roleModal">
   <div class="modal">
     <div class="modal__header">
@@ -383,7 +414,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
@@ -558,13 +589,13 @@ function renderCensorWords() {
 function addCensorWord() {
   var inp = document.getElementById('censorWordInput');
   var word = (inp.value||'').trim();
-  if (!word) { showToast('Введи слово','warn'); return; }
+  if (!word) { showToast('Введите слово','warn'); return; }
   if (censorship.words.some(function(w){ return (w.word||'').toLowerCase() === word.toLowerCase(); })) {
     showToast('Такое слово уже есть','warn'); return;
   }
   var forum = document.getElementById('censorNewForum').checked;
   var msg   = document.getElementById('censorNewMsg').checked;
-  if (!forum && !msg) { showToast('Выбери хотя бы один раздел','warn'); return; }
+  if (!forum && !msg) { showToast('Выберите хотя бы один раздел','warn'); return; }
   censorship.words.push({ word: word, forum: forum, messages: msg });
   inp.value = '';
   renderCensorWords();
@@ -594,7 +625,7 @@ async function saveCensorMessage() {
 
 async function savePolicyUrl() {
   var url = document.getElementById('policyUrlInput').value.trim();
-  if (!url) { showToast('Введи ссылку','error'); return; }
+  if (!url) { showToast('Введите ссылку','error'); return; }
   try {
     await api.post('/platform-config', { policyUrl: url });
     showToast('Ссылка на политику сохранена','success');
@@ -603,7 +634,7 @@ async function savePolicyUrl() {
 
 async function saveFeedLimit() {
   var val = parseInt(document.getElementById('feedLimitInput').value, 10);
-  if (isNaN(val)||val<5||val>100) { showToast('Введи число от 5 до 100','error'); return; }
+  if (isNaN(val)||val<5||val>100) { showToast('Введите число от 5 до 100','error'); return; }
   try {
     await api.post('/platform-config', { feedLimit: val });
     showToast('Лимит ленты сохранен: '+val,'success');
@@ -693,8 +724,88 @@ function showTab(name, btn) {
   document.getElementById('tab-settings').style.display = name==='settings' ?'block':'none';
   document.getElementById('tab-forum').style.display    = name==='forum'    ?'block':'none';
   document.getElementById('tab-polls').style.display    = name==='polls'    ?'block':'none';
+  document.getElementById('tab-ideas').style.display    = name==='ideas'    ?'block':'none';
   if (name==='forum') loadAdminTopics();
   if (name==='polls') loadAdminPolls();
+  if (name==='ideas') loadAdminIdeas();
+}
+
+// ── ИДЕИ (админ): переименование и удаление ───────────
+var adminIdeas = [];
+var renameIdeaId = null;
+
+async function loadAdminIdeas() {
+  var el = document.getElementById('adminIdeasList');
+  el.innerHTML = '<div class="spinner"></div>';
+  try {
+    adminIdeas = (await api.get('/ideas')).ideas || [];
+    renderAdminIdeas();
+  } catch(e) { el.innerHTML = '<p style="color:var(--danger)">Ошибка загрузки: '+esc(e.message)+'</p>'; }
+}
+
+function renderAdminIdeas() {
+  var el = document.getElementById('adminIdeasList');
+  var q  = document.getElementById('ideaAdminSearch').value.trim().toLowerCase();
+  var st = document.getElementById('ideaAdminStatus').value;
+  var list = adminIdeas.filter(function(i) {
+    if (st && i.status !== st) return false;
+    if (!q) return true;
+    return (i.title||'').toLowerCase().includes(q) || (i.authorName||'').toLowerCase().includes(q);
+  });
+  if (!list.length) {
+    el.innerHTML = '<p style="color:var(--text2);font-size:14px">'+(adminIdeas.length ? 'Ничего не найдено' : 'Идей пока нет')+'</p>';
+    return;
+  }
+  el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' + list.map(function(i) {
+    var status = i.status === 'taken'
+      ? '🚀 забрал(а) '+esc(i.takerName||'?')+(i.startupName ? ' → '+esc(i.startupName) : '')
+      : '🟢 свободна';
+    return '<div class="user-row">'+
+      '<span style="font-size:20px">💡</span>'+
+      '<div class="user-row__info">'+
+        '<div class="user-row__name">'+esc(i.title)+'</div>'+
+        '<div class="user-row__email">'+esc(i.authorName||'?')+(i.category ? ' · '+esc(i.category) : '')+' · '+status+' · '+formatDate(i.createdAt)+'</div>'+
+      '</div>'+
+      '<div class="user-row__actions">'+
+        '<button class="btn btn--outline btn--sm" data-id="'+esc(i.id)+'" onclick="openIdeaRename(this.getAttribute(\'data-id\'))">✏️ Переименовать</button>'+
+        '<button class="btn btn--danger btn--sm" data-id="'+esc(i.id)+'" onclick="delAdminIdea(this.getAttribute(\'data-id\'))">✕ Удалить</button>'+
+      '</div>'+
+    '</div>';
+  }).join('') + '</div>';
+}
+
+function openIdeaRename(id) {
+  var idea = adminIdeas.find(function(i){ return i.id === id; });
+  if (!idea) return;
+  renameIdeaId = id;
+  document.getElementById('ideaRenameInput').value = idea.title;
+  document.getElementById('ideaRenameErr').style.display = 'none';
+  document.getElementById('ideaRenameModal').classList.add('open');
+  setTimeout(function(){ document.getElementById('ideaRenameInput').select(); }, 30);
+}
+function closeIdeaRename() { document.getElementById('ideaRenameModal').classList.remove('open'); }
+
+async function applyIdeaRename() {
+  var title = document.getElementById('ideaRenameInput').value.trim();
+  var errEl = document.getElementById('ideaRenameErr');
+  if (!title) { errEl.textContent = 'Введите название'; errEl.style.display = 'block'; return; }
+  try {
+    await api.patch('/ideas/'+renameIdeaId, { title: title });
+    closeIdeaRename();
+    showToast('Идея переименована','success');
+    await loadAdminIdeas();
+  } catch(e) { errEl.textContent = 'Ошибка: '+e.message; errEl.style.display = 'block'; }
+}
+
+async function delAdminIdea(id) {
+  var idea = adminIdeas.find(function(i){ return i.id === id; });
+  var warn = idea && idea.status === 'taken' ? '\nИдею уже забрали — у стартапа пропадёт привязка к ней.' : '';
+  if (!(await uiConfirm({ title: 'Удалить идею?', text: '«'+(idea ? idea.title : '')+'»'+warn, okText: 'Удалить', danger: true }))) return;
+  try {
+    await api.delete('/ideas/'+id);
+    showToast('Идея удалена','success');
+    await loadAdminIdeas();
+  } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
 // ── ОПРОСЫ (админ) ────────────────────────────────────
@@ -806,7 +917,7 @@ async function doCreateUser() {
   var email = document.getElementById('cuEmail').value.trim();
   var pwd   = document.getElementById('cuPwd').value.trim();
   var role  = document.getElementById('cuRole').value;
-  if (!name||!email||!pwd) { showToast('Заполни все поля','error'); return; }
+  if (!name||!email||!pwd) { showToast('Заполните все поля','error'); return; }
   if (pwd.length<6) { showToast('Пароль минимум 6 символов','error'); return; }
   try {
     await api.post('/users/admin/create', { name, email, password: pwd, role });
@@ -1027,7 +1138,7 @@ function openCreateGroup() {
 function closeCreateGroup() { document.getElementById('createGroupModal').classList.remove('open'); }
 async function doCreateGroup() {
   var name = document.getElementById('cgName').value.trim();
-  if (!name) { showToast('Введи название','error'); return; }
+  if (!name) { showToast('Введите название','error'); return; }
   try {
     await api.post('/groups', { name });
     closeCreateGroup();

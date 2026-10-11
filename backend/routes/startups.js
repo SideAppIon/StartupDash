@@ -4,7 +4,8 @@ const { query, queryOne, queryAll } = require('../db');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { getUserGroupSettings } = require('./groups');
 const { checkCensor } = require('../lib/censor');
-const { isExpertRole, canJoinProject } = require('../lib/roles');
+const { isActiveExpert, canJoinProject, canSuggestTasks } = require('../lib/roles');
+const { sendDirectMessage } = require('../lib/dm');
 
 const router = express.Router();
 
@@ -31,6 +32,9 @@ async function ensureTasksSchema() {
     // Дедлайн и архив — на случай, если таблица создавалась до их появления в схеме
     await query('ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS deadline DATE');
     await query('ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false');
+    // Предложенные задачи (status='suggested'): кто предложил — эксперт или ментор
+    await query('ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS suggested_by TEXT');
+    await query("ALTER TABLE startup_tasks ADD COLUMN IF NOT EXISTS suggested_by_name TEXT DEFAULT ''");
     tasksSchemaEnsured = true;
   } catch (e) {
     console.error('ensureTasksSchema error:', e.message);
@@ -300,7 +304,8 @@ router.delete('/:id/like', requireAuth, async (req, res) => {
 // POST /startups — создать
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const canCreate = ['startup', 'admin'].includes(req.user.role) || isExpertRole(req.user.role);
+    // Наблюдатель стартапы не создаёт
+    const canCreate = ['startup', 'admin'].includes(req.user.role) || isActiveExpert(req.user.role);
     if (!canCreate) {
       return res.status(403).json({ error: 'Только стартапер или эксперт могут создавать проекты' });
     }
@@ -734,7 +739,7 @@ router.post('/:id/updates', requireAuth, async (req, res) => {
     const imageUrl = req.body.imageUrl || req.body.image_url || '';
     const videoUrl = normalizeVkVideo(req.body.videoUrl || req.body.video_url || '');
 
-    if (!content) return res.status(400).json({ error: 'Напиши содержание обновления' });
+    if (!content) return res.status(400).json({ error: 'Добавьте содержание обновления' });
 
     // Фильтр слов для публикуемых обновлений (область публичного контента)
     const cen = await checkCensor(title + ' ' + content, 'forum');
@@ -770,13 +775,21 @@ router.delete('/:id/updates/:updateId', requireAuth, async (req, res) => {
 });
 
 // ── Задачи (Roadmap/Kanban) ───────────────────────────────
-router.get('/:id/tasks', async (req, res) => {
+router.get('/:id/tasks', optionalAuth, async (req, res) => {
   try {
     await ensureTasksSchema();
-    const tasks = await queryAll(
+    let tasks = await queryAll(
       'SELECT * FROM startup_tasks WHERE startup_id = $1 ORDER BY position ASC, created_at ASC',
       [req.params.id]
     );
+    // Предложенные задачи видят основатель, админ, команда и сам автор предложения
+    if (tasks.some(t => t.status === 'suggested')) {
+      const uid = req.user && req.user.uid;
+      const startup = await queryOne('SELECT owner_uid FROM startups WHERE id=$1', [req.params.id]);
+      const insider = uid && ((startup && startup.owner_uid === uid) || req.user.role === 'admin'
+        || await isStartupMember(req.params.id, uid));
+      if (!insider) tasks = tasks.filter(t => t.status !== 'suggested' || (uid && t.suggested_by === uid));
+    }
     res.json({ tasks });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -791,8 +804,35 @@ router.post('/:id/tasks', requireAuth, async (req, res) => {
     const isOwner = startup.owner_uid === req.user.uid;
     const isAdmin = req.user.role === 'admin';
     const hasPerm = await checkTeamPermission(req.params.id, req.user.uid, 'kanban');
-    if (!isOwner && !isAdmin && !hasPerm) return res.status(403).json({ error: 'Нет доступа' });
     await ensureTasksSchema();
+
+    // Эксперт / ментор из команды стартапа без доступа к канбану — может только ПРЕДЛОЖИТЬ задачу
+    if (!isOwner && !isAdmin && !hasPerm) {
+      if (!canSuggestTasks(req.user.role)) return res.status(403).json({ error: 'Нет доступа' });
+      if (!(await isStartupMember(req.params.id, req.user.uid))) {
+        return res.status(403).json({ error: 'Предлагать задачи могут только участники команды стартапа' });
+      }
+      const title = String(req.body.title || '').trim().slice(0, 120);
+      const description = String(req.body.description || '').trim().slice(0, 2000);
+      const priority = ['low', 'med', 'high'].includes(req.body.priority) ? req.body.priority : 'med';
+      if (!title) return res.status(400).json({ error: 'Укажите название задачи' });
+      const cen = await checkCensor(title + ' ' + description, 'forum');
+      if (cen.blocked) return res.status(400).json({ error: cen.message });
+
+      const me = await queryOne('SELECT name FROM users WHERE uid=$1', [req.user.uid]);
+      const task = await queryOne(
+        `INSERT INTO startup_tasks (id, startup_id, title, description, status, priority, is_public,
+           locked, archived, suggested_by, suggested_by_name, created_at)
+         VALUES ($1,$2,$3,$4,'suggested',$5,false,false,false,$6,$7,NOW()) RETURNING *`,
+        [uuidv4(), req.params.id, title, description, priority, req.user.uid, me ? me.name : '']
+      );
+      const s = await queryOne('SELECT name FROM startups WHERE id=$1', [req.params.id]);
+      try {
+        await sendDirectMessage(req.user.uid, startup.owner_uid,
+          `💡 Предлагаю задачу «${title}» для роадмапа «${s ? s.name : ''}». Её можно принять или отклонить на странице Roadmap.`);
+      } catch (e) { console.error('suggest DM error:', e.message); }
+      return res.status(201).json({ task });
+    }
 
     const b = req.body;
     const title       = b.title       || '';
@@ -827,11 +867,35 @@ router.patch('/:id/tasks/:taskId', requireAuth, async (req, res) => {
     const isOwner = startup && startup.owner_uid === req.user.uid;
     const isAdmin = req.user.role === 'admin';
     const hasPerm = await checkTeamPermission(req.params.id, req.user.uid, 'kanban');
-    if (!isOwner && !isAdmin && !hasPerm) return res.status(403).json({ error: 'Нет доступа' });
     await ensureTasksSchema();
+    const current = await queryOne(
+      'SELECT locked, status, title, suggested_by FROM startup_tasks WHERE id=$1 AND startup_id=$2',
+      [req.params.taskId, req.params.id]
+    );
+    if (!current) return res.status(404).json({ error: 'Задача не найдена' });
+
+    // Автор предложения правит своё предложение, пока его не рассмотрели (только текст и приоритет)
+    if (!isOwner && !isAdmin && !hasPerm) {
+      if (!(current.status === 'suggested' && current.suggested_by === req.user.uid)) {
+        return res.status(403).json({ error: 'Нет доступа' });
+      }
+      const f = {};
+      if (req.body.title !== undefined)       f.title = String(req.body.title).trim().slice(0, 120);
+      if (req.body.description !== undefined) f.description = String(req.body.description).trim().slice(0, 2000);
+      if (['low', 'med', 'high'].includes(req.body.priority)) f.priority = req.body.priority;
+      if (f.title === '') return res.status(400).json({ error: 'Укажите название задачи' });
+      const keys = Object.keys(f);
+      if (!keys.length) return res.status(400).json({ error: 'Нечего обновлять' });
+      const cen = await checkCensor((f.title || '') + ' ' + (f.description || ''), 'forum');
+      if (cen.blocked) return res.status(400).json({ error: cen.message });
+      const task = await queryOne(
+        `UPDATE startup_tasks SET ${keys.map((k, i) => `${k}=$${i + 1}`).join(',')} WHERE id=$${keys.length + 1} RETURNING *`,
+        [...keys.map(k => f[k]), req.params.taskId]
+      );
+      return res.json({ task });
+    }
 
     // Если задача заблокирована — редактировать может только владелец/админ
-    const current = await queryOne('SELECT locked FROM startup_tasks WHERE id=$1', [req.params.taskId]);
     if (current && current.locked && !isOwner && !isAdmin) {
       return res.status(403).json({ error: 'Задача заблокирована основателем' });
     }
@@ -854,6 +918,14 @@ router.patch('/:id/tasks/:taskId', requireAuth, async (req, res) => {
     const task = await queryOne(
       `UPDATE startup_tasks SET ${updates.join(',')} WHERE id=$${values.length} RETURNING *`, values
     );
+    // Предложение приняли (перенесли из «Предложенных» в колонку) — сообщаем автору
+    if (current.status === 'suggested' && task && task.status !== 'suggested' && current.suggested_by) {
+      const s = await queryOne('SELECT name FROM startups WHERE id=$1', [req.params.id]);
+      try {
+        await sendDirectMessage(req.user.uid, current.suggested_by,
+          `✅ Ваша задача «${current.title}» принята в роадмап «${s ? s.name : ''}».`);
+      } catch (e) { console.error('suggest accept DM error:', e.message); }
+    }
     res.json({ task });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -862,10 +934,29 @@ router.patch('/:id/tasks/:taskId', requireAuth, async (req, res) => {
 
 router.delete('/:id/tasks/:taskId', requireAuth, async (req, res) => {
   try {
-    const startup = await queryOne('SELECT owner_uid FROM startups WHERE id = $1', [req.params.id]);
+    await ensureTasksSchema();
+    const startup = await queryOne('SELECT owner_uid, name FROM startups WHERE id = $1', [req.params.id]);
     const isOwner = startup && startup.owner_uid === req.user.uid;
-    if (!isOwner && req.user.role !== 'admin') return res.status(403).json({ error: 'Нет доступа' });
+    const isAdmin = req.user.role === 'admin';
+    const task = await queryOne(
+      'SELECT status, title, suggested_by FROM startup_tasks WHERE id=$1 AND startup_id=$2',
+      [req.params.taskId, req.params.id]
+    );
+    if (!task) return res.status(404).json({ error: 'Задача не найдена' });
+    const isSuggestion = task.status === 'suggested';
+    const isAuthor = isSuggestion && task.suggested_by === req.user.uid;
+    // Предложение может отклонить и участник с доступом к канбану, а автор — отозвать
+    const canReject = isSuggestion && await checkTeamPermission(req.params.id, req.user.uid, 'kanban');
+    if (!isOwner && !isAdmin && !canReject && !isAuthor) return res.status(403).json({ error: 'Нет доступа' });
+
     await queryOne('DELETE FROM startup_tasks WHERE id = $1', [req.params.taskId]);
+    // Предложение отклонил не сам автор — сообщаем ему
+    if (isSuggestion && !isAuthor && task.suggested_by) {
+      try {
+        await sendDirectMessage(req.user.uid, task.suggested_by,
+          `Задача «${task.title}», предложенная для роадмапа «${startup ? startup.name : ''}», отклонена.`);
+      } catch (e) { console.error('suggest reject DM error:', e.message); }
+    }
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -975,8 +1066,19 @@ function sanitizeProductInput(body) {
     description: clip(body.description, 2000),
     image_url:   clip(body.image_url != null ? body.image_url : body.imageUrl, 1000),
     price:       clip(body.price, 60),
-    buy_url:     clip(body.buy_url != null ? body.buy_url : body.buyUrl, 1000),
+    buy_url:     normalizeBuyLink(clip(body.buy_url != null ? body.buy_url : body.buyUrl, 1000)),
   };
+}
+
+// Ссылка «Купить» может быть контактом для связи: ник @username превращаем в ссылку на профиль,
+// а адрес без протокола (site.ru/…) дополняем https://
+function normalizeBuyLink(v) {
+  const s = String(v || '').trim();
+  const tg = s.match(/^@([A-Za-z0-9_]{5,32})$/);
+  if (tg) return 'https://t.me/' + tg[1];
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return s;                       // уже со схемой — проверит isSafeHttpUrl
+  if (/^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(s)) return 'https://' + s;   // домен без протокола
+  return s;
 }
 
 // Разрешаем только http(s)-ссылки — чтобы в кнопку «Купить» не попал javascript:/data:
@@ -1011,7 +1113,7 @@ router.post('/:id/products', requireAuth, async (req, res) => {
     const data = sanitizeProductInput(req.body);
     if (!data.description) return res.status(400).json({ error: 'Добавьте описание товара' });
     if (!isSafeHttpUrl(data.buy_url)) {
-      return res.status(400).json({ error: 'Укажите корректную ссылку «Купить» (http/https)' });
+      return res.status(400).json({ error: 'Укажите ссылку для покупки (https://…) или контакт для связи (@username)' });
     }
     const posRow = await queryOne(
       'SELECT COALESCE(MAX(position), -1) + 1 AS pos FROM startup_products WHERE startup_id=$1',
@@ -1044,7 +1146,7 @@ router.patch('/:id/products/:productId', requireAuth, async (req, res) => {
     const data = sanitizeProductInput(req.body);
     if (!data.description) return res.status(400).json({ error: 'Добавьте описание товара' });
     if (!isSafeHttpUrl(data.buy_url)) {
-      return res.status(400).json({ error: 'Укажите корректную ссылку «Купить» (http/https)' });
+      return res.status(400).json({ error: 'Укажите ссылку для покупки (https://…) или контакт для связи (@username)' });
     }
     const product = await queryOne(
       `UPDATE startup_products SET name=$1, description=$2, image_url=$3, price=$4, buy_url=$5

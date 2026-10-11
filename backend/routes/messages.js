@@ -4,7 +4,7 @@ const { query, queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { getUserGroupSettings } = require('./groups');
 const { checkCensor } = require('../lib/censor');
-const { isExpertRole, EXPERT_ROLES_SQL } = require('../lib/roles');
+const { isActiveExpert, isStaff, isObserver, ACTIVE_EXPERT_ROLES_SQL } = require('../lib/roles');
 
 const router = express.Router();
 
@@ -82,6 +82,46 @@ router.post('/notifications/seen', requireAuth, async (req, res) => {
   }
 });
 
+// ── Правила личной переписки (кто кому может НАЧАТЬ диалог) ──
+// Те же правила, что в интерфейсе (messages.html → canMessageUser):
+//   • персонал (админ, поддержка, модератор) пишет кому угодно, и ему может написать любой;
+//   • наблюдатель пишет только персоналу, и наблюдателю пишет только персонал;
+//   • одинаковые роли всегда могут писать друг другу;
+//   • стартапер → стартаперы, специалисты, эксперты (эксперт, куратор, ментор, буст-партнёр);
+//   • эксперт / куратор / ментор / буст-партнёр → стартаперы и коллеги со своей ролью;
+//   • специалист → специалисты и люди из его команд (владелец и участники);
+//   • если между людьми есть заявка или приглашение в проект — им можно переписываться.
+// В уже существующем диалоге отвечать можно всегда — проверяется только создание нового.
+async function canStartConversation(meUid, myRole, other) {
+  if (isStaff(myRole) || isStaff(other.role)) return true;
+  if (isObserver(myRole) || isObserver(other.role)) return false;
+  if (myRole === other.role) return true;
+  if (myRole === 'startup') return other.role === 'user' || isActiveExpert(other.role);
+  if (isActiveExpert(myRole) && other.role === 'startup') return true;
+
+  // Общая команда: один владелец стартапа, где другой в команде, или оба в одной команде
+  const sameTeam = await queryOne(
+    `SELECT 1 FROM startups s
+     WHERE (s.owner_uid = $1 AND EXISTS (SELECT 1 FROM startup_team t WHERE t.startup_id = s.id AND t.user_uid = $2))
+        OR (s.owner_uid = $2 AND EXISTS (SELECT 1 FROM startup_team t WHERE t.startup_id = s.id AND t.user_uid = $1))
+        OR (EXISTS (SELECT 1 FROM startup_team t WHERE t.startup_id = s.id AND t.user_uid = $1)
+            AND EXISTS (SELECT 1 FROM startup_team t WHERE t.startup_id = s.id AND t.user_uid = $2))
+     LIMIT 1`,
+    [meUid, other.uid]
+  );
+  if (sameTeam && myRole === 'user') return true;
+
+  // Заявка / приглашение в проект между ними (обсуждение заявки)
+  const invite = await queryOne(
+    `SELECT 1 FROM invites
+     WHERE (from_uid = $1 AND (startup_owner = $2 OR to_uid = $2))
+        OR (from_uid = $2 AND (startup_owner = $1 OR to_uid = $1))
+     LIMIT 1`,
+    [meUid, other.uid]
+  );
+  return !!invite;
+}
+
 // GET /conversations — список диалогов текущего пользователя
 router.get('/conversations', requireAuth, async (req, res) => {
   try {
@@ -115,6 +155,18 @@ router.post('/conversations', requireAuth, async (req, res) => {
     const { other_uid } = req.body;
     if (!other_uid || other_uid === req.user.uid) {
       return res.status(400).json({ error: 'other_uid обязателен' });
+    }
+
+    // Наблюдатель переписывается только с поддержкой / админами / модераторами,
+    // и писать наблюдателю тоже может только персонал (ответить он больше никому не сможет)
+    if (!isStaff(req.user.role)) {
+      const otherUser = await queryOne('SELECT role FROM users WHERE uid=$1', [other_uid]);
+      if (isObserver(req.user.role) && !(otherUser && isStaff(otherUser.role))) {
+        return res.status(403).json({ error: 'Наблюдатель не может писать в личные сообщения' });
+      }
+      if (otherUser && isObserver(otherUser.role)) {
+        return res.status(403).json({ error: 'Наблюдателю нельзя написать' });
+      }
     }
 
     // Проверяем ограничение коммуникации по группе
@@ -151,6 +203,13 @@ router.post('/conversations', requireAuth, async (req, res) => {
       [req.user.uid, other_uid]
     );
     if (existing) return res.json({ conversation: parseConv(existing) });
+
+    // Новый диалог — только если роли позволяют переписку
+    const otherForRules = await queryOne('SELECT uid, role FROM users WHERE uid=$1', [other_uid]);
+    if (!otherForRules) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (!(await canStartConversation(req.user.uid, req.user.role, otherForRules))) {
+      return res.status(403).json({ error: 'Вы не можете написать этому пользователю' });
+    }
 
     // Получаем данные обоих участников
     const [me, other] = await Promise.all([
@@ -229,6 +288,16 @@ router.post('/conversations/:id/messages', requireAuth, async (req, res) => {
     );
     if (!member) return res.status(403).json({ error: 'Нет доступа' });
 
+    // Наблюдатель может отвечать только в диалогах с персоналом (поддержка, модерация)
+    if (isObserver(req.user.role)) {
+      const nonStaff = await queryOne(
+        `SELECT 1 FROM conversation_participants cp JOIN users u ON u.uid = cp.user_uid
+         WHERE cp.conv_id = $1 AND cp.user_uid <> $2 AND u.role NOT IN ('admin','support','moderator') LIMIT 1`,
+        [req.params.id, req.user.uid]
+      );
+      if (nonStaff) return res.status(403).json({ error: 'Наблюдатель может переписываться только с поддержкой' });
+    }
+
     const { text, type } = req.body;
     if (!text) return res.status(400).json({ error: 'text обязателен' });
     // Фильтр слов для личных сообщений (системные сообщения не проверяем)
@@ -263,12 +332,17 @@ router.get('/available-users', requireAuth, async (req, res) => {
     let sql = `SELECT uid, name, email, role, avatar FROM users WHERE uid != $1`;
     const params = [req.user.uid];
 
+    // Одинаковые роли всегда могут писать друг другу (кроме наблюдателя — он не переписывается)
     if (myRole === 'startup') {
-      // Стартапер: специалисты и эксперты (куратор, ментор, наблюдатель)
-      sql += ` AND role IN ('user',${EXPERT_ROLES_SQL})`;
-    } else if (isExpertRole(myRole)) {
-      // Эксперт / куратор / ментор / наблюдатель: только стартаперы
-      sql += ` AND role = 'startup'`;
+      // Стартапер: другие стартаперы, специалисты и эксперты (куратор, ментор, буст-партнёр)
+      sql += ` AND role IN ('startup','user',${ACTIVE_EXPERT_ROLES_SQL})`;
+    } else if (isActiveExpert(myRole)) {
+      // Эксперт / куратор / ментор / буст-партнёр: стартаперы и коллеги с той же ролью
+      params.push(myRole);
+      sql += ` AND role IN ('startup', $${params.length})`;
+    } else if (isObserver(myRole)) {
+      // Наблюдатель новых диалогов не начинает
+      return res.json({ users: [] });
     } else if (myRole === 'user') {
       // Специалист: другие специалисты + команды
       // Базовый список — другие специалисты

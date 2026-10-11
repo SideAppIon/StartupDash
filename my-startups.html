@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Мои стартапы — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .s-row{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px;margin-bottom:14px;transition:border-color .2s}
     .s-row:hover{border-color:var(--border2)}
@@ -115,7 +115,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
@@ -129,7 +129,7 @@ onAuthReady(async function(user, userData) {
   myRole = userData ? userData.role : 'user';
   // Кнопка "Создать" — только для стартапера и эксперта
   var cb = document.getElementById('createStartupBtn');
-  if (cb && (myRole === 'startup' || isExpertRole(myRole) || myRole === 'admin')) {
+  if (cb && (myRole === 'startup' || isActiveExpert(myRole) || myRole === 'admin')) {
     cb.style.display = '';
   }
 
@@ -180,11 +180,11 @@ onAuthReady(async function(user, userData) {
     var allVisible = myStartups.concat(participatingStartups);
 
     if (!allVisible.length) {
-      var canCreate = myRole === 'startup' || isExpertRole(myRole) || myRole === 'admin';
+      var canCreate = myRole === 'startup' || isActiveExpert(myRole) || myRole === 'admin';
       el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🚀</div>' +
         '<div class="empty-state__title">Нет стартапов</div>' +
         '<p style="font-size:14px;margin-bottom:24px">' +
-          (canCreate ? 'Создай первый проект или подай заявку' : 'Подай заявку в команду стартапа') +
+          (canCreate ? tv('Создай первый проект или подай заявку','Создайте первый проект или подайте заявку') : 'Подайте заявку в команду стартапа') +
         '</p>' +
         (canCreate ? '<a href="create-startup.html" class="btn btn--primary btn--lg">Создать стартап</a>' : '') +
         '<a href="startups.html" class="btn btn--outline btn--lg" style="margin-left:12px">Найти стартап</a>' +
@@ -343,7 +343,7 @@ async function buildStartupCard(s, uid) {
         '<div class="s-tagline">'+esc(s.tagline||'')+'</div>'+
         '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
           '<span class="badge badge--green">'+esc(s.stage||'Идея')+'</span>'+
-          '<span class="badge badge--gray">'+esc(s.category||'')+'</span>'+
+          (s.category ? '<span class="badge badge--gray">'+esc(s.category)+'</span>' : '')+
           privBadge+
           (pendingInvites.length?'<span class="badge badge--red">'+pendingInvites.length+' заявок</span>':'')+
         '</div>'+
@@ -446,7 +446,7 @@ async function loadMemberPerms(src, docId) {
 async function saveEditRole() {
   if (!editRoleCtx) return;
   var newRole = document.getElementById('editRoleInput').value.trim();
-  if (!newRole) { showToast('Введи роль','error'); return; }
+  if (!newRole) { showToast(tv('Введи роль','Введите роль'),'error'); return; }
   var permissions = {
     kanban:  document.getElementById('permKanban').checked,
     updates: document.getElementById('permUpdates').checked,

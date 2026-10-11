@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Профиль участника — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .profile-cover{height:180px;background:linear-gradient(135deg,rgba(0,230,118,.15),rgba(180,139,255,.1) 50%,rgba(61,142,245,.1));border-bottom:1px solid var(--border)}
     .profile-main{max-width:860px;margin:0 auto;padding:0 24px}
@@ -147,7 +147,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 var profileUid = getUrlParam('uid');
 if (!profileUid) window.location.href = 'members.html';
@@ -278,12 +278,14 @@ function renderActions(user, userData, inviteStatus) {
     return;
   }
   var btns = '';
-  // Написать сообщение
-  btns += '<button class="btn btn--outline btn--sm" onclick="window.location.href=\'messages.html?to=' + profileUid + '\'">💬 Написать</button>';
+  // Написать сообщение (наблюдатель пишет только персоналу, наблюдателю пишет только персонал)
+  var vRole = userData && userData.role, pRole = profileData && profileData.role;
+  var canWrite = isStaffRole(vRole) || (vRole !== 'observer' && pRole !== 'observer') || (vRole === 'observer' && isStaffRole(pRole));
+  if (canWrite) btns += '<button class="btn btn--outline btn--sm" onclick="window.location.href=\'messages.html?to=' + profileUid + '\'">💬 Написать</button>';
   // Пожаловаться — для обычных пользователей (не модераторам/админам)
   var viewerIsMod = userData && (userData.role === 'admin' || userData.role === 'moderator');
   if (!viewerIsMod) {
-    btns += '<button class="btn btn--ghost" style="font-size:11px;padding:2px 7px;color:var(--text3)" onclick="openReport()" title="Пожаловаться">⚠️ Пожаловаться</button>';
+    btns += '<button class="btn btn--ghost" style="font-size:11px;padding:2px 7px;color:var(--text3)" onclick="openReport()" title="Пожаловаться">Пожаловаться</button>';
   }
   // Пригласить в команду — только стартаперы; наблюдателя пригласить нельзя
   if (userData && userData.role === 'startup' && profileData && canJoinProject(profileData.role)) {

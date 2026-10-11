@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Добро пожаловать — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px 16px; }
     .ob-wrap { width:100%; max-width:500px; }
@@ -66,21 +66,21 @@
   <div class="ob-card" id="step1">
     <div class="ob-icon">🎉</div>
     <div class="ob-title">Добро пожаловать!</div>
-    <div class="ob-sub">Ты в <strong>«Атриуме»</strong> — на платформе для стартаперов, специалистов и экспертов. Вот как все устроено:</div>
+    <div class="ob-sub" data-ty="Ты в <strong>«Атриуме»</strong> — на платформе для стартаперов, специалистов и экспертов. Вот как все устроено:">Вы в <strong>«Атриуме»</strong> — на платформе для стартаперов, специалистов и экспертов. Вот как все устроено:</div>
 
     <ul class="ob-list">
       <li>
         <span class="ob-list__icon">🚀</span>
         <div class="ob-list__text">
           <strong>Стартапы</strong>
-          Создавай проекты, описывай идею и собирай команду прямо на платформе
+          <span data-ty="Создавай проекты, описывай идею и собирай команду прямо на платформе">Проекты с описанием идеи и командой — прямо на платформе</span>
         </div>
       </li>
       <li>
         <span class="ob-list__icon">👥</span>
         <div class="ob-list__text">
           <strong>Команда</strong>
-          Находи специалистов и экспертов, приглашай их в свой проект
+          <span data-ty="Находи специалистов и экспертов, приглашай их в свой проект">Специалисты и эксперты, которых можно пригласить в проект</span>
         </div>
       </li>
       <li>
@@ -102,7 +102,7 @@
   <div class="ob-card" id="step2" style="display:none">
     <div class="ob-icon" id="s2icon">💡</div>
     <div class="ob-title" id="s2title">Как начать?</div>
-    <div class="ob-sub" id="s2sub">Несколько советов специально для тебя:</div>
+    <div class="ob-sub" id="s2sub" data-ty="Несколько советов специально для тебя:">Несколько советов специально для вас:</div>
 
     <ul class="ob-list" id="s2list"></ul>
 
@@ -117,7 +117,7 @@
   <div class="ob-card" id="step3" style="display:none">
     <div class="ob-icon">🗺️</div>
     <div class="ob-title">С чего начать?</div>
-    <div class="ob-sub">Выбери, куда хочешь попасть первым делом:</div>
+    <div class="ob-sub" data-ty="Выбери, куда хочешь попасть первым делом:">Выберите, куда перейти в первую очередь:</div>
 
     <div class="action-grid" id="actionGrid"></div>
 
@@ -128,7 +128,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
@@ -141,9 +141,9 @@ var ROLE_STEP2 = {
     title: 'Советы для специалиста',
     sub: 'Как найти интересный проект и попасть в команду:',
     items: [
-      { icon:'🔍', title:'Изучи каталог стартапов', text:'Найди проект, который тебя вдохновляет, и откликнись на вакансию' },
-      { icon:'👤', title:'Заполни профиль', text:'Укажи навыки и портфолио — основатели стартапов увидят тебя в поиске' },
-      { icon:'💬', title:'Общайся', text:'Напиши напрямую фаундеру, если проект заинтересовал. Не жди!' },
+      { icon:'🔍', title:'Изучите каталог стартапов', text:'Найдите проект, который вас вдохновляет, и откликнитесь на вакансию' },
+      { icon:'👤', title:'Заполните профиль', text:'Укажите навыки и портфолио — основатели стартапов увидят вас в поиске' },
+      { icon:'💬', title:'Общайтесь', text:'Напишите основателю напрямую, если проект заинтересовал' },
     ]
   },
   startup: {
@@ -161,19 +161,51 @@ var ROLE_STEP2 = {
     title: 'Советы для эксперта',
     sub: 'Как приносить пользу и находить интересные проекты:',
     items: [
-      { icon:'🔎', title:'Смотри стартапы', text:'Изучи проекты на платформе — найди тех, кому нужна твоя экспертиза' },
-      { icon:'💬', title:'Участвуй в форуме', text:'Делись опытом — это лучший способ познакомиться с сообществом' },
-      { icon:'👤', title:'Заполни профиль', text:'Укажи области экспертизы, чтобы стартаперы могли тебя найти' },
+      { icon:'🔎', title:'Изучите стартапы', text:'Найдите проекты, которым нужна ваша экспертиза' },
+      { icon:'💬', title:'Участвуйте в форуме', text:'Делитесь опытом — это лучший способ познакомиться с сообществом' },
+      { icon:'👤', title:'Заполните профиль', text:'Укажите области экспертизы, чтобы стартаперы могли вас найти' },
+    ]
+  },
+  boost_partner: {
+    icon: '📈',
+    title: 'Для буст-партнёра',
+    sub: 'Как работать со стартапами платформы:',
+    items: [
+      { icon:'💡', title:'Публикуйте идеи', text:'Стартаперы заберут их и запустят на их основе проекты' },
+      { icon:'🔎', title:'Изучите стартапы', text:'Найдите команды, интересные для пилотов и партнёрства' },
+      { icon:'💬', title:'Обсуждайте напрямую', text:'Пишите основателям, когда проект подходит вашей организации' },
+    ]
+  },
+  observer: {
+    icon: '👁',
+    title: 'Для наблюдателя',
+    sub: 'Что доступно на платформе:',
+    items: [
+      { icon:'🚀', title:'Каталог стартапов', text:'Следите за проектами и их обновлениями' },
+      { icon:'💡', title:'Идеи', text:'Смотрите идеи, которые публикуют буст-партнёры' },
+      { icon:'👤', title:'Статус заявки', text:'Если вы подали заявку на роль, её статус виден в профиле' },
     ]
   },
 };
 
 var ROLE_ACTIONS = {
+  boost_partner: [
+    { icon:'💡', name:'Идеи', desc:'Опубликуйте идею для стартаперов', href:'ideas.html' },
+    { icon:'🚀', name:'Каталог стартапов', desc:'Проекты для партнёрства', href:'startups.html' },
+    { icon:'💬', name:'Сообщения', desc:'Переписка с основателями', href:'messages.html' },
+    { icon:'👤', name:'Мой профиль', desc:'Статус заявки и данные', href:'profile.html' },
+  ],
+  observer: [
+    { icon:'🚀', name:'Каталог стартапов', desc:'Проекты платформы', href:'startups.html' },
+    { icon:'💡', name:'Идеи', desc:'Идеи от буст-партнёров', href:'ideas.html' },
+    { icon:'📰', name:'Лента', desc:'Новости и обновления стартапов', href:'feed.html' },
+    { icon:'👤', name:'Мой профиль', desc:'Здесь видно статус заявки на роль', href:'profile.html' },
+  ],
   user: [
-    { icon:'🚀', name:'Каталог стартапов', desc:'Найди проект куда вступить', href:'startups.html' },
-    { icon:'👥', name:'Участники', desc:'Познакомься с сообществом', href:'members.html' },
-    { icon:'💬', name:'Форум', desc:'Задай вопрос или поделись опытом', href:'forum.html' },
-    { icon:'👤', name:'Мой профиль', desc:'Дополни информацию о себе', href:'profile.html' },
+    { icon:'🚀', name:'Каталог стартапов', desc:'Найдите проект, куда вступить', href:'startups.html' },
+    { icon:'👥', name:'Участники', desc:'Познакомьтесь с сообществом', href:'members.html' },
+    { icon:'💬', name:'Форум', desc:'Задайте вопрос или поделитесь опытом', href:'forum.html' },
+    { icon:'👤', name:'Мой профиль', desc:'Дополните информацию о себе', href:'profile.html' },
   ],
   startup: [
     { icon:'✨', name:'Создать стартап', desc:'Оформи свою идею прямо сейчас', href:'create-startup.html' },
@@ -182,10 +214,10 @@ var ROLE_ACTIONS = {
     { icon:'👤', name:'Мой профиль', desc:'Заполни страницу о себе', href:'profile.html' },
   ],
   expert: [
-    { icon:'🚀', name:'Каталог стартапов', desc:'Посмотри проекты платформы', href:'startups.html' },
-    { icon:'👥', name:'Сообщество', desc:'Найди стартаперов для менторства', href:'members.html' },
-    { icon:'💬', name:'Форум', desc:'Поделись экспертизой', href:'forum.html' },
-    { icon:'👤', name:'Мой профиль', desc:'Расскажи о компетенциях', href:'profile.html' },
+    { icon:'🚀', name:'Каталог стартапов', desc:'Проекты платформы', href:'startups.html' },
+    { icon:'👥', name:'Сообщество', desc:'Стартаперы, которым нужна помощь', href:'members.html' },
+    { icon:'💬', name:'Форум', desc:'Поделитесь экспертизой', href:'forum.html' },
+    { icon:'👤', name:'Мой профиль', desc:'Опишите свои компетенции', href:'profile.html' },
   ],
 };
 

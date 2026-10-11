@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Мои опросы — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
 </head>
 <body>
 <nav class="nav">
@@ -28,7 +28,7 @@
     <div class="section-header" style="margin-bottom:24px">
       <div>
         <h1 class="page-title">📊 Мои опросы</h1>
-        <p class="page-subtitle">Создавай опросы и делись ссылкой для сбора мнений</p>
+        <p class="page-subtitle" data-ty="Создавай опросы и делись ссылкой для сбора мнений">Создавайте опросы и делитесь ссылкой для сбора мнений</p>
       </div>
       <button class="btn btn--primary" onclick="openPollModal()">+ Создать опрос</button>
     </div>
@@ -61,14 +61,14 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
 onAuthReady(function(user, userData) {
   if (!user) return;
   renderNav(userData);
-  var canPolls = userData && (['startup', 'user', 'admin'].indexOf(userData.role) !== -1 || isExpertRole(userData.role));
+  var canPolls = userData && (['startup', 'user', 'admin'].indexOf(userData.role) !== -1 || isActiveExpert(userData.role));
   if (!canPolls) {
     document.getElementById('pollsList').innerHTML =
       '<div class="empty-state"><div class="empty-state__icon">📊</div>'+
@@ -124,7 +124,7 @@ async function createPoll() {
   });
   var aud = document.querySelector('input[name="pollAud"]:checked').value;
   var showRes = document.getElementById('pollShowResults').checked;
-  if (!questions.length) { showToast('Заполни хотя бы один вопрос с 2 вариантами','error'); return; }
+  if (!questions.length) { showToast(tv('Заполни хотя бы один вопрос с 2 вариантами','Заполните хотя бы один вопрос с 2 вариантами'),'error'); return; }
   try {
     await api.post('/polls', { questions: questions, audience: aud, show_results: showRes });
     closePollModal();
@@ -144,7 +144,7 @@ async function loadMyPolls() {
 function renderMyPolls(polls) {
   var el = document.getElementById('pollsList');
   if (!polls.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">📊</div><div class="empty-state__title">Опросов пока нет</div><p style="font-size:14px">Создай первый опрос и поделись ссылкой.</p></div>';
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">📊</div><div class="empty-state__title">Опросов пока нет</div><p style="font-size:14px">'+tv('Создай первый опрос и поделись ссылкой.','Создайте первый опрос и поделитесь ссылкой.')+'</p></div>';
     return;
   }
   el.innerHTML = polls.map(function(p){

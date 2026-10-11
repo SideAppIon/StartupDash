@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Сообщения — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     html,body{height:100%;overflow:hidden}
     .chat-layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - var(--nav-h));margin-top:var(--nav-h)}
@@ -92,7 +92,7 @@
   <div class="chat-main">
     <div class="empty-chat" id="emptyState">
       <div class="empty-chat__icon">💬</div>
-      <p style="font-size:14px;text-align:center">Выбери диалог слева<br>или начни новый</p>
+      <p style="font-size:14px;text-align:center" data-ty="Выбери диалог слева<br>или начни новый">Выберите диалог слева<br>или начните новый</p>
     </div>
     <div id="chatHeader" class="chat-header" style="display:none">
       <img id="chatAvatar" class="avatar avatar--md" style="cursor:pointer"
@@ -106,7 +106,7 @@
     <div class="chat-input-area" id="chatInputArea" style="display:none">
       <input type="file" id="photoFileInput" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="sendPhoto(this)"/>
       <button class="send-btn" style="background:var(--bg3);color:var(--text2);font-size:20px" title="Прикрепить фото" onclick="document.getElementById('photoFileInput').click()">📎</button>
-      <textarea class="chat-textarea" id="msgInput" placeholder="Напиши сообщение..." rows="1"
+      <textarea class="chat-textarea" id="msgInput" placeholder="Напишите сообщение..." data-ty-placeholder="Напиши сообщение..." rows="1"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
       <button class="send-btn" id="sendBtn" onclick="send()">→</button>
@@ -131,7 +131,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
@@ -161,8 +161,10 @@ onAuthReady(async function(user, userData) {
     if (allowedUids.size > 0) {
       document.getElementById('newConvBtn').classList.remove('hidden');
     }
-  } else if (isExpertRole(myRole)) {
-    // Эксперт / куратор / ментор / наблюдатель: только стартаперы
+  } else if (myRole === 'observer') {
+    // Наблюдатель новых диалогов не начинает (отвечает только поддержке / админам)
+  } else if (isActiveExpert(myRole)) {
+    // Эксперт / куратор / ментор / буст-партнёр: стартаперы и коллеги с той же ролью
     await computeExpertAllowedUids();
     if (allowedUids.size > 0) {
       document.getElementById('newConvBtn').classList.remove('hidden');
@@ -174,6 +176,8 @@ onAuthReady(async function(user, userData) {
 
   var toUid = getUrlParam('to');
   if (toUid && toUid !== myUid) {
+    // Роль собеседника берётся из списка пользователей — загружаем его до проверки прав
+    if (!allUsers.length) await loadUsersForPicker();
     if (canMessageUser(toUid)) {
       try { activeId = await ensureConv(toUid); } catch(e) { console.warn(e.message); }
     } else {
@@ -225,12 +229,17 @@ async function computeAllowedUids() {
 }
 
 async function computeExpertAllowedUids() {
-  // Эксперт: только стартаперы
+  // Эксперт и родственные роли: стартаперы + коллеги с той же ролью
   allowedUids = new Set();
   try {
-    var snap = await db.collection('users').where('role','==','startup').get();
-    snap.docs.forEach(function(d) {
-      if (d.data().uid && d.data().uid !== myUid) allowedUids.add(d.data().uid);
+    var snaps = await Promise.all([
+      db.collection('users').where('role','==','startup').get(),
+      db.collection('users').where('role','==',myRole).get()
+    ]);
+    snaps.forEach(function(snap) {
+      snap.docs.forEach(function(d) {
+        if (d.data().uid && d.data().uid !== myUid) allowedUids.add(d.data().uid);
+      });
     });
   } catch(e) { console.warn('computeExpertAllowedUids:', e.message); }
 }
@@ -245,12 +254,16 @@ function canMessageUser(uid) {
   if (myRole === 'admin') return true;
   if (myRole === 'support') return true;   // поддержка отвечает любому пользователю
   if (myRole === 'startup') {
-    // Стартапер: пишет специалистам и экспертам
+    // Стартапер: пишет другим стартаперам, специалистам и экспертам
     var role = getUserRole(uid);
-    return role === 'user' || isExpertRole(role);
+    return role === 'startup' || role === 'user' || isActiveExpert(role);
   }
-  if (isExpertRole(myRole)) {
-    // Эксперт и родственные роли: пишут только стартаперам
+  if (myRole === 'observer') {
+    // Наблюдатель пишет только персоналу (поддержка, админ, модератор)
+    return isStaffRole(getUserRole(uid));
+  }
+  if (isActiveExpert(myRole)) {
+    // Эксперт и родственные роли: пишут стартаперам и коллегам с той же ролью
     return allowedUids.has(uid);
   }
   // Специалист: проверяем allowedUids
@@ -264,10 +277,15 @@ function startConvListener() {
     .where('participants','array-contains', myUid)
     .orderBy('lastAt','desc');
 
+  var openedFromLink = false;
   convUnsub = q.onSnapshot(function(snap) {
     allConvs = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
     filterConvs(document.getElementById('convSearch').value);
-    if (activeId) { highlightActive(activeId); }
+    if (activeId) {
+      // Диалог из ссылки (?to= / ?conv=) открываем один раз, дальше — только подсветка
+      if (!openedFromLink) { openedFromLink = true; openConv(activeId); }
+      else highlightActive(activeId);
+    }
   }, function() {
     db.collection('conversations').where('participants','array-contains', myUid).get()
       .then(function(snap) {
@@ -406,7 +424,7 @@ async function openConv(convId) {
       var el=document.getElementById('chatMessages');
       if (!el) return;
       if (!snap.docs.length) {
-        el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;margin-top:40px">Напиши первое сообщение</div>';
+        el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;margin-top:40px">'+tv('Напиши первое сообщение','Напишите первое сообщение')+'</div>';
         return;
       }
       var html='', lastDate='';
@@ -465,7 +483,7 @@ async function loadGroupMessages(startupId, convId) {
     var el = document.getElementById('chatMessages');
     if (!el) return;
     if (!msgs.length) {
-      el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;margin-top:40px">Напиши первое сообщение команде 👋</div>';
+      el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;margin-top:40px">'+tv('Напиши первое сообщение команде 👋','Напишите первое сообщение команде 👋')+'</div>';
       return;
     }
     var html = '', lastDate = '';
@@ -616,12 +634,12 @@ function openNewConvModal() {
   if (myRole==='user') {
     note.style.display='block';
     note.textContent='Вы можете писать другим специалистам и участникам ваших команд';
-  } else if (isExpertRole(myRole)) {
+  } else if (isActiveExpert(myRole)) {
     note.style.display='block';
-    note.textContent=(ROLE_LABELS[myRole]||'Эксперт')+': можно писать стартаперам';
+    note.textContent='Вы можете писать стартаперам и другим участникам с ролью «'+(ROLE_LABELS[myRole]||myRole)+'»';
   } else if (myRole==='startup') {
     note.style.display='block';
-    note.textContent='Вы можете писать специалистам и экспертам';
+    note.textContent='Вы можете писать другим стартаперам, специалистам и экспертам';
   } else {
     note.style.display='none';
   }
@@ -638,7 +656,7 @@ function renderUserPick(users) {
   // Фильтруем по правам
   var available=users.filter(function(u){ return canMessageUser(u.uid); });
   if (!available.length){
-    el.innerHTML='<div class="sidebar-empty">'+(myRole==='user'?'Нет доступных собеседников.<br>Вступи в команду стартапа.':'Никого не найдено')+'</div>';
+    el.innerHTML='<div class="sidebar-empty">'+(myRole==='user'?'Нет доступных собеседников.<br>Вступите в команду стартапа.':'Никого не найдено')+'</div>';
     return;
   }
   el.innerHTML=available.map(function(u){

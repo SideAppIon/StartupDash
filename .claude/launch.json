@@ -1,6 +1,7 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "static", "runtimeExecutable": "node", "runtimeArgs": ["server.js"], "port": 8000 }
+    { "name": "static", "runtimeExecutable": "node", "runtimeArgs": ["server.js"], "port": 8000 },
+    { "name": "api", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "backend", "run", "local"], "port": 3000 }
   ]
 }

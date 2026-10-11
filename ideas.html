@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Идеи — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .idea-tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap;align-items:center}
     .idea-tab{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .2s}
@@ -50,7 +50,7 @@
     <div class="section-header" style="margin-bottom:20px">
       <div>
         <h1 class="page-title">💡 Идеи</h1>
-        <p class="page-subtitle" id="pageSub">Идеи от буст-партнёров — забирай и запускай на их основе свой стартап</p>
+        <p class="page-subtitle" id="pageSub" data-ty="Идеи от буст-партнёров — забирай и запускай на их основе свой стартап">Идеи от буст-партнёров, на основе которых стартаперы запускают проекты</p>
       </div>
       <button class="btn btn--primary" id="newIdeaBtn" style="display:none" onclick="openIdeaModal()">+ Предложить идею</button>
     </div>
@@ -103,7 +103,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
@@ -120,7 +120,7 @@ onAuthReady(async function(user, userData) {
   var role = meData.role;
   if (canPublishIdeas()) {
     document.getElementById('newIdeaBtn').style.display = '';
-    document.getElementById('pageSub').textContent = 'Публикуй идеи — стартаперы заберут их и запустят на их основе проекты';
+    document.getElementById('pageSub').textContent = 'Публикуйте идеи — стартаперы заберут их и запустят на их основе проекты';
   }
   if (canPublishIdeas() || role === 'startup') document.getElementById('mineTab').style.display = '';
 
@@ -210,7 +210,8 @@ function buildCard(i) {
     actions.push('<button class="btn btn--outline btn--sm" data-id="'+esc(i.id)+'" onclick="openIdeaModal(this.getAttribute(\'data-id\'))">✏️</button>');
     actions.push('<button class="btn btn--ghost btn--sm" style="color:var(--danger)" data-id="'+esc(i.id)+'" onclick="deleteIdea(this)">🗑</button>');
   }
-  if (!isAuthor && i.status === 'open') {
+  // «Обсудить с автором» — тем, кому разрешено писать буст-партнёру (стартапер, буст-партнёр, персонал)
+  if (!isAuthor && i.status === 'open' && (meData.role === 'startup' || meData.role === i.authorRole || isStaffRole(meData.role))) {
     actions.push('<a class="btn btn--ghost btn--sm" href="messages.html?to='+encodeURIComponent(i.authorUid)+'">💬 Обсудить с автором</a>');
   }
 
@@ -249,8 +250,8 @@ async function saveIdea() {
     description: document.getElementById('ideaDesc').value.trim(),
   };
   errEl.style.display = 'none';
-  if (!body.title) { errEl.textContent = 'Укажи название'; errEl.style.display = 'block'; return; }
-  if (body.description.length < 30) { errEl.textContent = 'Опиши идею подробнее (минимум 30 символов)'; errEl.style.display = 'block'; return; }
+  if (!body.title) { errEl.textContent = 'Укажите название'; errEl.style.display = 'block'; return; }
+  if (body.description.length < 30) { errEl.textContent = 'Опишите идею подробнее (минимум 30 символов)'; errEl.style.display = 'block'; return; }
   btn.disabled = true;
   try {
     if (editingId) await api.patch('/ideas/' + editingId, body);
@@ -267,7 +268,7 @@ async function saveIdea() {
 }
 
 async function deleteIdea(btn) {
-  if (!confirm('Удалить идею?')) return;
+  if (!(await uiConfirm({ title: 'Удалить идею?', text: 'Идея пропадёт из банка идей без возможности восстановления.', okText: 'Удалить', danger: true }))) return;
   try {
     await api.delete('/ideas/' + btn.getAttribute('data-id'));
     showToast('Идея удалена', 'success');
@@ -277,7 +278,7 @@ async function deleteIdea(btn) {
 
 // ── Забрать / вернуть ─────────────────────────────────
 async function takeIdea(btn) {
-  if (!confirm('Забрать идею себе? Она пропадёт из свободных, а автор получит уведомление.')) return;
+  if (!(await uiConfirm({ title: 'Забрать идею?', text: 'Она пропадёт из свободных, а автор получит уведомление.', okText: 'Забрать' }))) return;
   var id = btn.getAttribute('data-id');
   btn.disabled = true;
   try {
@@ -293,7 +294,7 @@ async function takeIdea(btn) {
 }
 
 async function releaseIdea(btn) {
-  if (!confirm('Вернуть идею в свободные? Привязка к стартапу снимется.')) return;
+  if (!(await uiConfirm({ title: 'Вернуть идею?', text: 'Идея снова станет свободной, и её сможет забрать другой стартапер. Привязка к стартапу снимется.', okText: 'Вернуть' }))) return;
   try {
     await api.post('/ideas/' + btn.getAttribute('data-id') + '/release', {});
     showToast('Идея снова свободна', 'success');

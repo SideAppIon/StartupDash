@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Стартап — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .startup-hero{background:var(--bg2);border-bottom:1px solid var(--border);padding:calc(var(--nav-h) + 40px) 0 32px}
     .startup-hero__inner{display:flex;gap:24px;align-items:flex-start}
@@ -32,7 +32,7 @@
     .prod-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column;transition:border-color .2s}
     .prod-card:hover{border-color:var(--border2)}
     .prod-card__img{width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--bg3);display:block}
-    .prod-card__img--empty{display:flex;align-items:center;justify-content:center;font-size:38px;color:var(--text3)}
+    .prod-card__img--empty{display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text3)}
     .prod-card__body{padding:14px;display:flex;flex-direction:column;gap:8px;flex:1}
     .prod-card__name{font-family:var(--font-head);font-size:15px;font-weight:700;line-height:1.3}
     .prod-card__desc{font-size:13px;color:var(--text2);line-height:1.6;white-space:pre-wrap;flex:1}
@@ -111,7 +111,7 @@
             <button class="tab" onclick="switchTab(1,this)">Обновления</button>
             <button class="tab" onclick="switchTab(2,this)">Команда</button>
             <button class="tab" onclick="switchTab(3,this)">Вакансии</button>
-            <button class="tab" id="tabProducts" onclick="switchTab(4,this)" style="display:none">🛍 Витрина</button>
+            <button class="tab" id="tabProducts" onclick="switchTab(4,this)" style="display:none">Витрина</button>
           </div>
 
           <!-- О проекте -->
@@ -216,7 +216,7 @@
     <div class="form-group" style="margin-bottom:0">
       <label class="form-label">Сообщение / мини-резюме *</label>
       <textarea class="form-textarea" id="applyMsg" style="min-height:110px"
-        placeholder="Расскажи о себе: опыт, что умеешь, почему хочешь в этот проект..."></textarea>
+        placeholder="Расскажите о себе: опыт, что умеете, почему хотите в этот проект..."></textarea>
     </div>
 
     <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="sendAllInvites()">Отправить заявку</button>
@@ -238,7 +238,7 @@
     <div class="form-group" style="margin-bottom:0">
       <label class="form-label">Сообщение / предложение *</label>
       <textarea class="form-textarea" id="expertMsg" style="min-height:110px"
-        placeholder="Расскажи о своем опыте и чем можешь помочь проекту..."></textarea>
+        placeholder="Расскажите о своём опыте и чем можете помочь проекту..."></textarea>
     </div>
     <button class="btn btn--expert" style="width:100%;justify-content:center;margin-top:16px" onclick="sendExpertApplication()">Отправить заявку</button>
     <div id="expertError" class="form-error" style="display:none;margin-top:10px"></div>
@@ -285,7 +285,7 @@
     <div class="form-group" style="margin-bottom:0">
       <label class="form-label">Сопроводительное письмо *</label>
       <textarea class="form-textarea" id="vacApplyMsg" style="min-height:140px"
-        placeholder="Расскажи о себе, своем опыте и почему хочешь присоединиться к этому проекту..."></textarea>
+        placeholder="Расскажите о себе, своём опыте и почему хотите присоединиться к этому проекту..."></textarea>
     </div>
     <div id="vacApplyErr" class="form-error" style="display:none;margin-top:10px"></div>
     <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" onclick="sendVacApply()">Отправить заявку</button>
@@ -303,7 +303,7 @@
     <div class="form-group">
       <label class="form-label">Фото товара <span style="color:var(--text3);font-weight:400">(необязательно, до ~2 МБ)</span></label>
       <div style="display:flex;gap:12px;align-items:center">
-        <div id="prodImgPreview" style="width:72px;height:72px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--text3);overflow:hidden;flex-shrink:0">🛍</div>
+        <div id="prodImgPreview" style="width:72px;height:72px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text3);overflow:hidden;flex-shrink:0">Фото</div>
         <div>
           <input type="file" id="prodImgInput" accept="image/*" style="display:none" onchange="onProdImagePick(this)"/>
           <button type="button" class="btn btn--outline btn--sm" onclick="document.getElementById('prodImgInput').click()">Загрузить фото</button>
@@ -326,9 +326,9 @@
       <input type="text" class="form-input" id="prodPrice" maxlength="60" placeholder="1500 ₽ · от 990 ₽ · договорная"/>
     </div>
     <div class="form-group" style="margin-bottom:0">
-      <label class="form-label">Ссылка «Купить» *</label>
-      <input type="text" class="form-input" id="prodBuyUrl" maxlength="1000" placeholder="https://... — сайт, оплата или личка в соцсети"/>
-      <div class="form-hint">Куда попадёт покупатель: страница оплаты, товар на маркетплейсе или сообщение в соцсети</div>
+      <label class="form-label">Ссылка для покупки или контакт для связи *</label>
+      <input type="text" class="form-input" id="prodBuyUrl" maxlength="1000" placeholder="https://shop.ru/... или @username"/>
+      <div class="form-hint">Страница оплаты, товар на маркетплейсе — или ваш ник (@username), чтобы покупатель написал вам напрямую</div>
     </div>
     <div id="prodErr" class="form-error" style="display:none;margin-top:10px"></div>
     <button class="btn btn--primary" style="width:100%;justify-content:center;margin-top:16px" id="prodSaveBtn" onclick="saveProduct()">Опубликовать</button>
@@ -339,7 +339,7 @@
 <div class="modal-overlay" id="leaveModal">
   <div class="modal" style="max-width:440px">
     <div class="modal__header">
-      <div class="modal__title">🔗 Вы покидаете Атриум</div>
+      <div class="modal__title">Вы покидаете Атриум</div>
       <button class="modal__close" onclick="document.getElementById('leaveModal').classList.remove('open')">×</button>
     </div>
     <p style="font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:12px">
@@ -355,7 +355,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 var startupId = getUrlParam('id');
 if (!startupId) window.location.href = 'startups.html';
@@ -412,7 +412,10 @@ onAuthReady(async function(user, userData) {
     document.getElementById('sName').textContent    = startupData.name  || '';
     document.getElementById('sTagline').textContent = startupData.tagline || '';
     document.getElementById('sStage').textContent   = startupData.stage || 'Идея';
-    document.getElementById('sCategory').textContent= startupData.category || '';
+    // Категория необязательна — пустой бейдж не показываем (иначе остаётся пустая полоска)
+    var catEl = document.getElementById('sCategory');
+    catEl.textContent   = startupData.category || '';
+    catEl.style.display = startupData.category ? '' : 'none';
     document.title = (startupData.name || 'Стартап') + ' — Атриум';
 
     if (startupData.website) {
@@ -584,14 +587,13 @@ function renderActions(user, userData, inviteStatus, isTeamMember, memberPerms) 
   } else if (isExpertRole(role)) {
     var roleName = (ROLE_LABELS[role] || 'Эксперт').toLowerCase();
     if (!canJoinProject(role)) {
-      // Наблюдатель: смотрит и пишет, но в проект не вступает
+      // Наблюдатель только смотрит
       el.innerHTML =
-        '<a href="roadmap.html?id=' + startupId + '" class="btn btn--ghost btn--sm">🗺 Roadmap</a>' +
-        '<button class="btn btn--expert" onclick="writeToFounder()">💬 Написать основателю</button>';
+        '<a href="roadmap.html?id=' + startupId + '" class="btn btn--ghost btn--sm">🗺 Roadmap</a>';
     } else if (inviteStatus === 'accepted') {
       el.innerHTML =
         '<a href="roadmap.html?id=' + startupId + '" class="btn btn--outline btn--sm">🗺 Roadmap</a>' +
-        '<span class="badge badge--purple" style="padding:8px 16px;font-size:13px">✅ Ты ' + roleName + ' проекта</span>' +
+        '<span class="badge badge--purple" style="padding:8px 16px;font-size:13px">✅ Вы — ' + roleName + ' проекта</span>' +
         '<button class="btn btn--expert" onclick="writeToFounder()">💬 Написать основателю</button>';
     } else if (inviteStatus === 'pending') {
       el.innerHTML =
@@ -612,7 +614,7 @@ function renderActions(user, userData, inviteStatus, isTeamMember, memberPerms) 
     if (inviteStatus === 'accepted') {
       el.innerHTML =
         '<a href="roadmap.html?id=' + startupId + '" class="btn btn--outline btn--sm">🗺 Roadmap</a>' +
-        '<span class="badge badge--green" style="padding:8px 16px;font-size:13px">✅ Ты в команде</span>';
+        '<span class="badge badge--green" style="padding:8px 16px;font-size:13px">✅ Вы в команде</span>';
     } else if (inviteStatus === 'pending') {
       el.innerHTML = '<span class="badge badge--gray" style="padding:8px 16px;font-size:13px">⏳ Заявка на рассмотрении</span>';
     } else if (inviteStatus === 'rejected') {
@@ -944,8 +946,8 @@ async function sendAllInvites() {
 
   var msg  = document.getElementById('applyMsg').value.trim();
   var role = document.getElementById('applyRole').value || '';
-  if (!msg) { showInviteErr('Напиши сообщение / мини-резюме'); return; }
-  if (currentApplyType === 'role' && !role) { showInviteErr('Выбери роль из списка'); return; }
+  if (!msg) { showInviteErr('Напишите сообщение / мини-резюме'); return; }
+  if (currentApplyType === 'role' && !role) { showInviteErr('Выберите роль из списка'); return; }
 
   try {
     // Проверяем дубль
@@ -958,7 +960,7 @@ async function sendAllInvites() {
     });
     if (alreadyApplied) {
       var isAccepted = existing.docs.some(function(d){ return d.data().status === 'accepted'; });
-      showToast(isAccepted ? '✅ Ты уже в команде этого стартапа' : '⏳ Заявка уже отправлена', 'warn');
+      showToast(isAccepted ? '✅ Вы уже в команде этого стартапа' : '⏳ Заявка уже отправлена', 'warn');
       closeModal(); return;
     }
 
@@ -1011,8 +1013,8 @@ async function sendExpertApplication() {
   var msg  = document.getElementById('expertMsg').value.trim();
   var errEl = document.getElementById('expertError');
   errEl.style.display = 'none';
-  if (!area) { errEl.textContent = 'Укажи область экспертизы'; errEl.style.display = 'block'; return; }
-  if (!msg)  { errEl.textContent = 'Напиши сообщение'; errEl.style.display = 'block'; return; }
+  if (!area) { errEl.textContent = 'Укажите область экспертизы'; errEl.style.display = 'block'; return; }
+  if (!msg)  { errEl.textContent = 'Напишите сообщение'; errEl.style.display = 'block'; return; }
 
   try {
     var existing = await db.collection('invites')
@@ -1024,7 +1026,7 @@ async function sendExpertApplication() {
     });
     if (alreadyApplied) {
       var isAccepted = existing.docs.some(function(d){ return d.data().status === 'accepted'; });
-      showToast(isAccepted ? '✅ Ты уже в этом проекте' : '⏳ Заявка уже отправлена', 'warn');
+      showToast(isAccepted ? '✅ Вы уже в этом проекте' : '⏳ Заявка уже отправлена', 'warn');
       document.getElementById('expertModal').classList.remove('open');
       return;
     }
@@ -1216,8 +1218,8 @@ async function saveVacancy() {
   var tagsVal = document.getElementById('vacTags').value.trim();
   var err   = document.getElementById('vacErr');
   err.style.display = 'none';
-  if (!title) { err.textContent='Введи название вакансии'; err.style.display='block'; return; }
-  if (!desc)  { err.textContent='Напиши описание'; err.style.display='block'; return; }
+  if (!title) { err.textContent=tv('Введи название вакансии','Введите название вакансии'); err.style.display='block'; return; }
+  if (!desc)  { err.textContent=tv('Напиши описание','Напишите описание'); err.style.display='block'; return; }
   var tags = tagsVal ? tagsVal.split(',').map(function(t){return t.trim();}).filter(Boolean) : [];
   try {
     await db.collection('startups').doc(startupId).collection('vacancies').add({
@@ -1249,7 +1251,7 @@ async function sendVacApply() {
   var msg   = document.getElementById('vacApplyMsg').value.trim();
   var err   = document.getElementById('vacApplyErr');
   err.style.display = 'none';
-  if (!msg) { err.textContent='Напиши сопроводительное письмо'; err.style.display='block'; return; }
+  if (!msg) { err.textContent='Напишите сопроводительное письмо'; err.style.display='block'; return; }
 
   // Проверяем дубль по вакансии (через список откликнувшихся)
   try {
@@ -1260,7 +1262,7 @@ async function sendVacApply() {
         return (a && typeof a === 'object' ? a.uid : a) === pageUser.uid;
       });
       if (alreadyInVac) {
-        showToast('Ты уже откликнулся на эту вакансию', 'warn');
+        showToast('Вы уже откликнулись на эту вакансию', 'warn');
         document.getElementById('vacApplyModal').classList.remove('open'); return;
       }
     }
@@ -1422,7 +1424,7 @@ async function loadStartupForum() {
           '</div>'+
         '</div>';
       }).join('')
-    : '<div style="font-size:14px;color:var(--text3);padding:8px 0">Пока нет сообщений. Напиши первым!</div>';
+    : '<div style="font-size:14px;color:var(--text3);padding:8px 0">Пока нет сообщений. '+tv('Напиши первым!','Напишите первым!')+'</div>';
 
   var openLink = data.topicId
     ? '<a href="forum.html?topic='+esc(data.topicId)+'" class="btn btn--ghost btn--sm">Все комментарии →</a>'
@@ -1445,7 +1447,7 @@ async function sendStartupForum() {
   if (!pageUser) { window.location.href = 'login.html'; return; }
   var inp = document.getElementById('forumInput');
   var content = (inp.value||'').trim();
-  if (!content) { showToast('Напиши сообщение','warn'); return; }
+  if (!content) { showToast(tv('Напиши сообщение','Напишите сообщение'),'warn'); return; }
   try {
     var res = await api.post('/startups/'+startupId+'/forum', { content: content });
     window.location.href = 'forum.html?topic=' + res.topicId;
@@ -1497,6 +1499,21 @@ var _products    = [];
 var _canManageProducts = false;
 
 // Только http(s) — чтобы в кнопку не попал javascript:/data:
+// Ссылка «Купить» может быть контактом для связи: ник @username превращаем в ссылку на профиль,
+// адрес без протокола (shop.ru/…) дополняем https:// (та же логика на сервере)
+function normalizeBuyLink(v) {
+  var s = String(v || '').trim();
+  var tg = s.match(/^@([A-Za-z0-9_]{5,32})$/);
+  if (tg) return 'https://t.me/' + tg[1];
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return s;
+  if (/^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(s)) return 'https://' + s;
+  return s;
+}
+function isContactLink(url) {
+  try { var h = new URL(url).hostname.replace(/^www\./, ''); return h === 't.me'; }
+  catch(e) { return false; }
+}
+
 function isSafeHttpUrl(url) {
   if (!url) return false;
   try {
@@ -1531,7 +1548,7 @@ async function loadProducts(isOwnerOrAdmin, canView) {
   }
 
   if (!_products.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🛍</div>' +
+    el.innerHTML = '<div class="empty-state">' +
       '<div class="empty-state__title">Витрина пуста</div>' +
       '<p style="font-size:14px;color:var(--text2)">' +
       (isOwnerOrAdmin ? 'Добавьте первый товар или услугу — покупатели увидят их здесь' : 'Товары ещё не добавлены') +
@@ -1544,8 +1561,8 @@ async function loadProducts(isOwnerOrAdmin, canView) {
 
 function renderProductCard(p) {
   var img = p.imageUrl
-    ? '<img class="prod-card__img" src="'+esc(p.imageUrl)+'" alt="'+esc(p.name||p.description||'')+'" onerror="this.classList.add(&quot;prod-card__img--empty&quot;);this.removeAttribute(&quot;src&quot;);this.textContent=&quot;🛍&quot;"/>'
-    : '<div class="prod-card__img prod-card__img--empty">🛍</div>';
+    ? '<img class="prod-card__img" src="'+esc(p.imageUrl)+'" alt="'+esc(p.name||p.description||'')+'" onerror="this.classList.add(&quot;prod-card__img--empty&quot;);this.removeAttribute(&quot;src&quot;)"/>'
+    : '<div class="prod-card__img prod-card__img--empty">Нет фото</div>';
 
   var name  = p.name ? '<div class="prod-card__name">'+esc(p.name)+'</div>' : '';
   var price = p.price ? '<div class="prod-card__price">'+esc(p.price)+'</div>' : '';
@@ -1554,13 +1571,13 @@ function renderProductCard(p) {
   var safe  = isSafeHttpUrl(p.buyUrl);
   var buyBtn = safe
     ? '<button class="btn btn--primary btn--sm" style="flex:1;justify-content:center" ' +
-        'data-url="'+esc(p.buyUrl)+'" onclick="confirmLeave(this.getAttribute(&quot;data-url&quot;))">Купить →</button>'
+        'data-url="'+esc(p.buyUrl)+'" onclick="confirmLeave(this.getAttribute(&quot;data-url&quot;))">'+(isContactLink(p.buyUrl) ? 'Написать →' : 'Купить →')+'</button>'
     : '<span class="badge badge--gray">Ссылка недоступна</span>';
 
   var manage = _canManageProducts
     ? '<div class="prod-card__manage">' +
-        '<button class="btn btn--ghost btn--sm" data-pid="'+esc(p.id)+'" onclick="editProduct(this)">✏️</button>' +
-        '<button class="btn btn--danger btn--sm" data-pid="'+esc(p.id)+'" onclick="deleteProduct(this)">✕</button>' +
+        '<button class="btn btn--ghost btn--sm" data-pid="'+esc(p.id)+'" onclick="editProduct(this)">Изменить</button>' +
+        '<button class="btn btn--danger btn--sm" data-pid="'+esc(p.id)+'" onclick="deleteProduct(this)">Удалить</button>' +
       '</div>'
     : '';
 
@@ -1625,7 +1642,7 @@ function _renderProdPreview(url) {
     box.innerHTML = '<img src="'+esc(url)+'" style="width:100%;height:100%;object-fit:cover"/>';
     clr.style.display = '';
   } else {
-    box.textContent = '🛍';
+    box.textContent = 'Фото';
     clr.style.display = 'none';
   }
 }
@@ -1670,14 +1687,14 @@ async function saveProduct() {
     name:        document.getElementById('prodName').value.trim(),
     description: document.getElementById('prodDesc').value.trim(),
     price:       document.getElementById('prodPrice').value.trim(),
-    buy_url:     document.getElementById('prodBuyUrl').value.trim(),
+    buy_url:     normalizeBuyLink(document.getElementById('prodBuyUrl').value),
     image_url:   document.getElementById('prodImgUrl').value.trim()
   };
   var err = document.getElementById('prodErr');
   err.style.display = 'none';
   if (!body.description) { err.textContent = 'Добавьте описание товара'; err.style.display = 'block'; return; }
   if (!isSafeHttpUrl(body.buy_url)) {
-    err.textContent = 'Укажите корректную ссылку «Купить» — она должна начинаться с http:// или https://';
+    err.textContent = 'Укажите ссылку для покупки (https://…) или контакт для связи (@username)';
     err.style.display = 'block'; return;
   }
   var btn = document.getElementById('prodSaveBtn');

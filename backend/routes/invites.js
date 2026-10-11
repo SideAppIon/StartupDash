@@ -136,7 +136,7 @@ router.post('/', requireAuth, async (req, res) => {
       }
       if (existing) {
         return res.status(409).json({
-          error: vacancy_id ? 'Ты уже откликнулся на эту вакансию' : 'Заявка уже отправлена',
+          error: vacancy_id ? 'Вы уже откликнулись на эту вакансию' : 'Заявка уже отправлена',
         });
       }
     }

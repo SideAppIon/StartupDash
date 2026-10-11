@@ -5,7 +5,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Стартапы — Атриум</title>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .filters {
       background:var(--bg2);border-bottom:1px solid var(--border);
@@ -89,7 +89,7 @@
     <div class="section-header" style="margin-bottom:0;">
       <div>
         <h1 class="page-title">Каталог стартапов</h1>
-        <p class="page-subtitle">Найди проект мечты или вдохновись чужими идеями</p>
+        <p class="page-subtitle" data-ty="Найди проект мечты или вдохновись чужими идеями">Найдите проект мечты или вдохновитесь чужими идеями</p>
       </div>
     </div>
 
@@ -99,7 +99,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
   let allStartups = [];
 
@@ -187,7 +187,7 @@ function renderList(items) {
         <div class="empty-state" style="margin-top:60px;">
           <div class="empty-state__icon">🔍</div>
           <div class="empty-state__title">Ничего не найдено</div>
-          <p style="font-size:14px;">Попробуй изменить фильтры или поисковый запрос</p>
+          <p style="font-size:14px;">${tv('Попробуй изменить фильтры или поисковый запрос', 'Попробуйте изменить фильтры или поисковый запрос')}</p>
         </div>`;
       return;
     }

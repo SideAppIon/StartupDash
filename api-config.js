@@ -4,7 +4,10 @@
 // работают через REST API бэкенда на Yandex Cloud
 // ─────────────────────────────────────────────────────────
 
-const API_URL = 'https://d5d0pq825bknmdlu2u40.6brbn2wz.apigw.yandexcloud.net';
+// Локальный стенд: сайт открыт с localhost → ходим в локальный бэкенд (npm run local)
+const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:3000'
+  : 'https://d5d0pq825bknmdlu2u40.6brbn2wz.apigw.yandexcloud.net';
 
 // ─────────────────────────────────────────────────────────
 // ТОКЕН
@@ -61,6 +64,11 @@ function _notifyCallbacks() {
   _authCallbacks.forEach(cb => cb(_currentUser));
 }
 
+// Гостю (без входа) часть пунктов меню не показываем — см. .is-guest в styles.css.
+// Без токена помечаем сразу, чтобы ссылки не мелькали; с токеном — после проверки сессии.
+function _markGuest(isGuest) { document.documentElement.classList.toggle('is-guest', isGuest); }
+if (!getToken()) _markGuest(true);
+
 // Восстанавливаем сессию при загрузке страницы
 (async function initAuth() {
   const token = getToken();
@@ -77,6 +85,8 @@ function _notifyCallbacks() {
     }
   }
   _authResolved = true;
+  _markGuest(!_currentUser);
+  applyAddressForm();
   _notifyCallbacks();
   // Колокольчик уведомлений — с задержкой, чтобы страницы с кастомной шапкой
   // (например, лента) успели построить .nav__user
@@ -97,8 +107,18 @@ function _initSupportButton() {
   fab.type = 'button';
   fab.title = 'Написать в поддержку';
   fab.innerHTML = '<span style="font-size:18px">🎧</span><span class="sf-label">Поддержка</span>';
+  // В чатах справа внизу «Отправить» и последние сообщения — переносим кнопку в левый
+  // нижний угол, поверх списка диалогов. На телефоне списка нет (там слева 📎) — прячем.
+  const inChat = !!document.querySelector('.chat-input-area');
+  if (inChat && !document.getElementById('supportFabChatCss')) {
+    const css = document.createElement('style');
+    css.id = 'supportFabChatCss';
+    css.textContent = '@media(max-width:640px){#supportFab.in-chat{display:none!important}}';
+    document.head.appendChild(css);
+  }
+  if (inChat) fab.className = 'in-chat';
   fab.style.cssText =
-    'position:fixed;right:20px;bottom:20px;z-index:1200;display:flex;align-items:center;gap:8px;' +
+    'position:fixed;' + (inChat ? 'left:20px' : 'right:20px') + ';bottom:20px;z-index:1200;display:flex;align-items:center;gap:8px;' +
     'padding:11px 16px;border:none;border-radius:26px;cursor:pointer;font-family:inherit;font-size:14px;' +
     'font-weight:600;color:#04120a;background:var(--accent,#00e676);box-shadow:0 6px 20px rgba(0,0,0,.35)';
 
@@ -160,6 +180,32 @@ function _initSupportButton() {
 }
 
 // ─────────────────────────────────────────────────────────
+// ОБРАЩЕНИЕ: стартаперам — на «ты», всем остальным (и гостям) — на «Вы».
+// Статичный текст в HTML пишем на «Вы», вариант на «ты» — в атрибутах
+// data-ty (содержимое) / data-ty-placeholder (подсказка в поле).
+// В JS-строках — tv('на ты', 'на Вы').
+// ─────────────────────────────────────────────────────────
+function isInformal(role) { return role === 'startup'; }
+function tv(ty, vy, role) {
+  var r = role !== undefined ? role : (_currentUserData && _currentUserData.role);
+  return isInformal(r) ? ty : vy;
+}
+function applyAddressForm(role) {
+  var informal = isInformal(role !== undefined ? role : (_currentUserData && _currentUserData.role));
+  document.querySelectorAll('[data-ty],[data-ty-placeholder]').forEach(function(el) {
+    // Запоминаем исходный вариант на «Вы», чтобы можно было переключать туда-обратно
+    if (el.dataset.vy === undefined) {
+      el.dataset.vy = el.innerHTML;
+      el.dataset.vyPlaceholder = el.getAttribute('placeholder') || '';
+    }
+    if (el.hasAttribute('data-ty')) el.innerHTML = informal ? el.dataset.ty : el.dataset.vy;
+    if (el.hasAttribute('data-ty-placeholder')) {
+      el.setAttribute('placeholder', informal ? el.dataset.tyPlaceholder : el.dataset.vyPlaceholder);
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────
 // AUTH API
 // ─────────────────────────────────────────────────────────
 const auth = {
@@ -175,6 +221,7 @@ const auth = {
   async signInWithEmailAndPassword(email, password) {
     const data = await api.post('/auth/login', { email, password });
     setToken(data.token);
+    _markGuest(false);
     _currentUser     = { uid: data.user.uid, email: data.user.email };
     _currentUserData = data.user;
     _notifyCallbacks();
@@ -182,6 +229,7 @@ const auth = {
   },
   async signOut() {
     removeToken();
+    _markGuest(true);
     _currentUser = _currentUserData = null;
     _notifyCallbacks();
   },
@@ -584,8 +632,12 @@ var ROLE_LABELS = {
 var EXPERT_ROLES = ['expert', 'curator', 'mentor', 'boost_partner', 'observer'];
 function isExpertRole(role)   { return EXPERT_ROLES.indexOf(role) !== -1; }
 function canJoinProject(role) { return role !== 'observer'; }
-// Статус «Готов помочь / Занят» — только у одобренных ролей группы (не у наблюдателя)
-function showsExpertStatus(role) { return isExpertRole(role) && role !== 'observer'; }
+// Наблюдатель только смотрит: не создаёт стартапы и опросы, не пишет в личку
+// (кроме поддержки / админов / модераторов). Это и роль всех, кто ждёт модерации.
+function isActiveExpert(role) { return isExpertRole(role) && role !== 'observer'; }
+function isStaffRole(role)    { return role === 'admin' || role === 'support' || role === 'moderator'; }
+// Статус «Готов помочь / Занят» — только у действующих экспертов (не у наблюдателя)
+function showsExpertStatus(role) { return isActiveExpert(role); }
 
 // Эксперт, куратор, ментор и буст-партнёр проходят ручную модерацию.
 // Первые три прикладывают сертификат, буст-партнёр (человек из бизнеса) — ИНН.
@@ -616,21 +668,54 @@ function validateCertificateFile(file) {
   return '';
 }
 
-// Загрузить сертификаты и отправить заявку на роль. files — массив File, inn — для буст-партнёра.
-async function submitRoleVerification(requestedRole, files, comment, inn) {
+// Реквизиты организации буст-партнёра. org = { inn, legalAddress, directorName, directorPhone, logoFile, logoUrl }
+// Возвращает текст ошибки или ''
+var LOGO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+function validateOrgInfo(org) {
+  if (!isValidInn(org.inn)) return 'Проверьте ИНН: 10 цифр для компании или 12 для ИП';
+  if ((org.legalAddress || '').trim().length < 10) return 'Укажите юридический адрес полностью';
+  if ((org.directorName || '').trim().split(/\s+/).length < 2) return 'Укажите ФИО руководителя (минимум фамилию и имя)';
+  var digits = (org.directorPhone || '').replace(/\D/g, '');
+  if (digits.length < 10 || digits.length > 15) return 'Укажите рабочий телефон руководителя';
+  if (!org.logoFile && !org.logoUrl) return 'Загрузите логотип организации';
+  if (org.logoFile) {
+    if (LOGO_TYPES.indexOf(org.logoFile.type) === -1) return 'Логотип: нужно изображение (jpg, png, webp)';
+    if (org.logoFile.size > 2 * 1024 * 1024) return 'Логотип: файл больше 2 МБ';
+  }
+  return '';
+}
+
+function _readFileB64(f) {
+  return new Promise(function(resolve, reject) {
+    var r = new FileReader();
+    r.onload  = function(e) { resolve(String(e.target.result).split(',')[1]); };
+    r.onerror = function() { reject(new Error('Не удалось прочитать файл ' + f.name)); };
+    r.readAsDataURL(f);
+  });
+}
+
+// Загрузить файлы и отправить заявку на роль.
+// files — сертификаты/документы (File[]), org — реквизиты буст-партнёра или null.
+async function submitRoleVerification(requestedRole, files, comment, org) {
   var certs = [];
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
-    var b64 = await new Promise(function(resolve, reject) {
-      var r = new FileReader();
-      r.onload  = function(e) { resolve(String(e.target.result).split(',')[1]); };
-      r.onerror = function() { reject(new Error('Не удалось прочитать файл ' + f.name)); };
-      r.readAsDataURL(f);
-    });
-    var up = await api.post('/upload', { data: b64, contentType: f.type, folder: 'certificates', filename: f.name });
+    var up = await api.post('/upload', { data: await _readFileB64(f), contentType: f.type, folder: 'certificates', filename: f.name });
     certs.push({ url: up.url, name: f.name });
   }
-  return api.post('/verification', { requested_role: requestedRole, certificates: certs, comment: comment || '', inn: inn || '' });
+  var body = { requested_role: requestedRole, certificates: certs, comment: comment || '' };
+  if (org) {
+    var logoUrl = org.logoUrl || '';
+    if (org.logoFile) {
+      logoUrl = (await api.post('/upload', { data: await _readFileB64(org.logoFile), contentType: org.logoFile.type, folder: 'org-logos' })).url;
+    }
+    body.inn            = (org.inn || '').replace(/\s/g, '');
+    body.legal_address  = (org.legalAddress || '').trim();
+    body.director_name  = (org.directorName || '').trim();
+    body.director_phone = (org.directorPhone || '').trim();
+    body.org_logo       = logoUrl;
+  }
+  return api.post('/verification', body);
 }
 
 function renderNav(userData) {
@@ -713,6 +798,42 @@ function _openNotifPopup() {
     _notifItems = [];
   }
   popup.style.display = 'block';
+}
+
+// ── Окно подтверждения в стиле сайта (вместо системного confirm) ──
+// uiConfirm({ title, text, okText, cancelText, danger }) → Promise<boolean>
+function uiConfirm(opts) {
+  opts = opts || {};
+  return new Promise(function(resolve) {
+    var ov = document.createElement('div');
+    ov.className = 'modal-overlay';
+    ov.innerHTML =
+      '<div class="modal" style="max-width:420px">' +
+        '<div class="modal__header"><div class="modal__title">' + esc(opts.title || 'Подтверждение') + '</div>' +
+          '<button class="modal__close" type="button" data-act="no">×</button></div>' +
+        (opts.text ? '<p style="font-size:14px;color:var(--text2);line-height:1.6;margin:0 0 20px">' + esc(opts.text) + '</p>' : '') +
+        '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+          '<button class="btn btn--ghost" type="button" data-act="no">' + esc(opts.cancelText || 'Отмена') + '</button>' +
+          '<button class="btn ' + (opts.danger ? 'btn--danger' : 'btn--primary') + '" type="button" data-act="yes">' + esc(opts.okText || 'Подтвердить') + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    requestAnimationFrame(function(){ ov.classList.add('open'); });
+    var done = function(val) {
+      document.removeEventListener('keydown', onKey);
+      ov.classList.remove('open');
+      setTimeout(function(){ ov.remove(); }, 200);
+      resolve(val);
+    };
+    var onKey = function(e) { if (e.key === 'Escape') done(false); if (e.key === 'Enter') done(true); };
+    document.addEventListener('keydown', onKey);
+    ov.addEventListener('click', function(e) {
+      var act = e.target.getAttribute && e.target.getAttribute('data-act');
+      if (act === 'yes') done(true);
+      else if (act === 'no' || e.target === ov) done(false);
+    });
+    setTimeout(function(){ var b = ov.querySelector('[data-act="yes"]'); if (b) b.focus(); }, 30);
+  });
 }
 
 function esc(s) {

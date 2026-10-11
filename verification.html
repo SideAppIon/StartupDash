@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Модерация ролей — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .cmp-tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
     .cmp-tab{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .2s}
@@ -45,7 +45,7 @@
     <div class="section-header" style="margin-bottom:24px">
       <div>
         <h1 class="page-title">🎓 Модерация ролей</h1>
-        <p class="page-subtitle">Заявки на роли Эксперт, Куратор, Ментор и Буст-партнёр. Проверь сертификат или ИНН и прими решение — пользователь получит личное сообщение.</p>
+        <p class="page-subtitle">Заявки на роли Эксперт, Куратор, Ментор и Буст-партнёр. Проверьте сертификат или реквизиты организации и примите решение — пользователь получит личное сообщение.</p>
       </div>
     </div>
     <div class="cmp-tabs">
@@ -76,7 +76,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
@@ -160,15 +160,31 @@ function buildCard(v) {
     (v.userBio ? '<div class="vf-label">О себе</div><div class="vf-block">'+esc(v.userBio)+'</div>' : '') +
     (v.userPortfolio ? '<div class="vf-label">Портфолио</div><div class="vf-block">'+esc(v.userPortfolio)+'</div>' : '') +
     (v.comment ? '<div class="vf-label">Комментарий к заявке</div><div class="vf-block">'+esc(v.comment)+'</div>' : '') +
-    (v.inn ? '<div class="vf-label">ИНН</div><div class="vf-block" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><b style="font-size:16px;letter-spacing:1px">'+esc(v.inn)+'</b>' +
-      '<span class="vf-sub">'+(v.inn.length===10?'юрлицо':'ИП / физлицо')+'</span>' +
-      '<a class="vf-sub" style="color:var(--accent)" target="_blank" rel="noopener" href="https://egrul.nalog.ru/">Проверить в ЕГРЮЛ/ЕГРИП ↗</a></div>' : '') +
+    (v.inn ? buildOrgBlock(v) : '') +
     '<div class="vf-label">'+(v.requestedRole==='boost_partner'?'Документы':'Сертификаты')+'</div><div class="vf-files">'+(files||'<span class="vf-sub">нет файлов</span>')+'</div>' +
     (v.status==='rejected' && v.reviewNote ? '<div class="vf-label">Причина отказа</div><div class="vf-block">'+esc(v.reviewNote)+'</div>' : '') +
     '<div class="vf-meta"><span>Подана '+formatDate(v.createdAt)+'</span>' +
       (v.reviewedAt ? '<span>· рассмотрена '+formatDate(v.reviewedAt)+'</span>' : '') + '</div>' +
     '<div class="vf-actions">'+actions+'</div>' +
   '</div>';
+}
+
+// Реквизиты организации буст-партнёра
+function buildOrgBlock(v) {
+  var row = function(label, val) {
+    return '<div style="display:flex;gap:10px;margin-top:6px"><span class="vf-sub" style="min-width:150px">'+label+'</span><span>'+esc(val||'—')+'</span></div>';
+  };
+  return '<div class="vf-label">Организация</div>' +
+    '<div class="vf-block" style="white-space:normal">' +
+      '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">' +
+        (v.orgLogo ? '<a href="'+esc(v.orgLogo)+'" target="_blank" rel="noopener"><img src="'+esc(v.orgLogo)+'" alt="Логотип" style="width:64px;height:64px;border-radius:12px;object-fit:contain;background:var(--bg2);border:1px solid var(--border2)"/></a>' : '') +
+        '<div><b style="font-size:16px;letter-spacing:1px">ИНН '+esc(v.inn)+'</b> <span class="vf-sub">'+(v.inn.length===10?'юрлицо':'ИП / физлицо')+'</span><br/>' +
+          '<a class="vf-sub" style="color:var(--accent)" target="_blank" rel="noopener" href="https://egrul.nalog.ru/">Проверить в ЕГРЮЛ/ЕГРИП ↗</a></div>' +
+      '</div>' +
+      row('Юридический адрес', v.legalAddress) +
+      row('Руководитель', v.directorName) +
+      row('Рабочий телефон', v.directorPhone) +
+    '</div>';
 }
 
 async function approve(btn) {

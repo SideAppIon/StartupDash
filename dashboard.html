@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Дашборд — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=8"/>
   <style>
     .dash-grid{display:grid;grid-template-columns:280px 1fr;gap:24px}
     @media(max-width:900px){.dash-grid{grid-template-columns:1fr}}
@@ -80,13 +80,14 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=6"></script>
+<script src="api-config.js?v=13"></script>
 <script>
 requireAuth('login.html');
 
 var NAV = {
   startup:  [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'💡',l:'Идеи',h:'ideas.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   expert:   [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'💡',l:'Идеи',h:'ideas.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'🧑‍🚀',l:'Мои стартаперы',h:'my-founders.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'➕',l:'Создать стартап',h:'create-startup.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
+  observer: [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'💡',l:'Идеи',h:'ideas.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   user:     [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'🚀',l:'Мои стартапы',h:'my-startups.html'},{i:'🔍',l:'Стартапы',h:'startups.html'},{i:'👥',l:'Участники',h:'members.html'},{i:'📊',l:'Опросы',h:'my-polls.html'},{i:'💬',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
   admin:    [{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'👥',l:'Все пользователи',h:'admin.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'🎧',l:'Поддержка',h:'support.html'},{i:'🎓',l:'Модерация ролей',h:'verification.html'},{i:'🚀',l:'Все стартапы',h:'startups.html'},{i:'💬',l:'Сообщения',h:'messages.html'}],
   moderator:[{i:'🏠',l:'Дашборд',h:'dashboard.html'},{i:'🛡',l:'Жалобы',h:'complaints.html'},{i:'💬',l:'Форум',h:'forum.html'},{i:'📰',l:'Лента',h:'feed.html'},{i:'✉️',l:'Сообщения',h:'messages.html'},{i:'👤',l:'Мой профиль',h:'profile.html'}],
@@ -258,7 +259,7 @@ async function renderExpert(el, uid, dash) {
   }
 
   var myStartupsHtml = '';
-  if (myStartups.length) {
+  if (myStartups.length && isActiveExpert(currentUserData && currentUserData.role)) {
     myStartupsHtml = '<div class="section-header" style="margin-bottom:16px"><div class="section-title">Мои стартапы</div><a href="create-startup.html" class="btn btn--primary btn--sm">+ Создать</a></div>' +
       myStartups.map(function(s){
         return '<a class="s-card" href="startup.html?id='+s.id+'" style="display:flex">' +

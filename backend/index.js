@@ -75,6 +75,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Локальный стенд: отдаём загруженные файлы с диска ──
+if (uploadRoutes.LOCAL_UPLOADS) {
+  app.use('/uploads', express.static(uploadRoutes.LOCAL_UPLOAD_DIR));
+}
+
 // ── Healthcheck ───────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
