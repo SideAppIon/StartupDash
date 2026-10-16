@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Админ-панель — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=8"/>
+  <link rel="stylesheet" href="styles.css?v=9"/>
   <style>
     .admin-header{background:linear-gradient(135deg,rgba(255,71,87,.08),rgba(255,71,87,.02));border-bottom:1px solid rgba(255,71,87,.2);padding:32px 0;margin-bottom:28px}
     .admin-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,71,87,.15);border:1px solid rgba(255,71,87,.3);color:var(--danger);font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:.5px;margin-bottom:12px}
@@ -63,7 +63,7 @@
   <a href="forum.html">Форум</a>
   <a href="ideas.html">Идеи</a>
   <a href="members.html">Участники</a>
-  <a href="verification.html">Модерация ролей</a>
+  <a href="verification.html">Модерация</a>
   <div class="nav__user">
     <a href="messages.html" class="btn btn--ghost btn--sm">💬 Сообщения</a>
     <img class="nav__avatar" id="navAvatar" src="https://ui-avatars.com/api/?background=181c24&color=ff4757&name=A" onclick="goProfile()"/>
@@ -240,7 +240,7 @@
     </div>
     <div class="form-group">
       <label class="form-label">Название</label>
-      <input type="text" class="form-input" id="ideaRenameInput" maxlength="120"
+      <input type="text" class="form-input" id="ideaRenameInput" maxlength="50"
         onkeydown="if(event.key==='Enter'){event.preventDefault();applyIdeaRename()}"/>
     </div>
     <div id="ideaRenameErr" class="form-error" style="display:none;margin-bottom:10px"></div>
@@ -414,7 +414,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=13"></script>
+<script src="api-config.js?v=15"></script>
 <script>
 requireAuth('login.html');
 
@@ -757,14 +757,17 @@ function renderAdminIdeas() {
     return;
   }
   el.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' + list.map(function(i) {
-    var status = i.status === 'taken'
+    var status = i.moderation === 'pending'  ? '⏳ на модерации'
+               : i.moderation === 'rejected' ? '❌ отклонена модерацией'
+               : i.status === 'taken'
       ? '🚀 забрал(а) '+esc(i.takerName||'?')+(i.startupName ? ' → '+esc(i.startupName) : '')
       : '🟢 свободна';
+    var kindLabel = i.kind === 'task' ? 'Бизнес-задача' : 'Идея';
     return '<div class="user-row">'+
       '<span style="font-size:20px">💡</span>'+
       '<div class="user-row__info">'+
         '<div class="user-row__name">'+esc(i.title)+'</div>'+
-        '<div class="user-row__email">'+esc(i.authorName||'?')+(i.category ? ' · '+esc(i.category) : '')+' · '+status+' · '+formatDate(i.createdAt)+'</div>'+
+        '<div class="user-row__email">'+kindLabel+' · '+esc(i.authorName||'?')+' · '+status+' · '+formatDate(i.createdAt)+'</div>'+
       '</div>'+
       '<div class="user-row__actions">'+
         '<button class="btn btn--outline btn--sm" data-id="'+esc(i.id)+'" onclick="openIdeaRename(this.getAttribute(\'data-id\'))">✏️ Переименовать</button>'+

@@ -4,8 +4,8 @@
 -- psql -h <HOST> -U <USER> -d <DATABASE> -f schema.sql
 -- ============================================================
 
--- Расширения
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Расширения не нужны: id генерирует бэкенд (uuid в Node.js).
+-- В Managed PostgreSQL расширения подключаются через настройки базы, а не CREATE EXTENSION.
 
 -- ── Пользователи ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
@@ -386,6 +386,14 @@ CREATE TABLE IF NOT EXISTS ideas (
 CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ideas_author ON ideas(author_uid);
 CREATE INDEX IF NOT EXISTS idx_ideas_taken  ON ideas(taken_by);
+-- Тип (идея для стартапа / бизнес-задача компании), модерация (до 24 часов) и тема на форуме
+ALTER TABLE ideas ADD COLUMN IF NOT EXISTS kind           TEXT NOT NULL DEFAULT 'idea';      -- idea | task
+ALTER TABLE ideas ADD COLUMN IF NOT EXISTS moderation     TEXT NOT NULL DEFAULT 'approved';  -- pending | approved | rejected
+ALTER TABLE ideas ADD COLUMN IF NOT EXISTS review_note    TEXT DEFAULT '';
+ALTER TABLE ideas ADD COLUMN IF NOT EXISTS reviewed_by    TEXT;
+ALTER TABLE ideas ADD COLUMN IF NOT EXISTS reviewed_at    TIMESTAMPTZ;
+ALTER TABLE ideas ADD COLUMN IF NOT EXISTS forum_topic_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_ideas_moderation ON ideas(moderation);
 
 -- ── Группы пользователей (ограничения видимости стартапов и переписки) ──
 -- В проде создавались вручную; здесь — чтобы схему можно было поднять с нуля

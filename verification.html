@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Модерация ролей — Атриум</title>
+  <title>Модерация — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=8"/>
+  <link rel="stylesheet" href="styles.css?v=9"/>
   <style>
     .cmp-tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
     .cmp-tab{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .2s}
@@ -44,9 +44,14 @@
   <div class="container--md">
     <div class="section-header" style="margin-bottom:24px">
       <div>
-        <h1 class="page-title">🎓 Модерация ролей</h1>
-        <p class="page-subtitle">Заявки на роли Эксперт, Куратор, Ментор и Буст-партнёр. Проверьте сертификат или реквизиты организации и примите решение — пользователь получит личное сообщение.</p>
+        <h1 class="page-title">🛡 Модерация</h1>
+        <p class="page-subtitle" id="pageSub"></p>
       </div>
+    </div>
+    <!-- Раздел: заявки на роли / идеи и бизнес-задачи -->
+    <div class="cmp-tabs" style="margin-bottom:12px">
+      <button class="cmp-tab active" data-sec="roles" onclick="setSection('roles')">Заявки на роли <span class="badge badge--purple" id="cntRoles" style="font-size:11px;display:none"></span></button>
+      <button class="cmp-tab" data-sec="ideas" onclick="setSection('ideas')">Идеи и задачи <span class="badge badge--purple" id="cntIdeas" style="font-size:11px;display:none"></span></button>
     </div>
     <div class="cmp-tabs">
       <button class="cmp-tab active" data-st="pending" onclick="setTab('pending')">Ожидают</button>
@@ -76,13 +81,20 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=13"></script>
+<script src="api-config.js?v=15"></script>
 <script>
 requireAuth('login.html');
 
-var allItems = [];
+var allItems = [];     // заявки на роли
+var allIdeas = [];     // идеи и бизнес-задачи
 var curTab = 'pending';
-var rejectId = null;
+var curSection = getUrlParam('section') === 'ideas' ? 'ideas' : 'roles';
+var rejectId = null, rejectKind = 'role';
+
+var SECTION_SUBS = {
+  roles: 'Заявки на роли Эксперт, Куратор, Ментор и Буст-партнёр. Проверьте сертификат или реквизиты организации и примите решение — пользователь получит личное сообщение.',
+  ideas: 'Идеи для стартапов и бизнес-задачи от экспертов, менторов и буст-партнёров. Проверка — до 24 часов; после одобрения идея появится в банке идей, автор получит личное сообщение.'
+};
 
 onAuthReady(async function(user, userData) {
   if (!user) return;
@@ -92,15 +104,30 @@ onAuthReady(async function(user, userData) {
     window.location.href = 'dashboard.html';
     return;
   }
+  setSection(curSection);
   await loadItems();
 });
+
+function setSection(sec) {
+  curSection = sec;
+  document.querySelectorAll('[data-sec]').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-sec')===sec); });
+  document.getElementById('pageSub').textContent = SECTION_SUBS[sec];
+  render();
+}
 
 async function loadItems() {
   var el = document.getElementById('content');
   el.innerHTML = '<div class="spinner"></div>';
   try {
-    var data = await api.get('/verification');
-    allItems = data.verifications || [];
+    var res = await Promise.all([api.get('/verification'), api.get('/ideas')]);
+    allItems = res[0].verifications || [];
+    allIdeas = res[1].ideas || [];
+    // Счётчики ожидающих в переключателе разделов
+    [['cntRoles', allItems.filter(function(v){ return v.status === 'pending'; }).length],
+     ['cntIdeas', allIdeas.filter(function(i){ return i.moderation === 'pending'; }).length]].forEach(function(c) {
+      var b = document.getElementById(c[0]);
+      b.textContent = c[1]; b.style.display = c[1] ? '' : 'none';
+    });
     render();
   } catch(e) {
     el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div>' +
@@ -110,12 +137,23 @@ async function loadItems() {
 
 function setTab(st) {
   curTab = st;
-  document.querySelectorAll('.cmp-tab').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-st')===st); });
+  document.querySelectorAll('[data-st]').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-st')===st); });
   render();
 }
 
 function render() {
   var el = document.getElementById('content');
+  if (curSection === 'ideas') {
+    var ideasList = curTab ? allIdeas.filter(function(i){ return i.moderation===curTab; }) : allIdeas;
+    if (!ideasList.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">✅</div>' +
+        '<div class="empty-state__title">' + (curTab==='pending'?'Нет идей на проверке':'Идей нет') + '</div>' +
+        '<p style="font-size:14px">Здесь появятся идеи и бизнес-задачи на модерацию</p></div>';
+      return;
+    }
+    el.innerHTML = ideasList.map(buildIdeaCard).join('');
+    return;
+  }
   var list = curTab ? allItems.filter(function(v){ return v.status===curTab; }) : allItems;
   if (!list.length) {
     el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">✅</div>' +
@@ -187,9 +225,54 @@ function buildOrgBlock(v) {
     '</div>';
 }
 
+// ── Идеи и бизнес-задачи ──────────────────────────────
+var IDEA_KINDS = { idea: 'Идея для стартапа/проекта', task: 'Бизнес-задача компании' };
+function buildIdeaCard(i) {
+  var av = i.authorAvatar || 'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(i.authorName||'U');
+  var statusBadge = i.moderation==='pending'
+    ? '<span class="badge badge--purple" style="font-size:11px">⏳ На проверке</span>'
+    : i.moderation==='approved'
+    ? '<span class="badge badge--green" style="font-size:11px">✅ Одобрена</span>'
+    : '<span class="badge badge--red" style="font-size:11px">❌ Отклонена</span>';
+  var cardCls = 'vf-card' + (i.moderation==='approved'?' vf-card--approved':i.moderation==='rejected'?' vf-card--rejected':'');
+  var actions = i.moderation === 'pending'
+    ? '<button class="btn btn--primary btn--sm" data-id="'+esc(i.id)+'" onclick="approveIdea(this)">✅ Одобрить и опубликовать</button>' +
+      '<button class="btn btn--outline btn--sm" data-id="'+esc(i.id)+'" data-kind="idea" onclick="openReject(this)">❌ Отклонить</button>'
+    : '';
+  actions += '<a class="btn btn--ghost btn--sm" href="messages.html?to='+encodeURIComponent(i.authorUid||'')+'">💬 Написать автору</a>';
+  return '<div class="'+cardCls+'">' +
+    '<div class="vf-head">' +
+      '<img class="vf-ava" src="'+esc(av)+'"/>' +
+      '<div><a class="vf-link" href="member.html?uid='+esc(i.authorUid||'')+'">'+esc(i.authorName||'Автор')+'</a>' +
+        '<div class="vf-sub">'+esc(ROLE_LABELS[i.authorRole]||i.authorRole||'')+'</div></div>' +
+      '<span style="margin-left:auto">'+statusBadge+'</span>' +
+    '</div>' +
+    '<div class="vf-label">'+esc(IDEA_KINDS[i.kind]||IDEA_KINDS.idea)+'</div>' +
+    '<div style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:10px">'+esc(i.title)+'</div>' +
+    '<div class="vf-label">Описание</div><div class="vf-block">'+esc(i.description)+'</div>' +
+    (i.moderation==='rejected' && i.reviewNote ? '<div class="vf-label">Причина отказа</div><div class="vf-block">'+esc(i.reviewNote)+'</div>' : '') +
+    '<div class="vf-meta"><span>Отправлена '+formatDate(i.updatedAt || i.createdAt)+'</span>' +
+      (i.reviewedAt ? '<span>· рассмотрена '+formatDate(i.reviewedAt)+'</span>' : '') + '</div>' +
+    '<div class="vf-actions">'+actions+'</div>' +
+  '</div>';
+}
+
+async function approveIdea(btn) {
+  if (!(await uiConfirm({ title: 'Одобрить идею?', text: 'Она появится в банке идей, автор получит уведомление.', okText: 'Одобрить' }))) return;
+  btn.disabled = true;
+  try {
+    await api.post('/ideas/'+btn.getAttribute('data-id')+'/moderate', { decision: 'approve' });
+    showToast('Идея опубликована, автор уведомлён','success');
+    await loadItems();
+  } catch(e) {
+    btn.disabled = false;
+    showToast('Ошибка: '+(e.message||'не удалось'),'error');
+  }
+}
+
 async function approve(btn) {
   var id = btn.getAttribute('data-id');
-  if (!confirm('Одобрить заявку и сменить роль пользователю?')) return;
+  if (!(await uiConfirm({ title: 'Одобрить заявку?', text: 'Пользователю сразу сменится роль, он получит уведомление.', okText: 'Одобрить' }))) return;
   btn.disabled = true;
   try {
     await api.patch('/verification/'+id, { status: 'approved' });
@@ -203,6 +286,8 @@ async function approve(btn) {
 
 function openReject(btn) {
   rejectId = btn.getAttribute('data-id');
+  rejectKind = btn.getAttribute('data-kind') === 'idea' ? 'idea' : 'role';
+  document.querySelector('#rejectModal .modal__title').textContent = rejectKind === 'idea' ? 'Отклонить идею' : 'Отклонить заявку';
   document.getElementById('rejectNote').value = '';
   document.getElementById('rejectErr').style.display = 'none';
   document.getElementById('rejectModal').classList.add('open');
@@ -214,9 +299,10 @@ async function confirmReject() {
   var errEl = document.getElementById('rejectErr');
   if (!note) { errEl.textContent = 'Укажите причину'; errEl.style.display = 'block'; return; }
   try {
-    await api.patch('/verification/'+rejectId, { status: 'rejected', note: note });
+    if (rejectKind === 'idea') await api.post('/ideas/'+rejectId+'/moderate', { decision: 'reject', note: note });
+    else await api.patch('/verification/'+rejectId, { status: 'rejected', note: note });
     closeReject();
-    showToast('Заявка отклонена, пользователь уведомлён','success');
+    showToast(rejectKind === 'idea' ? 'Идея отклонена, автор уведомлён' : 'Заявка отклонена, пользователь уведомлён','success');
     await loadItems();
   } catch(e) {
     errEl.textContent = 'Ошибка: '+(e.message||'не удалось');

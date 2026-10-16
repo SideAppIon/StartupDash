@@ -7,7 +7,7 @@
 // Локальный стенд: сайт открыт с localhost → ходим в локальный бэкенд (npm run local)
 const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? 'http://localhost:3000'
-  : 'https://d5d0pq825bknmdlu2u40.6brbn2wz.apigw.yandexcloud.net';
+  : 'https://api.atriumplatform.ru';   // бэкенд на сервере Selectel (nginx → Node.js)
 
 // ─────────────────────────────────────────────────────────
 // ТОКЕН
@@ -801,7 +801,8 @@ function _openNotifPopup() {
 }
 
 // ── Окно подтверждения в стиле сайта (вместо системного confirm) ──
-// uiConfirm({ title, text, okText, cancelText, danger }) → Promise<boolean>
+// uiConfirm({ title, text, okText, cancelText, danger, alert }) → Promise<boolean>
+// alert: true — информационное окно с одной кнопкой (по умолчанию «Понятно»)
 function uiConfirm(opts) {
   opts = opts || {};
   return new Promise(function(resolve) {
@@ -813,8 +814,8 @@ function uiConfirm(opts) {
           '<button class="modal__close" type="button" data-act="no">×</button></div>' +
         (opts.text ? '<p style="font-size:14px;color:var(--text2);line-height:1.6;margin:0 0 20px">' + esc(opts.text) + '</p>' : '') +
         '<div style="display:flex;gap:10px;justify-content:flex-end">' +
-          '<button class="btn btn--ghost" type="button" data-act="no">' + esc(opts.cancelText || 'Отмена') + '</button>' +
-          '<button class="btn ' + (opts.danger ? 'btn--danger' : 'btn--primary') + '" type="button" data-act="yes">' + esc(opts.okText || 'Подтвердить') + '</button>' +
+          (opts.alert ? '' : '<button class="btn btn--ghost" type="button" data-act="no">' + esc(opts.cancelText || 'Отмена') + '</button>') +
+          '<button class="btn ' + (opts.danger ? 'btn--danger' : 'btn--primary') + '" type="button" data-act="yes">' + esc(opts.okText || (opts.alert ? 'Понятно' : 'Подтвердить')) + '</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(ov);

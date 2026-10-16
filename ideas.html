@@ -5,16 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Идеи — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=8"/>
+  <link rel="stylesheet" href="styles.css?v=9"/>
   <style>
     .idea-tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap;align-items:center}
     .idea-tab{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .2s}
     .idea-tab.active{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
-    .idea-filter{margin-left:auto;max-width:200px}
+    .idea-filter{margin-left:auto;max-width:220px}
     .idea-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
     .idea-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;display:flex;flex-direction:column;gap:12px;transition:border-color .2s}
     .idea-card:hover{border-color:var(--border2)}
     .idea-card--taken{opacity:.8}
+    .idea-card--pending{border-style:dashed}
     .idea-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     .idea-title{font-family:var(--font-head);font-size:18px;font-weight:700;line-height:1.3;word-break:break-word}
     .idea-desc{font-size:14px;color:var(--text2);line-height:1.6;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
@@ -24,9 +25,19 @@
     .idea-author img{width:26px;height:26px;border-radius:50%;object-fit:cover;background:var(--bg3)}
     .idea-author a{color:inherit;text-decoration:none;font-weight:600}
     .idea-author a:hover{color:var(--accent)}
-    .idea-taken{font-size:13px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 12px;color:var(--text2)}
-    .idea-taken a{color:var(--accent);text-decoration:none}
+    .idea-note{font-size:13px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 12px;color:var(--text2);line-height:1.5}
+    .idea-note a{color:var(--accent);text-decoration:none}
+    .idea-note--warn{border-color:rgba(255,159,67,.35);background:rgba(255,159,67,.08)}
+    .idea-note--danger{border-color:rgba(255,71,87,.35);background:rgba(255,71,87,.08)}
     .idea-actions{display:flex;gap:8px;flex-wrap:wrap}
+    /* Форма: выбор типа */
+    .kind-pick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .kind-opt{border:1.5px solid var(--border2);border-radius:var(--radius);padding:12px 14px;cursor:pointer;background:var(--bg3);transition:all .2s}
+    .kind-opt.sel{border-color:var(--accent);background:var(--accent-dim)}
+    .kind-opt__name{font-size:14px;font-weight:600}
+    .kind-opt__desc{font-size:12px;color:var(--text3);margin-top:3px;line-height:1.4}
+    .field-count{float:right;font-size:12px;color:var(--text3);font-weight:400}
+    @media(max-width:520px){.kind-pick{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -50,7 +61,7 @@
     <div class="section-header" style="margin-bottom:20px">
       <div>
         <h1 class="page-title">💡 Идеи</h1>
-        <p class="page-subtitle" id="pageSub" data-ty="Идеи от буст-партнёров — забирай и запускай на их основе свой стартап">Идеи от буст-партнёров, на основе которых стартаперы запускают проекты</p>
+        <p class="page-subtitle" id="pageSub" data-ty="Идеи и бизнес-задачи от экспертов, менторов и буст-партнёров — забирай и запускай на их основе свой стартап">Идеи для стартапов и бизнес-задачи компаний от экспертов, менторов и буст-партнёров</p>
       </div>
       <button class="btn btn--primary" id="newIdeaBtn" style="display:none" onclick="openIdeaModal()">+ Предложить идею</button>
     </div>
@@ -59,7 +70,11 @@
       <button class="idea-tab active" data-tab="open" onclick="setTab('open')">Свободные</button>
       <button class="idea-tab" data-tab="taken" onclick="setTab('taken')">Забранные</button>
       <button class="idea-tab" data-tab="mine" id="mineTab" style="display:none" onclick="setTab('mine')">Мои</button>
-      <select class="form-select idea-filter" id="catFilter" onchange="render()"></select>
+      <select class="form-select idea-filter" id="kindFilter" onchange="render()">
+        <option value="">Идеи и задачи</option>
+        <option value="idea">Идеи для стартапов</option>
+        <option value="task">Бизнес-задачи</option>
+      </select>
     </div>
 
     <div id="content"><div class="spinner"></div></div>
@@ -68,26 +83,39 @@
 
 <!-- Создание / редактирование идеи -->
 <div class="modal-overlay" id="ideaModal">
-  <div class="modal" style="max-width:560px">
+  <div class="modal" style="max-width:580px">
     <div class="modal__header">
       <div class="modal__title" id="ideaModalTitle">Новая идея</div>
       <button class="modal__close" onclick="closeIdeaModal()">×</button>
     </div>
     <div class="form-group">
-      <label class="form-label">Название *</label>
-      <input type="text" class="form-input" id="ideaTitle" maxlength="120" placeholder="Например: Сервис аренды спецтехники для фермеров"/>
+      <label class="form-label">Тип *</label>
+      <div class="kind-pick">
+        <div class="kind-opt sel" data-kind="idea" onclick="selectKind('idea')">
+          <div class="kind-opt__name">Идея для стартапа/проекта</div>
+          <div class="kind-opt__desc">Задумка, которую стартапер может взять и развить в проект</div>
+        </div>
+        <div class="kind-opt" data-kind="task" onclick="selectKind('task')">
+          <div class="kind-opt__name">Бизнес-задача компании</div>
+          <div class="kind-opt__desc">Реальная задача бизнеса, которую может решить стартап</div>
+        </div>
+      </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Категория</label>
-      <select class="form-select" id="ideaCategory"></select>
+      <label class="form-label">Краткое наименование * <span class="field-count" id="titleCount">0 / 50</span></label>
+      <input type="text" class="form-input" id="ideaTitle" maxlength="50" oninput="updateCounts()" placeholder="Например: Аренда спецтехники для фермеров"/>
     </div>
     <div class="form-group" style="margin-bottom:0">
-      <label class="form-label">Описание *</label>
-      <textarea class="form-textarea" id="ideaDesc" style="min-height:160px" maxlength="5000"
-        placeholder="Какую проблему решает, для кого, почему сейчас, чем вы как партнёр можете помочь..."></textarea>
+      <label class="form-label">Описание сути * <span class="field-count" id="descCount">0 / 2000</span></label>
+      <textarea class="form-textarea" id="ideaDesc" style="min-height:160px" maxlength="2000" oninput="updateCounts()"></textarea>
+      <div class="form-hint">Можно описать суть, для кого это полезно, и указать любую информацию</div>
+    </div>
+    <div class="idea-note" style="margin-top:14px">
+      ⏳ После отправки идея уйдёт на модерацию — проверка занимает до 24 часов.
+      Пока её не одобрят, она видна только вам. О решении придёт личное сообщение.
     </div>
     <div id="ideaErr" class="form-error" style="display:none;margin-top:10px"></div>
-    <button class="btn btn--primary" id="ideaSave" style="width:100%;justify-content:center;margin-top:16px" onclick="saveIdea()">Опубликовать</button>
+    <button class="btn btn--primary" id="ideaSave" style="width:100%;justify-content:center;margin-top:16px" onclick="saveIdea()">Отправить на модерацию</button>
   </div>
 </div>
 
@@ -103,7 +131,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=13"></script>
+<script src="api-config.js?v=15"></script>
 <script>
 requireAuth('login.html');
 
@@ -111,27 +139,26 @@ var me = null, meData = null;
 var ideas = [];
 var curTab = 'open';
 var editingId = null;
+var formKind = 'idea';
+
+var KIND_LABELS = { idea: 'Идея для стартапа', task: 'Бизнес-задача' };
+var PUBLISHER_ROLES = ['expert', 'mentor', 'boost_partner'];
 
 onAuthReady(async function(user, userData) {
   if (!user) return;
   me = user; meData = userData || {};
   renderNav(meData);
 
-  var role = meData.role;
   if (canPublishIdeas()) {
     document.getElementById('newIdeaBtn').style.display = '';
-    document.getElementById('pageSub').textContent = 'Публикуйте идеи — стартаперы заберут их и запустят на их основе проекты';
+    document.getElementById('pageSub').textContent =
+      'Предлагайте идеи для стартапов и бизнес-задачи компаний — стартаперы заберут их и запустят проекты';
   }
-  if (canPublishIdeas() || role === 'startup') document.getElementById('mineTab').style.display = '';
-
-  loadPlatformConfig().then(function(cfg) {
-    document.getElementById('catFilter').innerHTML = '<option value="">Все категории</option>' +
-      cfg.categories.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
-  });
+  if (canPublishIdeas() || meData.role === 'startup') document.getElementById('mineTab').style.display = '';
   await loadIdeas();
 });
 
-function canPublishIdeas() { return meData && (meData.role === 'boost_partner' || meData.role === 'admin'); }
+function canPublishIdeas() { return meData && PUBLISHER_ROLES.indexOf(meData.role) !== -1; }
 function canTakeIdeas()    { return meData && meData.role === 'startup'; }
 
 async function loadIdeas() {
@@ -153,20 +180,21 @@ function setTab(t) {
 }
 
 function render() {
-  var el  = document.getElementById('content');
-  var cat = document.getElementById('catFilter').value;
+  var el   = document.getElementById('content');
+  var kind = document.getElementById('kindFilter').value;
   var list = ideas.filter(function(i) {
-    if (cat && i.category !== cat) return false;
+    if (kind && i.kind !== kind) return false;
     if (curTab === 'mine') return i.authorUid === me.uid || i.takenBy === me.uid;
-    return i.status === curTab;
+    // В общих вкладках — только одобренные
+    return i.moderation === 'approved' && i.status === curTab;
   });
   if (!list.length) {
     var msg = curTab === 'open' ? 'Свободных идей пока нет'
             : curTab === 'taken' ? 'Пока никто не забрал идеи'
-            : (canPublishIdeas() ? 'Вы ещё не публиковали идеи' : 'Вы ещё не забирали идеи');
-    var hint = curTab === 'open' && canPublishIdeas()
+            : (canPublishIdeas() ? 'Вы ещё не предлагали идеи' : 'Вы ещё не забирали идеи');
+    var hint = curTab !== 'taken' && canPublishIdeas()
       ? '<button class="btn btn--primary" style="margin-top:14px" onclick="openIdeaModal()">+ Предложить идею</button>'
-      : '<p style="font-size:14px">Буст-партнёры публикуют здесь идеи для новых стартапов</p>';
+      : '<p style="font-size:14px">Эксперты, менторы и буст-партнёры публикуют здесь идеи и бизнес-задачи</p>';
     el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">💡</div><div class="empty-state__title">'+msg+'</div>'+hint+'</div>';
     return;
   }
@@ -181,23 +209,34 @@ function buildCard(i) {
   var isAuthor = i.authorUid === me.uid;
   var isTaker  = i.takenBy === me.uid;
   var isAdmin  = meData.role === 'admin';
+  var approved = i.moderation === 'approved';
   var av = i.authorAvatar || 'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(i.authorName||'U');
 
-  var badges = (i.category ? '<span class="badge badge--gray">'+esc(i.category)+'</span>' : '') +
-    (i.status === 'open'
-      ? '<span class="badge badge--green">Свободна</span>'
-      : '<span class="badge badge--purple">Забрана</span>');
+  var badges = '<span class="badge badge--gray">'+esc(KIND_LABELS[i.kind] || KIND_LABELS.idea)+'</span>';
+  if (i.moderation === 'pending')       badges += '<span class="badge badge--purple">⏳ На модерации</span>';
+  else if (i.moderation === 'rejected') badges += '<span class="badge badge--red">Отклонена</span>';
+  else badges += i.status === 'open'
+    ? '<span class="badge badge--green">Свободна</span>'
+    : '<span class="badge badge--purple">Забрана</span>';
+
+  // Пояснение автору по модерации
+  var note = '';
+  if (isAuthor && i.moderation === 'pending') {
+    note = '<div class="idea-note idea-note--warn">Проверка занимает до 24 часов. После одобрения идею увидят стартаперы, о решении придёт личное сообщение.</div>';
+  } else if (isAuthor && i.moderation === 'rejected') {
+    note = '<div class="idea-note idea-note--danger">Причина отказа: '+esc(i.reviewNote || '—')+'<br/>Исправьте идею — она снова уйдёт на модерацию.</div>';
+  }
 
   var taken = '';
-  if (i.status === 'taken') {
-    taken = '<div class="idea-taken">🚀 Забрал(а) <a href="member.html?uid='+esc(i.takenBy||'')+'">'+esc(i.takerName||'стартапер')+'</a>' +
+  if (approved && i.status === 'taken') {
+    taken = '<div class="idea-note">🚀 Забрал(а) <a href="member.html?uid='+esc(i.takenBy||'')+'">'+esc(i.takerName||'стартапер')+'</a>' +
       (i.takenAt ? ' · '+formatDate(i.takenAt) : '') +
       (i.startupId ? '<br/>Стартап: <a href="startup.html?id='+esc(i.startupId)+'">'+esc(i.startupName||'открыть')+'</a>' : '') +
     '</div>';
   }
 
   var actions = [];
-  if (i.status === 'open' && canTakeIdeas() && !isAuthor) {
+  if (approved && i.status === 'open' && canTakeIdeas() && !isAuthor) {
     actions.push('<button class="btn btn--primary btn--sm" data-id="'+esc(i.id)+'" onclick="takeIdea(this)">✋ Забрать себе</button>');
   }
   if (isTaker && !i.startupId) {
@@ -206,37 +245,56 @@ function buildCard(i) {
   if (isTaker || (isAdmin && i.status === 'taken')) {
     actions.push('<button class="btn btn--ghost btn--sm" data-id="'+esc(i.id)+'" onclick="releaseIdea(this)">Вернуть идею</button>');
   }
-  if ((isAuthor && i.status === 'open') || isAdmin) {
-    actions.push('<button class="btn btn--outline btn--sm" data-id="'+esc(i.id)+'" onclick="openIdeaModal(this.getAttribute(\'data-id\'))">✏️</button>');
-    actions.push('<button class="btn btn--ghost btn--sm" style="color:var(--danger)" data-id="'+esc(i.id)+'" onclick="deleteIdea(this)">🗑</button>');
+  if (approved) {
+    actions.push('<button class="btn btn--outline btn--sm" data-id="'+esc(i.id)+'" onclick="discussIdea(this)">Обсудить на форуме</button>');
   }
-  // «Обсудить с автором» — тем, кому разрешено писать буст-партнёру (стартапер, буст-партнёр, персонал)
-  if (!isAuthor && i.status === 'open' && (meData.role === 'startup' || meData.role === i.authorRole || isStaffRole(meData.role))) {
-    actions.push('<a class="btn btn--ghost btn--sm" href="messages.html?to='+encodeURIComponent(i.authorUid)+'">💬 Обсудить с автором</a>');
+  // «Обсудить с автором» — тем, кому разрешено писать автору (стартапер, та же роль, персонал)
+  if (approved && !isAuthor && i.status === 'open' && (meData.role === 'startup' || meData.role === i.authorRole || isStaffRole(meData.role))) {
+    actions.push('<a class="btn btn--ghost btn--sm" href="messages.html?to='+encodeURIComponent(i.authorUid)+'">Написать автору</a>');
+  }
+  if ((isAuthor && i.status === 'open') || isAdmin) {
+    actions.push('<button class="btn btn--ghost btn--sm" data-id="'+esc(i.id)+'" onclick="openIdeaModal(this.getAttribute(\'data-id\'))">Изменить</button>');
+    actions.push('<button class="btn btn--ghost btn--sm" style="color:var(--danger)" data-id="'+esc(i.id)+'" onclick="deleteIdea(this)">Удалить</button>');
   }
 
-  return '<div class="idea-card'+(i.status==='taken'?' idea-card--taken':'')+'">' +
+  var cls = 'idea-card' + (i.status === 'taken' ? ' idea-card--taken' : '') + (approved ? '' : ' idea-card--pending');
+  return '<div class="'+cls+'">' +
     '<div class="idea-top">'+badges+'</div>' +
     '<div class="idea-title">'+esc(i.title)+'</div>' +
     '<div class="idea-desc">'+esc(i.description)+'</div>' +
     '<button class="idea-more" style="display:none" onclick="this.previousElementSibling.classList.toggle(\'open\');this.textContent=this.previousElementSibling.classList.contains(\'open\')?\'Свернуть\':\'Читать полностью\'">Читать полностью</button>' +
-    taken +
+    note + taken +
     '<div class="idea-author"><img src="'+esc(av)+'"/><a href="member.html?uid='+esc(i.authorUid)+'">'+esc(i.authorName||'Автор')+'</a>' +
       '<span>· '+formatDate(i.createdAt)+'</span></div>' +
     (actions.length ? '<div class="idea-actions">'+actions.join('')+'</div>' : '') +
   '</div>';
 }
 
-// ── Публикация / редактирование ───────────────────────
+// ── Предложение / редактирование ──────────────────────
+function selectKind(kind) {
+  formKind = kind;
+  document.querySelectorAll('.kind-opt').forEach(function(o){ o.classList.toggle('sel', o.getAttribute('data-kind') === kind); });
+  document.getElementById('ideaDesc').placeholder = kind === 'task'
+    ? 'Какую задачу нужно решить, в каких условиях, что будет результатом...'
+    : 'Какую проблему решает идея, для кого, почему сейчас...';
+}
+function updateCounts() {
+  document.getElementById('titleCount').textContent = document.getElementById('ideaTitle').value.length + ' / 50';
+  document.getElementById('descCount').textContent  = document.getElementById('ideaDesc').value.length + ' / 2000';
+}
+
 function openIdeaModal(id) {
   editingId = id || null;
   var idea = id ? ideas.find(function(x){ return x.id === id; }) : null;
-  document.getElementById('ideaModalTitle').textContent = idea ? 'Редактировать идею' : 'Новая идея';
-  document.getElementById('ideaSave').textContent = idea ? '💾 Сохранить' : 'Опубликовать';
+  var adminEdit = idea && meData.role === 'admin' && idea.authorUid !== me.uid;
+  document.getElementById('ideaModalTitle').textContent = idea ? 'Изменить идею' : 'Новая идея';
+  document.getElementById('ideaSave').textContent = adminEdit ? 'Сохранить' : 'Отправить на модерацию';
   document.getElementById('ideaTitle').value = idea ? idea.title : '';
   document.getElementById('ideaDesc').value  = idea ? idea.description : '';
   document.getElementById('ideaErr').style.display = 'none';
-  fillCategorySelect('ideaCategory', idea ? idea.category : '');
+  document.querySelector('#ideaModal .idea-note').style.display = adminEdit ? 'none' : '';
+  selectKind(idea ? (idea.kind || 'idea') : 'idea');
+  updateCounts();
   document.getElementById('ideaModal').classList.add('open');
 }
 function closeIdeaModal() { document.getElementById('ideaModal').classList.remove('open'); }
@@ -245,20 +303,29 @@ async function saveIdea() {
   var errEl = document.getElementById('ideaErr');
   var btn   = document.getElementById('ideaSave');
   var body = {
+    kind:        formKind,
     title:       document.getElementById('ideaTitle').value.trim(),
-    category:    document.getElementById('ideaCategory').value,
     description: document.getElementById('ideaDesc').value.trim(),
   };
   errEl.style.display = 'none';
-  if (!body.title) { errEl.textContent = 'Укажите название'; errEl.style.display = 'block'; return; }
-  if (body.description.length < 30) { errEl.textContent = 'Опишите идею подробнее (минимум 30 символов)'; errEl.style.display = 'block'; return; }
+  if (!body.title) { errEl.textContent = 'Укажите краткое наименование'; errEl.style.display = 'block'; return; }
+  if (body.description.length < 20) { errEl.textContent = 'Опишите суть подробнее (минимум 20 символов)'; errEl.style.display = 'block'; return; }
   btn.disabled = true;
   try {
-    if (editingId) await api.patch('/ideas/' + editingId, body);
-    else await api.post('/ideas', body);
+    var saved = editingId ? (await api.patch('/ideas/' + editingId, body)).idea : (await api.post('/ideas', body)).idea;
     closeIdeaModal();
-    showToast(editingId ? 'Идея обновлена' : '💡 Идея опубликована', 'success');
     await loadIdeas();
+    if (saved && saved.moderation === 'pending') {
+      setTab('mine');
+      await uiConfirm({
+        alert: true,
+        title: 'Отправлено на модерацию',
+        text: (body.kind === 'task' ? 'Бизнес-задача' : 'Идея') + ' появится в банке идей после проверки — она занимает до 24 часов. ' +
+              'О решении придёт личное сообщение, а пока статус виден во вкладке «Мои».'
+      });
+    } else {
+      showToast('Сохранено', 'success');
+    }
   } catch(e) {
     errEl.textContent = 'Ошибка: ' + (e.message || 'не удалось сохранить');
     errEl.style.display = 'block';
@@ -274,6 +341,18 @@ async function deleteIdea(btn) {
     showToast('Идея удалена', 'success');
     await loadIdeas();
   } catch(e) { showToast('Ошибка: ' + (e.message || 'не удалось удалить'), 'error'); }
+}
+
+// ── Обсуждение на форуме ──────────────────────────────
+async function discussIdea(btn) {
+  btn.disabled = true;
+  try {
+    var r = await api.post('/ideas/' + btn.getAttribute('data-id') + '/discussion', {});
+    window.location.href = 'forum.html?topic=' + encodeURIComponent(r.topicId);
+  } catch(e) {
+    btn.disabled = false;
+    showToast('Ошибка: ' + (e.message || 'не удалось открыть обсуждение'), 'error');
+  }
 }
 
 // ── Забрать / вернуть ─────────────────────────────────

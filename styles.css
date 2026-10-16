@@ -249,6 +249,8 @@ body {
   background: var(--bg2); border: 1px solid var(--border2);
   border-radius: var(--radius-lg); padding: 32px;
   width: 100%; max-width: 520px; margin: 24px;
+  /* Длинная форма не обрезается на невысоком экране — прокручивается внутри окна */
+  max-height: calc(100vh - 48px); overflow-y: auto;
   transform: scale(.96); transition: transform .2s;
 }
 .modal-overlay.open .modal { transform: scale(1); }
