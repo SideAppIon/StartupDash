@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const { query, queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { MODERATED_ROLES, needsModeration, needsInn, isValidInn, ensureRoleConstraint } = require('../lib/roles');
-const { fileUrl } = require('./upload');
+const { fileUrl, deleteStoredFile } = require('./upload');
 const { sendDirectMessage } = require('../lib/dm');
 
 const router = express.Router();
@@ -68,6 +68,8 @@ async function ensureVerificationSchema() {
     await query("ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS director_name  TEXT DEFAULT ''");
     await query("ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS director_phone TEXT DEFAULT ''");
     await query("ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS org_logo       TEXT DEFAULT ''");
+    // Когда удалены файлы заявки (сертификаты, логотип) — через 7 дней после решения
+    await query('ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS files_purged_at TIMESTAMPTZ');
     schemaEnsured = true;
   } catch (e) {
     console.error('ensureVerificationSchema error:', e.message);
@@ -91,6 +93,7 @@ function shape(r) {
     directorName:  r.director_name || '',
     directorPhone: r.director_phone || '',
     orgLogo:       r.org_logo || '',
+    filesPurgedAt: r.files_purged_at || null,
     status:        r.status,
     reviewNote:    r.review_note || '',
     reviewedBy:    r.reviewed_by,
@@ -236,4 +239,78 @@ router.patch('/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ── Очистка файлов модерации ─────────────────────────
+// Через FILES_KEEP_DAYS дней после решения (одобрено / отклонено) удаляем с сервера
+// сертификаты и логотип организации, а из заявки убираем ссылки на них.
+// Остальные данные заявки (роль, ИНН, реквизиты, причина отказа) остаются.
+// Запускается по расписанию: npm run purge-moderation-files (см. purge-moderation-files.js).
+const FILES_KEEP_DAYS = 7;
+async function purgeReviewedFiles(days = FILES_KEEP_DAYS) {
+  await ensureVerificationSchema();
+  const rows = await queryAll(
+    `SELECT id, certificates, org_logo FROM role_verifications
+     WHERE status IN ('approved','rejected') AND files_purged_at IS NULL
+       AND reviewed_at < NOW() - make_interval(days => $1)`,
+    [days]
+  );
+  let files = 0;
+  for (const r of rows) files += await purgeRequestFiles(r);
+  return { requests: rows.length, files };
+}
+
+// Удалить файлы одной заявки и отметить это в ней. Возвращает число удалённых файлов.
+async function purgeRequestFiles(r) {
+  const urls = parseCerts(r.certificates).map(c => c.url);
+  if (r.org_logo) urls.push(r.org_logo);
+  let files = 0;
+  for (const url of urls) {
+    if (await deleteStoredFile(url, ['certificates', 'org-logos'])) files++;
+  }
+  await queryOne(
+    `UPDATE role_verifications SET certificates='[]', org_logo='', files_purged_at=NOW() WHERE id=$1`,
+    [r.id]
+  );
+  return files;
+}
+
+// Ручная очистка одобренной заявки (админ / поддержка) — экономия места, статус и роль не меняются.
+// Только для одобренных: по ожидающей ещё нужно принять решение, отклонённую могут оспорить.
+async function loadApprovedForCleanup(req, res) {
+  if (!isReviewer(req.user)) { res.status(403).json({ error: 'Только для администратора и поддержки' }); return null; }
+  await ensureVerificationSchema();
+  const row = await queryOne('SELECT * FROM role_verifications WHERE id=$1', [req.params.id]);
+  if (!row) { res.status(404).json({ error: 'Заявка не найдена' }); return null; }
+  if (row.status !== 'approved') { res.status(409).json({ error: 'Удалять можно только одобренные заявки' }); return null; }
+  return row;
+}
+
+// POST /verification/:id/purge-files — удалить вложения (заявка остаётся в списке)
+router.post('/:id/purge-files', requireAuth, async (req, res) => {
+  try {
+    const row = await loadApprovedForCleanup(req, res);
+    if (!row) return;
+    const files = await purgeRequestFiles(row);
+    res.json({ ok: true, files });
+  } catch (e) {
+    console.error('POST /verification/:id/purge-files error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// DELETE /verification/:id — удалить заявку из списка целиком вместе с вложениями
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const row = await loadApprovedForCleanup(req, res);
+    if (!row) return;
+    await purgeRequestFiles(row);
+    await queryOne('DELETE FROM role_verifications WHERE id=$1', [row.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /verification/:id error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 module.exports = router;
+module.exports.purgeReviewedFiles = purgeReviewedFiles;
+module.exports.FILES_KEEP_DAYS = FILES_KEEP_DAYS;

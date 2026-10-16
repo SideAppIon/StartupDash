@@ -368,6 +368,8 @@ ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS legal_address  TEXT DEFA
 ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS director_name  TEXT DEFAULT '';
 ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS director_phone TEXT DEFAULT '';
 ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS org_logo       TEXT DEFAULT '';
+-- Когда удалены файлы заявки: через 7 дней после решения (purge-moderation-files.js)
+ALTER TABLE role_verifications ADD COLUMN IF NOT EXISTS files_purged_at TIMESTAMPTZ;
 
 -- ── Банк идей: буст-партнёры публикуют, стартаперы забирают ──
 CREATE TABLE IF NOT EXISTS ideas (

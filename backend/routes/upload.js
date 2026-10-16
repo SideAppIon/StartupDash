@@ -1,5 +1,5 @@
 const express = require('express');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { v4: uuidv4 } = require('uuid');
 const fs   = require('fs');
 const path = require('path');
@@ -131,7 +131,26 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
+// Удалить ранее загруженный файл по его публичному URL.
+// Удаляет только файлы из папок allowedFolders (защита от удаления чужих / произвольных файлов).
+// Возвращает true, если файл удалён или его уже нет; false — если URL не наш или папка не разрешена.
+async function deleteStoredFile(url, allowedFolders) {
+  const prefix = fileUrl('');
+  if (typeof url !== 'string' || !url.startsWith(prefix)) return false;
+  const key = url.slice(prefix.length);
+  const folder = key.split('/')[0];
+  if (!allowedFolders.includes(folder) || key.includes('..') || !/^[\w-]+\/[\w.-]+$/.test(key)) return false;
+  if (LOCAL_UPLOADS) {
+    try { fs.unlinkSync(path.join(LOCAL_UPLOAD_DIR, key)); }
+    catch (e) { if (e.code !== 'ENOENT') throw e; }
+  } else {
+    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+  }
+  return true;
+}
+
 module.exports = router;
 module.exports.fileUrl = fileUrl;
+module.exports.deleteStoredFile = deleteStoredFile;
 module.exports.LOCAL_UPLOADS = LOCAL_UPLOADS;
 module.exports.LOCAL_UPLOAD_DIR = LOCAL_UPLOAD_DIR;

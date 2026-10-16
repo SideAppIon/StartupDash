@@ -92,7 +92,7 @@ var curSection = getUrlParam('section') === 'ideas' ? 'ideas' : 'roles';
 var rejectId = null, rejectKind = 'role';
 
 var SECTION_SUBS = {
-  roles: 'Заявки на роли Эксперт, Куратор, Ментор и Буст-партнёр. Проверьте сертификат или реквизиты организации и примите решение — пользователь получит личное сообщение.',
+  roles: 'Заявки на роли Эксперт, Куратор, Ментор и Буст-партнёр. Проверьте сертификат или реквизиты организации и примите решение — пользователь получит личное сообщение. Файлы заявки хранятся 7 дней после решения, затем удаляются.',
   ideas: 'Идеи для стартапов и бизнес-задачи от экспертов, менторов и буст-партнёров. Проверка — до 24 часов; после одобрения идея появится в банке идей, автор получит личное сообщение.'
 };
 
@@ -186,6 +186,12 @@ function buildCard(v) {
       '<button class="btn btn--outline btn--sm" data-id="'+esc(v.id)+'" onclick="openReject(this)">❌ Отклонить</button>';
   }
   actions += '<a class="btn btn--ghost btn--sm" href="messages.html?to='+encodeURIComponent(v.userUid||'')+'">💬 Написать</a>';
+  // Одобренную заявку можно почистить: удалить вложения или всю заявку (роль пользователя не меняется)
+  if (v.status === 'approved') {
+    var hasFiles = (v.certificates && v.certificates.length) || v.orgLogo;
+    if (hasFiles) actions += '<button class="btn btn--ghost btn--sm" data-id="'+esc(v.id)+'" onclick="purgeFiles(this)">Удалить вложения</button>';
+    actions += '<button class="btn btn--ghost btn--sm" style="color:var(--danger)" data-id="'+esc(v.id)+'" onclick="deleteRequest(this)">Удалить заявку</button>';
+  }
 
   return '<div class="'+cardCls+'">' +
     '<div class="vf-head">' +
@@ -200,11 +206,25 @@ function buildCard(v) {
     (v.comment ? '<div class="vf-label">Комментарий к заявке</div><div class="vf-block">'+esc(v.comment)+'</div>' : '') +
     (v.inn ? buildOrgBlock(v) : '') +
     '<div class="vf-label">'+(v.requestedRole==='boost_partner'?'Документы':'Сертификаты')+'</div><div class="vf-files">'+(files||'<span class="vf-sub">нет файлов</span>')+'</div>' +
+    filesRetentionNote(v) +
     (v.status==='rejected' && v.reviewNote ? '<div class="vf-label">Причина отказа</div><div class="vf-block">'+esc(v.reviewNote)+'</div>' : '') +
     '<div class="vf-meta"><span>Подана '+formatDate(v.createdAt)+'</span>' +
       (v.reviewedAt ? '<span>· рассмотрена '+formatDate(v.reviewedAt)+'</span>' : '') + '</div>' +
     '<div class="vf-actions">'+actions+'</div>' +
   '</div>';
+}
+
+// Срок хранения файлов заявки: 7 дней после решения, затем удаляются с сервера
+var FILES_KEEP_DAYS = 7;
+function filesRetentionNote(v) {
+  if (v.filesPurgedAt) {
+    return '<div class="vf-sub" style="margin:-4px 0 12px">🗑 Файлы удалены '+formatDate(v.filesPurgedAt)+' — хранятся '+FILES_KEEP_DAYS+' дней после решения</div>';
+  }
+  if (v.reviewedAt && v.status !== 'pending') {
+    var until = new Date(new Date(v.reviewedAt).getTime() + FILES_KEEP_DAYS * 86400000);
+    return '<div class="vf-sub" style="margin:-4px 0 12px">Файлы будут удалены после '+formatDate(until.toISOString())+'</div>';
+  }
+  return '';
 }
 
 // Реквизиты организации буст-партнёра
@@ -268,6 +288,27 @@ async function approveIdea(btn) {
     btn.disabled = false;
     showToast('Ошибка: '+(e.message||'не удалось'),'error');
   }
+}
+
+// ── Очистка одобренных заявок (экономия места) ────────
+async function purgeFiles(btn) {
+  if (!(await uiConfirm({ title: 'Удалить вложения?', text: 'Сертификаты и логотип будут удалены с сервера. Заявка останется в списке, роль пользователя не изменится.', okText: 'Удалить вложения', danger: true }))) return;
+  btn.disabled = true;
+  try {
+    var r = await api.post('/verification/'+btn.getAttribute('data-id')+'/purge-files', {});
+    showToast('Вложения удалены' + (r.files ? ' (файлов: '+r.files+')' : ''), 'success');
+    await loadItems();
+  } catch(e) { btn.disabled = false; showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
+}
+
+async function deleteRequest(btn) {
+  if (!(await uiConfirm({ title: 'Удалить заявку?', text: 'Заявка исчезнет из списка вместе с вложениями. Роль пользователя не изменится.', okText: 'Удалить заявку', danger: true }))) return;
+  btn.disabled = true;
+  try {
+    await api.delete('/verification/'+btn.getAttribute('data-id'));
+    showToast('Заявка удалена', 'success');
+    await loadItems();
+  } catch(e) { btn.disabled = false; showToast('Ошибка: '+(e.message||'не удалось'),'error'); }
 }
 
 async function approve(btn) {
