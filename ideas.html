@@ -37,6 +37,18 @@
     .kind-opt__name{font-size:14px;font-weight:600}
     .kind-opt__desc{font-size:12px;color:var(--text3);margin-top:3px;line-height:1.4}
     .field-count{float:right;font-size:12px;color:var(--text3);font-weight:400}
+    /* Приглашения поработать над идеей */
+    .tab-count{display:inline-block;min-width:18px;padding:0 6px;margin-left:4px;border-radius:9px;background:var(--danger);color:#fff;font-size:11px;line-height:18px;text-align:center}
+    .inv-chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:2px 4px 2px 10px;margin:4px 6px 0 0;font-size:12px}
+    .inv-chip button{background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;line-height:1;padding:0 4px}
+    .inv-card{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--expert);border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:12px}
+    .inv-card--done{opacity:.7;border-left-color:var(--border2)}
+    .pick-list{max-height:260px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius);margin-top:8px}
+    .pick-item{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border)}
+    .pick-item:last-child{border-bottom:none}
+    .pick-item:hover{background:var(--bg3)}
+    .pick-item.sel{background:var(--accent-dim)}
+    .pick-item img{width:28px;height:28px;border-radius:50%;object-fit:cover;background:var(--bg3)}
     @media(max-width:520px){.kind-pick{grid-template-columns:1fr}}
   </style>
 </head>
@@ -70,6 +82,7 @@
       <button class="idea-tab active" data-tab="open" onclick="setTab('open')">Свободные</button>
       <button class="idea-tab" data-tab="taken" onclick="setTab('taken')">Забранные</button>
       <button class="idea-tab" data-tab="mine" id="mineTab" style="display:none" onclick="setTab('mine')">Мои</button>
+      <button class="idea-tab" data-tab="invites" id="invitesTab" style="display:none" onclick="setTab('invites')">Приглашения<span class="tab-count" id="invitesCount" style="display:none"></span></button>
       <select class="form-select idea-filter" id="kindFilter" onchange="render()">
         <option value="">Идеи и задачи</option>
         <option value="idea">Идеи для стартапов</option>
@@ -119,6 +132,29 @@
   </div>
 </div>
 
+<!-- Пригласить специалиста или стартапера поработать над идеей -->
+<div class="modal-overlay" id="inviteModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal__header">
+      <div class="modal__title" id="inviteModalTitle">Пригласить поработать над идеей</div>
+      <button class="modal__close" onclick="closeInviteModal()">×</button>
+    </div>
+    <p style="font-size:14px;color:var(--text2);margin-bottom:14px" id="inviteIdeaTitle"></p>
+    <div class="form-group">
+      <label class="form-label">Кого пригласить *</label>
+      <input type="text" class="form-input" id="inviteSearch" placeholder="Имя или ник специалиста / стартапера" oninput="renderPickList()"/>
+      <div class="pick-list" id="pickList"></div>
+      <div class="form-hint">Специалист станет участником идеи, стартапер — заберёт её себе и сможет создать стартап</div>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Сообщение <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
+      <textarea class="form-textarea" id="inviteMessage" maxlength="1000" style="min-height:80px" placeholder="Почему именно этот человек, что предстоит сделать..."></textarea>
+    </div>
+    <div id="inviteErr" class="form-error" style="display:none;margin-top:10px"></div>
+    <button class="btn btn--primary" id="inviteSend" style="width:100%;justify-content:center;margin-top:16px" onclick="sendIdeaInvite()">Отправить приглашение</button>
+  </div>
+</div>
+
 <!-- После того как идею забрали -->
 <div class="modal-overlay" id="takenModal">
   <div class="modal" style="max-width:440px;text-align:center">
@@ -154,12 +190,18 @@ onAuthReady(async function(user, userData) {
     document.getElementById('pageSub').textContent =
       'Предлагайте идеи для стартапов и бизнес-задачи компаний — стартаперы заберут их и запустят проекты';
   }
-  if (canPublishIdeas() || meData.role === 'startup') document.getElementById('mineTab').style.display = '';
+  if (canPublishIdeas() || canBeInvited()) document.getElementById('mineTab').style.display = '';
+  if (canBeInvited()) { document.getElementById('invitesTab').style.display = ''; loadInvites(); }
+  if (getUrlParam('tab') === 'invites' && canBeInvited()) curTab = 'invites';
   await loadIdeas();
+  if (curTab === 'invites') setTab('invites');
 });
 
 function canPublishIdeas() { return meData && PUBLISHER_ROLES.indexOf(meData.role) !== -1; }
 function canTakeIdeas()    { return meData && meData.role === 'startup'; }
+// Приглашать можно специалистов и стартаперов
+function canBeInvited()    { return meData && (meData.role === 'user' || meData.role === 'startup'); }
+function isParticipant(i)  { return (i.participants || []).some(function(p){ return p.uid === me.uid; }); }
 
 async function loadIdeas() {
   var el = document.getElementById('content');
@@ -181,10 +223,11 @@ function setTab(t) {
 
 function render() {
   var el   = document.getElementById('content');
+  if (curTab === 'invites') { renderInvites(); return; }
   var kind = document.getElementById('kindFilter').value;
   var list = ideas.filter(function(i) {
     if (kind && i.kind !== kind) return false;
-    if (curTab === 'mine') return i.authorUid === me.uid || i.takenBy === me.uid;
+    if (curTab === 'mine') return i.authorUid === me.uid || i.takenBy === me.uid || isParticipant(i);
     // В общих вкладках — только одобренные
     return i.moderation === 'approved' && i.status === curTab;
   });
@@ -235,7 +278,24 @@ function buildCard(i) {
     '</div>';
   }
 
+  // Кто работает над идеей (специалисты, принявшие приглашение) и кого автор пригласил
+  var team = '';
+  if ((i.participants || []).length) {
+    team += '<div class="idea-note">👥 Работают над '+(i.kind === 'task' ? 'задачей' : 'идеей')+': ' + i.participants.map(function(p){
+      return '<a href="member.html?uid='+esc(p.uid)+'">'+esc(p.name || 'участник')+'</a>';
+    }).join(', ') + '</div>';
+  }
+  if (isAuthor && (i.pendingInvites || []).length) {
+    team += '<div class="idea-note">Приглашены, ждём ответа:<br/>' + i.pendingInvites.map(function(v){
+      return '<span class="inv-chip">'+esc(v.name || 'пользователь')+' · '+esc(ROLE_LABELS[v.role] || v.role)+
+        '<button title="Отозвать приглашение" data-id="'+esc(v.id)+'" onclick="cancelIdeaInvite(this)">×</button></span>';
+    }).join('') + '</div>';
+  }
+
   var actions = [];
+  if (isAuthor && approved && i.status === 'open') {
+    actions.push('<button class="btn btn--primary btn--sm" data-id="'+esc(i.id)+'" onclick="openInviteModal(this.getAttribute(\'data-id\'))">Пригласить</button>');
+  }
   if (approved && i.status === 'open' && canTakeIdeas() && !isAuthor) {
     actions.push('<button class="btn btn--primary btn--sm" data-id="'+esc(i.id)+'" onclick="takeIdea(this)">✋ Забрать себе</button>');
   }
@@ -263,7 +323,7 @@ function buildCard(i) {
     '<div class="idea-title">'+esc(i.title)+'</div>' +
     '<div class="idea-desc">'+esc(i.description)+'</div>' +
     '<button class="idea-more" style="display:none" onclick="this.previousElementSibling.classList.toggle(\'open\');this.textContent=this.previousElementSibling.classList.contains(\'open\')?\'Свернуть\':\'Читать полностью\'">Читать полностью</button>' +
-    note + taken +
+    note + taken + team +
     '<div class="idea-author"><img src="'+esc(av)+'"/><a href="member.html?uid='+esc(i.authorUid)+'">'+esc(i.authorName||'Автор')+'</a>' +
       '<span>· '+formatDate(i.createdAt)+'</span></div>' +
     (actions.length ? '<div class="idea-actions">'+actions.join('')+'</div>' : '') +
@@ -341,6 +401,136 @@ async function deleteIdea(btn) {
     showToast('Идея удалена', 'success');
     await loadIdeas();
   } catch(e) { showToast('Ошибка: ' + (e.message || 'не удалось удалить'), 'error'); }
+}
+
+// ── Приглашения: полученные (вкладка «Приглашения») ───
+var invites = { received: [], sent: [] };
+async function loadInvites() {
+  try { invites = await api.get('/ideas/invites'); } catch(e) { invites = { received: [], sent: [] }; }
+  var n = invites.received.filter(function(v){ return v.status === 'pending'; }).length;
+  var badge = document.getElementById('invitesCount');
+  badge.textContent = n; badge.style.display = n ? '' : 'none';
+  if (curTab === 'invites') renderInvites();
+}
+
+var INVITE_STATUS = { accepted: 'Принято', declined: 'Отклонено', cancelled: 'Отозвано автором' };
+function renderInvites() {
+  var el = document.getElementById('content');
+  var list = invites.received;
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state__icon">✉️</div><div class="empty-state__title">Приглашений пока нет</div>' +
+      '<p style="font-size:14px">'+tv('Здесь появятся приглашения поработать над идеями от экспертов, менторов и буст-партнёров',
+                                       'Здесь появятся приглашения поработать над идеями от экспертов, менторов и буст-партнёров')+'</p></div>';
+    return;
+  }
+  el.innerHTML = list.map(function(v) {
+    var pending = v.status === 'pending';
+    var what = v.ideaKind === 'task' ? 'бизнес-задачей' : 'идеей';
+    var acceptHint = meData.role === 'startup'
+      ? tv('Приняв, ты заберёшь идею себе и сможешь создать по ней стартап.', 'Приняв, вы заберёте идею себе и сможете создать по ней стартап.')
+      : 'Приняв, вы станете участником ' + (v.ideaKind === 'task' ? 'задачи.' : 'идеи.');
+    return '<div class="inv-card'+(pending ? '' : ' inv-card--done')+'">' +
+      '<div style="font-size:13px;color:var(--text3);margin-bottom:6px">' +
+        '<a href="member.html?uid='+esc(v.fromUid)+'" style="color:var(--text2);text-decoration:none;font-weight:600">'+esc(v.fromName||'Автор')+'</a>' +
+        ' · '+esc(ROLE_LABELS[v.fromRole] || v.fromRole || '')+' · '+formatDate(v.createdAt)+'</div>' +
+      '<div style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:6px">Поработать над '+what+' «'+esc(v.ideaTitle)+'»</div>' +
+      (v.message ? '<div class="idea-note" style="margin-bottom:10px;white-space:pre-wrap">'+esc(v.message)+'</div>' : '') +
+      (pending
+        ? '<div style="font-size:12px;color:var(--text3);margin-bottom:10px">'+acceptHint+'</div>' +
+          '<div class="idea-actions">' +
+            '<button class="btn btn--primary btn--sm" data-id="'+esc(v.id)+'" onclick="respondInvite(this,\'accept\')">Принять</button>' +
+            '<button class="btn btn--ghost btn--sm" data-id="'+esc(v.id)+'" onclick="respondInvite(this,\'decline\')">Отклонить</button>' +
+            '<a class="btn btn--ghost btn--sm" href="messages.html?to='+encodeURIComponent(v.fromUid)+'">Написать автору</a>' +
+          '</div>'
+        : '<span class="badge '+(v.status==='accepted'?'badge--green':'badge--gray')+'">'+esc(INVITE_STATUS[v.status] || v.status)+'</span>') +
+    '</div>';
+  }).join('');
+}
+
+async function respondInvite(btn, decision) {
+  var accept = decision === 'accept';
+  var ok = await uiConfirm(accept
+    ? { title: 'Принять приглашение?', text: meData.role === 'startup'
+          ? tv('Идея перейдёт к тебе, автор получит сообщение.', 'Идея перейдёт к вам, автор получит сообщение.')
+          : 'Вы станете участником, автор получит сообщение.', okText: 'Принять' }
+    : { title: 'Отклонить приглашение?', text: 'Автор получит сообщение об отказе.', okText: 'Отклонить', danger: true });
+  if (!ok) return;
+  btn.disabled = true;
+  try {
+    await api.post('/ideas/invites/'+btn.getAttribute('data-id')+'/respond', { decision: decision });
+    showToast(accept ? 'Приглашение принято' : 'Приглашение отклонено', 'success');
+    await Promise.all([loadInvites(), loadIdeas()]);
+    if (accept) setTab('mine');
+  } catch(e) { btn.disabled = false; showToast(e.message || 'Не удалось ответить', 'error'); }
+}
+
+// ── Приглашения: отправка автором ─────────────────────
+var inviteIdeaId = null, inviteCandidates = null, invitePicked = null;
+async function openInviteModal(id) {
+  var idea = ideas.find(function(x){ return x.id === id; });
+  if (!idea) return;
+  inviteIdeaId = id; invitePicked = null;
+  document.getElementById('inviteModalTitle').textContent = 'Пригласить поработать над ' + (idea.kind === 'task' ? 'задачей' : 'идеей');
+  document.getElementById('inviteIdeaTitle').textContent = (idea.kind === 'task' ? 'Бизнес-задача' : 'Идея') + ': «' + idea.title + '»';
+  document.getElementById('inviteSearch').value = '';
+  document.getElementById('inviteMessage').value = '';
+  document.getElementById('inviteErr').style.display = 'none';
+  document.getElementById('pickList').innerHTML = '<div style="padding:12px;font-size:13px;color:var(--text3)">Загрузка...</div>';
+  document.getElementById('inviteModal').classList.add('open');
+  if (!inviteCandidates) {
+    try {
+      var r = await Promise.all([api.get('/users?role=user'), api.get('/users?role=startup')]);
+      inviteCandidates = (r[0].users || []).concat(r[1].users || []).filter(function(u){ return u.uid !== me.uid; });
+    } catch(e) { inviteCandidates = []; }
+  }
+  renderPickList();
+  setTimeout(function(){ document.getElementById('inviteSearch').focus(); }, 30);
+}
+function closeInviteModal() { document.getElementById('inviteModal').classList.remove('open'); }
+
+function renderPickList() {
+  var q = document.getElementById('inviteSearch').value.trim().toLowerCase();
+  var idea = ideas.find(function(x){ return x.id === inviteIdeaId; }) || {};
+  var busy = {};
+  (idea.pendingInvites || []).forEach(function(v){ busy[v.uid] = 'уже приглашён'; });
+  (idea.participants || []).forEach(function(p){ busy[p.uid] = 'уже в работе'; });
+  var list = (inviteCandidates || []).filter(function(u) {
+    return !q || (u.name||'').toLowerCase().indexOf(q) !== -1 || (u.nickname||'').toLowerCase().indexOf(q) !== -1;
+  }).slice(0, 50);
+  document.getElementById('pickList').innerHTML = list.length ? list.map(function(u) {
+    var av = u.avatar || 'https://ui-avatars.com/api/?background=181c24&color=00e676&name=' + encodeURIComponent(u.name||'U');
+    var note = busy[u.uid] ? ' · <span style="color:var(--text3)">'+busy[u.uid]+'</span>' : '';
+    return '<div class="pick-item'+(invitePicked===u.uid?' sel':'')+'" data-uid="'+esc(u.uid)+'"'+(busy[u.uid]?' style="opacity:.5;pointer-events:none"':' onclick="pickInvitee(this)"')+'>' +
+      '<img src="'+esc(av)+'"/><div style="flex:1"><div style="font-weight:600">'+esc(u.name||'Без имени')+'</div>' +
+      '<div style="font-size:12px;color:var(--text3)">'+esc(ROLE_LABELS[u.role]||u.role)+(u.nickname?' · @'+esc(u.nickname):'')+note+'</div></div></div>';
+  }).join('') : '<div style="padding:12px;font-size:13px;color:var(--text3)">Никого не найдено</div>';
+}
+function pickInvitee(el) {
+  invitePicked = el.getAttribute('data-uid');
+  document.querySelectorAll('.pick-item').forEach(function(x){ x.classList.toggle('sel', x === el); });
+}
+
+async function sendIdeaInvite() {
+  var errEl = document.getElementById('inviteErr'), btn = document.getElementById('inviteSend');
+  errEl.style.display = 'none';
+  if (!invitePicked) { errEl.textContent = 'Выберите, кого пригласить'; errEl.style.display = 'block'; return; }
+  btn.disabled = true;
+  try {
+    await api.post('/ideas/'+inviteIdeaId+'/invites', { to_uid: invitePicked, message: document.getElementById('inviteMessage').value.trim() });
+    closeInviteModal();
+    showToast('Приглашение отправлено — человек получит личное сообщение', 'success');
+    await loadIdeas();
+  } catch(e) { errEl.textContent = e.message || 'Не удалось отправить'; errEl.style.display = 'block'; }
+  finally { btn.disabled = false; }
+}
+
+async function cancelIdeaInvite(btn) {
+  if (!(await uiConfirm({ title: 'Отозвать приглашение?', text: 'Человек больше не сможет его принять.', okText: 'Отозвать', danger: true }))) return;
+  try {
+    await api.post('/ideas/invites/'+btn.getAttribute('data-id')+'/cancel', {});
+    showToast('Приглашение отозвано', 'success');
+    await loadIdeas();
+  } catch(e) { showToast(e.message || 'Не удалось отозвать', 'error'); }
 }
 
 // ── Обсуждение на форуме ──────────────────────────────

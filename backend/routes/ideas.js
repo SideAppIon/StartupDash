@@ -57,6 +57,20 @@ async function ensureIdeasSchema() {
     await query('CREATE INDEX IF NOT EXISTS idx_ideas_author ON ideas(author_uid)');
     await query('CREATE INDEX IF NOT EXISTS idx_ideas_taken  ON ideas(taken_by)');
     await query('CREATE INDEX IF NOT EXISTS idx_ideas_moderation ON ideas(moderation)');
+    // Приглашения поработать над идеей: автор → конкретный специалист или стартапер
+    await query(`CREATE TABLE IF NOT EXISTS idea_invites (
+      id           TEXT PRIMARY KEY,
+      idea_id      TEXT NOT NULL REFERENCES ideas(id) ON DELETE CASCADE,
+      from_uid     TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+      to_uid       TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+      message      TEXT DEFAULT '',
+      status       TEXT NOT NULL DEFAULT 'pending'
+                     CHECK (status IN ('pending','accepted','declined','cancelled')),
+      created_at   TIMESTAMPTZ DEFAULT NOW(),
+      responded_at TIMESTAMPTZ
+    )`);
+    await query('CREATE INDEX IF NOT EXISTS idx_idea_invites_to   ON idea_invites(to_uid, status)');
+    await query('CREATE INDEX IF NOT EXISTS idx_idea_invites_idea ON idea_invites(idea_id, status)');
     schemaEnsured = true;
   } catch (e) {
     console.error('ensureIdeasSchema error:', e.message);
@@ -67,13 +81,20 @@ const SELECT_IDEAS = `
   SELECT i.*,
          a.name AS author_name, a.avatar AS author_avatar, a.role AS author_role,
          t.name AS taker_name,  t.avatar AS taker_avatar,
-         s.name AS startup_name
+         s.name AS startup_name,
+         (SELECT COALESCE(json_agg(json_build_object('uid', u.uid, 'name', u.name) ORDER BY ii.responded_at), '[]'::json)
+            FROM idea_invites ii JOIN users u ON u.uid = ii.to_uid
+           WHERE ii.idea_id = i.id AND ii.status = 'accepted' AND u.role = 'user') AS participants,
+         (SELECT COALESCE(json_agg(json_build_object('id', ii.id, 'uid', u.uid, 'name', u.name, 'role', u.role) ORDER BY ii.created_at), '[]'::json)
+            FROM idea_invites ii JOIN users u ON u.uid = ii.to_uid
+           WHERE ii.idea_id = i.id AND ii.status = 'pending') AS pending_invites
   FROM ideas i
   LEFT JOIN users a    ON a.uid = i.author_uid
   LEFT JOIN users t    ON t.uid = i.taken_by
   LEFT JOIN startups s ON s.id  = i.startup_id`;
 
-function shape(r) {
+function shape(r, viewer) {
+  const canSeeInvites = viewer && (viewer.uid === r.author_uid || isAdmin(viewer));
   return {
     id:           r.id,
     kind:         r.kind || 'idea',
@@ -95,6 +116,8 @@ function shape(r) {
     takenAt:      r.taken_at,
     startupId:    r.startup_id,
     startupName:  r.startup_name || '',
+    participants: r.participants || [],                         // специалисты, работающие над идеей
+    pendingInvites: canSeeInvites ? (r.pending_invites || []) : [],
     createdAt:    r.created_at,
     updatedAt:    r.updated_at,
   };
@@ -152,9 +175,103 @@ router.get('/', requireAuth, async (req, res) => {
     }
     sql += ` ORDER BY (i.moderation = 'pending') DESC, i.created_at DESC LIMIT 300`;
     const rows = await queryAll(sql, params);
-    res.json({ ideas: rows.map(shape) });
+    res.json({ ideas: rows.map(r => shape(r, req.user)) });
   } catch (e) {
     console.error('GET /ideas error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ── Приглашения поработать над идеей ──────────────────
+const INVITEE_ROLES = ['user', 'startup'];   // приглашать можно специалистов и стартаперов
+
+function shapeInvite(r) {
+  return {
+    id: r.id, ideaId: r.idea_id, status: r.status, message: r.message || '',
+    createdAt: r.created_at, respondedAt: r.responded_at,
+    ideaTitle: r.idea_title, ideaKind: r.idea_kind || 'idea', ideaStatus: r.idea_status,
+    fromUid: r.from_uid, fromName: r.from_name || '', fromRole: r.from_role || '',
+    toUid: r.to_uid, toName: r.to_name || '', toRole: r.to_role || '',
+  };
+}
+const SELECT_INVITES = `
+  SELECT ii.*, i.title AS idea_title, i.kind AS idea_kind, i.status AS idea_status,
+         f.name AS from_name, f.role AS from_role, t.name AS to_name, t.role AS to_role
+  FROM idea_invites ii
+  JOIN ideas i ON i.id = ii.idea_id
+  LEFT JOIN users f ON f.uid = ii.from_uid
+  LEFT JOIN users t ON t.uid = ii.to_uid`;
+
+// GET /ideas/invites — мои приглашения: полученные и отправленные
+router.get('/invites', requireAuth, async (req, res) => {
+  try {
+    await ensureIdeasSchema();
+    const [received, sent] = await Promise.all([
+      queryAll(`${SELECT_INVITES} WHERE ii.to_uid = $1 ORDER BY (ii.status = 'pending') DESC, ii.created_at DESC LIMIT 100`, [req.user.uid]),
+      queryAll(`${SELECT_INVITES} WHERE ii.from_uid = $1 ORDER BY ii.created_at DESC LIMIT 100`, [req.user.uid]),
+    ]);
+    res.json({ received: received.map(shapeInvite), sent: sent.map(shapeInvite) });
+  } catch (e) {
+    console.error('GET /ideas/invites error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// POST /ideas/invites/:inviteId/respond — ответ приглашённого. Body: { decision: 'accept' | 'decline' }
+// Стартапер, приняв приглашение, забирает идею себе; специалист становится участником идеи.
+router.post('/invites/:inviteId/respond', requireAuth, async (req, res) => {
+  try {
+    await ensureIdeasSchema();
+    const decision = req.body.decision;
+    if (!['accept', 'decline'].includes(decision)) return res.status(400).json({ error: 'Неверное решение' });
+    const inv = await queryOne(`${SELECT_INVITES} WHERE ii.id = $1`, [req.params.inviteId]);
+    if (!inv || inv.to_uid !== req.user.uid) return res.status(404).json({ error: 'Приглашение не найдено' });
+    if (inv.status !== 'pending') return res.status(409).json({ error: 'Приглашение уже неактуально' });
+
+    if (decision === 'accept' && req.user.role === 'startup') {
+      // Стартапер забирает идею — атомарно, только если она ещё свободна
+      const took = await queryOne(
+        `UPDATE ideas SET status='taken', taken_by=$1, taken_at=NOW(), updated_at=NOW()
+         WHERE id=$2 AND status='open' AND moderation='approved' RETURNING id`,
+        [req.user.uid, inv.idea_id]
+      );
+      if (!took) return res.status(409).json({ error: 'Идею уже забрал другой стартапер' });
+    } else if (decision === 'accept' && !INVITEE_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Принять приглашение может только специалист или стартапер' });
+    }
+
+    await queryOne(
+      'UPDATE idea_invites SET status=$1, responded_at=NOW() WHERE id=$2',
+      [decision === 'accept' ? 'accepted' : 'declined', inv.id]
+    );
+    const what = inv.idea_kind === 'task' ? 'бизнес-задаче' : 'идее';
+    const text = decision === 'accept'
+      ? (req.user.role === 'startup'
+          ? `✅ Принимаю приглашение по ${what} «${inv.idea_title}» — забираю её и буду делать на её основе стартап.`
+          : `✅ Принимаю приглашение поработать над ${inv.idea_kind === 'task' ? 'бизнес-задачей' : 'идеей'} «${inv.idea_title}».`)
+      : `Спасибо за приглашение по ${what} «${inv.idea_title}», но сейчас не смогу присоединиться.`;
+    try { await sendDirectMessage(req.user.uid, inv.from_uid, text); }
+    catch (e) { console.error('idea invite DM error:', e.message); }
+
+    res.json({ invite: shapeInvite(await queryOne(`${SELECT_INVITES} WHERE ii.id = $1`, [inv.id])) });
+  } catch (e) {
+    console.error('POST /ideas/invites/:id/respond error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// POST /ideas/invites/:inviteId/cancel — отозвать ожидающее приглашение (автор идеи)
+router.post('/invites/:inviteId/cancel', requireAuth, async (req, res) => {
+  try {
+    await ensureIdeasSchema();
+    const row = await queryOne(
+      `UPDATE idea_invites SET status='cancelled', responded_at=NOW()
+       WHERE id=$1 AND from_uid=$2 AND status='pending' RETURNING id`,
+      [req.params.inviteId, req.user.uid]
+    );
+    if (!row) return res.status(404).json({ error: 'Приглашение не найдено или уже неактуально' });
+    res.json({ ok: true });
+  } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
@@ -165,7 +282,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     await ensureIdeasSchema();
     const row = await loadIdea(req.params.id);
     if (!row || !canSee(req.user, row)) return res.status(404).json({ error: 'Идея не найдена' });
-    res.json({ idea: shape(row) });
+    res.json({ idea: shape(row, req.user) });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
@@ -190,7 +307,7 @@ router.post('/', requireAuth, async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,'','open','pending',NOW(),NOW())`,
       [id, req.user.uid, f.kind, f.title, f.description]
     );
-    res.status(201).json({ idea: shape(await loadIdea(id)) });
+    res.status(201).json({ idea: shape(await loadIdea(id), req.user) });
   } catch (e) {
     console.error('POST /ideas error:', e.message);
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -227,7 +344,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
        WHERE id=$4`,
       [f.kind, f.title, f.description, req.params.id]
     );
-    res.json({ idea: shape(await loadIdea(req.params.id)) });
+    res.json({ idea: shape(await loadIdea(req.params.id), req.user) });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
@@ -259,7 +376,7 @@ router.post('/:id/moderate', requireAuth, async (req, res) => {
     try { await sendDirectMessage(req.user.uid, row.author_uid, text); }
     catch (e) { console.error('idea moderation DM error:', e.message); }
 
-    res.json({ idea: shape(await loadIdea(row.id)) });
+    res.json({ idea: shape(await loadIdea(row.id), req.user) });
   } catch (e) {
     console.error('POST /ideas/:id/moderate error:', e.message);
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -306,6 +423,54 @@ router.post('/:id/discussion', requireAuth, async (req, res) => {
   }
 });
 
+// POST /ideas/:id/invites — пригласить специалиста или стартапера поработать над идеей.
+// Body: { to_uid, message }. Только автор, только одобренная и свободная идея.
+router.post('/:id/invites', requireAuth, async (req, res) => {
+  try {
+    await ensureIdeasSchema();
+    const idea = await queryOne('SELECT * FROM ideas WHERE id=$1', [req.params.id]);
+    if (!idea) return res.status(404).json({ error: 'Идея не найдена' });
+    if (idea.author_uid !== req.user.uid) return res.status(403).json({ error: 'Приглашать может только автор идеи' });
+    if (idea.moderation !== 'approved') return res.status(409).json({ error: 'Приглашать можно после модерации идеи' });
+    if (idea.status !== 'open') return res.status(409).json({ error: 'Идею уже забрали' });
+
+    const toUid = req.body.to_uid || req.body.toUid;
+    const target = await queryOne('SELECT uid, name, role FROM users WHERE uid=$1', [toUid]);
+    if (!target || target.uid === req.user.uid) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (!INVITEE_ROLES.includes(target.role)) {
+      return res.status(400).json({ error: 'Пригласить можно только специалиста или стартапера' });
+    }
+    const dup = await queryOne(
+      "SELECT status FROM idea_invites WHERE idea_id=$1 AND to_uid=$2 AND status IN ('pending','accepted')",
+      [idea.id, target.uid]
+    );
+    if (dup) return res.status(409).json({ error: dup.status === 'pending' ? 'Приглашение уже отправлено' : 'Уже работает над идеей' });
+
+    const message = String(req.body.message || '').trim().slice(0, 1000);
+    if (message) {
+      const cen = await checkCensor(message, 'messages');
+      if (cen.blocked) return res.status(400).json({ error: cen.message });
+    }
+    const id = uuidv4();
+    await queryOne(
+      `INSERT INTO idea_invites (id, idea_id, from_uid, to_uid, message, status, created_at)
+       VALUES ($1,$2,$3,$4,$5,'pending',NOW())`,
+      [id, idea.id, req.user.uid, target.uid, message]
+    );
+    const what = idea.kind === 'task' ? 'бизнес-задачей' : 'идеей';
+    const text = `💡 Приглашаю вас поработать над ${what} «${idea.title}».` +
+      (message ? `\n${message}` : '') +
+      '\nПринять или отклонить приглашение можно на странице «Идеи», во вкладке «Приглашения».';
+    try { await sendDirectMessage(req.user.uid, target.uid, text); }
+    catch (e) { console.error('idea invite DM error:', e.message); }
+
+    res.status(201).json({ invite: shapeInvite(await queryOne(`${SELECT_INVITES} WHERE ii.id = $1`, [id])) });
+  } catch (e) {
+    console.error('POST /ideas/:id/invites error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // DELETE /ideas/:id — удалить (автор, пока идею не забрали; админ — всегда)
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
@@ -343,7 +508,7 @@ router.post('/:id/take', requireAuth, async (req, res) => {
         `💡 Я забрал вашу ${what} «${row.title}» и буду делать на её основе стартап. Спасибо!`);
     } catch (e) { console.error('ideas DM error:', e.message); }
 
-    res.json({ idea: shape(await loadIdea(row.id)) });
+    res.json({ idea: shape(await loadIdea(row.id), req.user) });
   } catch (e) {
     console.error('POST /ideas/:id/take error:', e.message);
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -362,7 +527,7 @@ router.post('/:id/release', requireAuth, async (req, res) => {
        WHERE id=$1`,
       [req.params.id]
     );
-    res.json({ idea: shape(await loadIdea(req.params.id)) });
+    res.json({ idea: shape(await loadIdea(req.params.id), req.user) });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
@@ -382,7 +547,7 @@ router.post('/:id/startup', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Можно привязать только свой стартап' });
     }
     await queryOne('UPDATE ideas SET startup_id=$1, updated_at=NOW() WHERE id=$2', [startupId, req.params.id]);
-    res.json({ idea: shape(await loadIdea(req.params.id)) });
+    res.json({ idea: shape(await loadIdea(req.params.id), req.user) });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });
   }

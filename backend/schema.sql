@@ -419,3 +419,20 @@ ALTER TABLE conversations ADD COLUMN IF NOT EXISTS startup_id TEXT REFERENCES st
 
 -- Пройден ли онбординг (заполняется при регистрации)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_done BOOLEAN DEFAULT FALSE;
+
+-- ── Приглашения поработать над идеей ───────────────────
+-- Автор идеи (эксперт / ментор / буст-партнёр) приглашает специалиста или стартапера.
+-- Стартапер, приняв, забирает идею; специалист становится участником идеи.
+CREATE TABLE IF NOT EXISTS idea_invites (
+  id           TEXT PRIMARY KEY,
+  idea_id      TEXT NOT NULL REFERENCES ideas(id) ON DELETE CASCADE,
+  from_uid     TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  to_uid       TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  message      TEXT DEFAULT '',
+  status       TEXT NOT NULL DEFAULT 'pending'
+                 CHECK (status IN ('pending','accepted','declined','cancelled')),
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  responded_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_idea_invites_to   ON idea_invites(to_uid, status);
+CREATE INDEX IF NOT EXISTS idx_idea_invites_idea ON idea_invites(idea_id, status);
