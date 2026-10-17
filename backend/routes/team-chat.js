@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { checkCensor } = require('../lib/censor');
+const { prepareChatMessage } = require('../lib/chat-message');
 
 const router = express.Router();
 
@@ -158,12 +158,8 @@ router.post('/:startup_id/messages', requireAuth, async (req, res) => {
     );
     if (!conv) return res.status(404).json({ error: 'Чат не найден — сначала открой его' });
 
-    const { text, type } = req.body;
-    if (!text) return res.status(400).json({ error: 'text обязателен' });
-    if ((type || 'user') === 'user') {
-      const cen = await checkCensor(text, 'messages');
-      if (cen.blocked) return res.status(400).json({ error: cen.message });
-    }
+    const m = await prepareChatMessage(req.body.text, req.body.type);
+    if (m.error) return res.status(400).json({ error: m.error });
 
     const me = await queryOne(
       'SELECT name, avatar, role FROM users WHERE uid=$1', [req.user.uid]
@@ -173,23 +169,24 @@ router.post('/:startup_id/messages', requireAuth, async (req, res) => {
       [startup_id, req.user.uid]
     );
 
+    // Имя / аватар / роль отправителя в таблице messages не храним — подставляем в ответ,
+    // как это делает GET /messages (JOIN с users)
     const id  = uuidv4();
     const msg = await queryOne(
-      `INSERT INTO messages (id, conv_id, sender_uid, sender_name, sender_avatar, sender_role, text, type, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *`,
-      [id, conv.id, req.user.uid,
-       me.name, me.avatar || '',
-       teamRole ? teamRole.role : me.role,
-       text, type || 'user']
+      `INSERT INTO messages (id, conv_id, sender_uid, text, type, created_at)
+       VALUES ($1,$2,$3,$4,$5,NOW()) RETURNING *`,
+      [id, conv.id, req.user.uid, m.text, m.type]
     );
 
-    const preview = type === 'image' ? '📷 Фото' : text.substring(0, 80);
     await queryOne(
       'UPDATE conversations SET last_message=$1, last_at=NOW() WHERE id=$2',
-      [preview, conv.id]
+      [m.preview, conv.id]
     );
 
-    res.status(201).json({ message: msg });
+    res.status(201).json({ message: Object.assign(msg, {
+      sender_name: me.name, sender_avatar: me.avatar || '',
+      sender_role: teamRole ? teamRole.role : me.role,
+    }) });
   } catch (e) {
     console.error('[team-chat/:startup_id/messages POST]', e.message);
     res.status(500).json({ error: 'Ошибка сервера' });

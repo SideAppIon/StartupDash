@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Сообщения — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=9"/>
+  <link rel="stylesheet" href="styles.css?v=10"/>
   <style>
     html,body{height:100%;overflow:hidden}
     .chat-layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - var(--nav-h));margin-top:var(--nav-h)}
@@ -104,8 +104,8 @@
     </div>
     <div class="chat-messages" id="chatMessages" style="display:none"></div>
     <div class="chat-input-area" id="chatInputArea" style="display:none">
-      <input type="file" id="photoFileInput" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="sendPhoto(this)"/>
-      <button class="send-btn" style="background:var(--bg3);color:var(--text2);font-size:20px" title="Прикрепить фото" onclick="document.getElementById('photoFileInput').click()">📎</button>
+      <input type="file" id="photoFileInput" style="display:none" onchange="sendPhoto(this)"/>
+      <button class="send-btn" style="background:var(--bg3);color:var(--text2);font-size:20px" title="Прикрепить фото или файл до 2 МБ" onclick="var f=document.getElementById('photoFileInput');f.accept=CHAT_FILE_ACCEPT;f.click()">📎</button>
       <textarea class="chat-textarea" id="msgInput" placeholder="Напишите сообщение..." data-ty-placeholder="Напиши сообщение..." rows="1"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
@@ -131,7 +131,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=15"></script>
+<script src="api-config.js?v=16"></script>
 <script>
 requireAuth('login.html');
 
@@ -434,11 +434,9 @@ async function openConv(convId) {
         if (ds&&ds!==lastDate){html+='<div class="chat-date-sep">'+ds+'</div>';lastDate=ds;}
         if (sys) {
           html+='<div class="msg msg--system"><div class="msg__bubble">'+esc(m.text||'').replace(/\n/g,'<br>')+'</div></div>';
-        } else if (m.type==='image') {
+        } else if (m.type==='image' || m.type==='file') {
           html+='<div class="msg '+(mine?'msg--mine':'msg--theirs')+'">'+
-            '<div class="msg__bubble" style="padding:4px">'+
-              '<img src="'+esc(m.text)+'" style="max-width:260px;max-height:320px;border-radius:8px;display:block;cursor:pointer" onclick="window.open(this.src,\'_blank\')"/>'+
-            '</div>'+
+            chatAttachmentBubble(m)+
             '<div class="msg__time">'+timeStr(m.createdAt)+'</div>'+
           '</div>';
         } else {
@@ -499,9 +497,8 @@ async function loadGroupMessages(startupId, convId) {
           ? '<img src="'+esc(m.sender_avatar)+'" class="avatar avatar--sm" style="flex-shrink:0"/>'
           : '<div class="avatar avatar--sm" style="background:var(--bg3);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);flex-shrink:0">'+senderName.charAt(0)+'</div>';
         var roleLbl = m.sender_role ? ' <span style="font-size:10px;color:var(--text3)">('+esc(m.sender_role)+')</span>' : '';
-        var bubble = m.type === 'image'
-          ? '<div class="msg__bubble" style="padding:4px"><img src="'+esc(m.text)+'" style="max-width:260px;max-height:320px;border-radius:8px;display:block;cursor:pointer" onclick="window.open(this.src,\'_blank\')"/></div>'
-          : '<div class="msg__bubble">'+esc(m.text||'').replace(/\n/g,'<br>')+'</div>';
+        var bubble = chatAttachmentBubble(m)
+          || '<div class="msg__bubble">'+esc(m.text||'').replace(/\n/g,'<br>')+'</div>';
         if (mine) {
           html += '<div class="msg msg--mine">'+bubble+'<div class="msg__time">'+timeStr({toDate:function(){return new Date(m.created_at);}})+'</div></div>';
         } else {
@@ -555,22 +552,15 @@ async function sendPhoto(input) {
   var file = input.files[0];
   input.value = '';
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) { showToast('Файл слишком большой (макс. 2 МБ)', 'error'); return; }
   if (!activeId || !myUid) return;
-  showToast('Загружаю фото...', 'info');
+  showToast('Загружаю файл...', 'info');
   try {
-    var base64 = await new Promise(function(resolve, reject) {
-      var r = new FileReader();
-      r.onload = function(e) { resolve(e.target.result.split(',')[1]); };
-      r.onerror = reject;
-      r.readAsDataURL(file);
-    });
-    var res = await api.post('/upload', { data: base64, contentType: file.type, folder: 'chat' });
+    var body = await uploadChatAttachment(file);
     if (activeGroupStartupId) {
-      await api.post('/team-chat/' + activeGroupStartupId + '/messages', { text: res.url, type: 'image' });
+      await api.post('/team-chat/' + activeGroupStartupId + '/messages', body);
       await loadGroupMessages(activeGroupStartupId, activeId);
     } else {
-      await db.collection('conversations').doc(activeId).collection('messages').add({ text: res.url, type: 'image' });
+      await db.collection('conversations').doc(activeId).collection('messages').add(body);
     }
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }

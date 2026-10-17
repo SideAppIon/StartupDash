@@ -803,6 +803,61 @@ function _openNotifPopup() {
 // ── Окно подтверждения в стиле сайта (вместо системного confirm) ──
 // uiConfirm({ title, text, okText, cancelText, danger, alert }) → Promise<boolean>
 // alert: true — информационное окно с одной кнопкой (по умолчанию «Понятно»)
+// ── Вложения в чатах (личка и проектный чат) ─────────
+// Картинки уходят сообщением type:'image', документы — type:'file' с JSON {url,name,size}.
+var CHAT_FILE_MAX = 2 * 1024 * 1024;
+var CHAT_FILE_TYPES = {
+  jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp',
+  pdf:'application/pdf', doc:'application/msword',
+  docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls:'application/vnd.ms-excel', xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt:'application/vnd.ms-powerpoint', pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  txt:'text/plain', csv:'text/csv', zip:'application/zip'
+};
+var CHAT_FILE_ACCEPT = Object.keys(CHAT_FILE_TYPES).map(function(e){ return '.' + e; }).join(',');
+
+function formatFileSize(n) {
+  n = +n || 0;
+  if (n < 1024) return n + ' Б';
+  if (n < 1024 * 1024) return Math.round(n / 1024) + ' КБ';
+  return (n / 1024 / 1024).toFixed(1).replace('.', ',') + ' МБ';
+}
+
+// Загружает файл и возвращает тело сообщения { text, type }
+async function uploadChatAttachment(file) {
+  var ext = (file.name.split('.').pop() || '').toLowerCase();
+  var ct = CHAT_FILE_TYPES[ext];
+  if (!ct) throw new Error('Такой тип файла не поддерживается. Можно: фото, PDF, Word, Excel, PowerPoint, TXT, CSV, ZIP');
+  if (file.size > CHAT_FILE_MAX) throw new Error('Файл слишком большой (макс. 2 МБ)');
+  var base64 = await new Promise(function(resolve, reject) {
+    var r = new FileReader();
+    r.onload = function(e) { resolve(e.target.result.split(',')[1]); };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+  var res = await api.post('/upload', { data: base64, contentType: ct, folder: 'chat' });
+  if (ct.indexOf('image/') === 0) return { text: res.url, type: 'image' };
+  return { text: JSON.stringify({ url: res.url, name: file.name, size: file.size }), type: 'file' };
+}
+
+// HTML пузыря для сообщений с картинкой или файлом; null — обычный текст
+function chatAttachmentBubble(m) {
+  if (m.type === 'image') {
+    return '<div class="msg__bubble" style="padding:4px"><img src="'+esc(m.text)+'" style="max-width:260px;max-height:320px;border-radius:8px;display:block;cursor:pointer" onclick="window.open(this.src,\'_blank\')"/></div>';
+  }
+  if (m.type === 'file') {
+    var f = {};
+    try { f = typeof m.text === 'string' ? JSON.parse(m.text) : (m.text || {}); } catch(e) {}
+    if (!f.url || !/^https?:\/\//.test(f.url)) return '<div class="msg__bubble">Вложение недоступно</div>';
+    var ext = ((f.name || '').split('.').pop() || 'файл').toUpperCase().slice(0, 4);
+    return '<a class="msg__bubble msg-file" href="'+esc(f.url)+'" target="_blank" rel="noopener" download="'+esc(f.name || '')+'">' +
+      '<span class="msg-file__icon">'+esc(ext)+'</span>' +
+      '<span class="msg-file__meta"><span class="msg-file__name">'+esc(f.name || 'Файл')+'</span>' +
+      '<span class="msg-file__size">'+(f.size ? formatFileSize(f.size) + ' · ' : '')+'Скачать</span></span></a>';
+  }
+  return null;
+}
+
 function uiConfirm(opts) {
   opts = opts || {};
   return new Promise(function(resolve) {

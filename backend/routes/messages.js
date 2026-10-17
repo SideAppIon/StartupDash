@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const { query, queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { getUserGroupSettings } = require('./groups');
-const { checkCensor } = require('../lib/censor');
+const { prepareChatMessage } = require('../lib/chat-message');
 const { isActiveExpert, isStaff, isObserver, ACTIVE_EXPERT_ROLES_SQL } = require('../lib/roles');
 
 const router = express.Router();
@@ -298,25 +298,21 @@ router.post('/conversations/:id/messages', requireAuth, async (req, res) => {
       if (nonStaff) return res.status(403).json({ error: 'Наблюдатель может переписываться только с поддержкой' });
     }
 
-    const { text, type } = req.body;
-    if (!text) return res.status(400).json({ error: 'text обязателен' });
-    // Фильтр слов для личных сообщений (системные сообщения не проверяем)
-    if ((type || 'user') === 'user') {
-      const cen = await checkCensor(text, 'messages');
-      if (cen.blocked) return res.status(400).json({ error: cen.message });
-    }
+    // Проверка типа, вложения и фильтр слов (системные сообщения не проверяем)
+    const m = await prepareChatMessage(req.body.text, req.body.type);
+    if (m.error) return res.status(400).json({ error: m.error });
 
     const id  = uuidv4();
     const msg = await queryOne(
       `INSERT INTO messages (id, conv_id, sender_uid, text, type, created_at)
        VALUES ($1,$2,$3,$4,$5,NOW()) RETURNING *`,
-      [id, req.params.id, req.user.uid, text, type || 'user']
+      [id, req.params.id, req.user.uid, m.text, m.type]
     );
 
     // Обновляем preview диалога
     await queryOne(
       'UPDATE conversations SET last_message=$1, last_at=NOW() WHERE id=$2',
-      [text.substring(0, 80), req.params.id]
+      [m.preview, req.params.id]
     );
 
     res.status(201).json({ message: msg });

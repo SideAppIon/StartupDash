@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Идеи — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=9"/>
+  <link rel="stylesheet" href="styles.css?v=10"/>
   <style>
     .idea-tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap;align-items:center}
     .idea-tab{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .2s}
@@ -80,8 +80,8 @@
 
     <div class="idea-tabs">
       <button class="idea-tab active" data-tab="open" onclick="setTab('open')">Свободные</button>
-      <button class="idea-tab" data-tab="taken" onclick="setTab('taken')">Забранные</button>
-      <button class="idea-tab" data-tab="mine" id="mineTab" style="display:none" onclick="setTab('mine')">Мои</button>
+      <button class="idea-tab" data-tab="taken" onclick="setTab('taken')">Занятые</button>
+      <button class="idea-tab" data-tab="mine" id="mineTab" style="display:none" onclick="setTab('mine')">Выбранные</button>
       <button class="idea-tab" data-tab="invites" id="invitesTab" style="display:none" onclick="setTab('invites')">Приглашения<span class="tab-count" id="invitesCount" style="display:none"></span></button>
       <select class="form-select idea-filter" id="kindFilter" onchange="render()">
         <option value="">Идеи и задачи</option>
@@ -167,7 +167,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=15"></script>
+<script src="api-config.js?v=16"></script>
 <script>
 requireAuth('login.html');
 
@@ -233,7 +233,7 @@ function render() {
   });
   if (!list.length) {
     var msg = curTab === 'open' ? 'Свободных идей пока нет'
-            : curTab === 'taken' ? 'Пока никто не забрал идеи'
+            : curTab === 'taken' ? 'Занятых идей пока нет'
             : (canPublishIdeas() ? 'Вы ещё не предлагали идеи' : 'Вы ещё не забирали идеи');
     var hint = curTab !== 'taken' && canPublishIdeas()
       ? '<button class="btn btn--primary" style="margin-top:14px" onclick="openIdeaModal()">+ Предложить идею</button>'
@@ -260,7 +260,7 @@ function buildCard(i) {
   else if (i.moderation === 'rejected') badges += '<span class="badge badge--red">Отклонена</span>';
   else badges += i.status === 'open'
     ? '<span class="badge badge--green">Свободна</span>'
-    : '<span class="badge badge--purple">Забрана</span>';
+    : '<span class="badge badge--purple">Занята</span>';
 
   // Пояснение автору по модерации
   var note = '';
@@ -381,7 +381,7 @@ async function saveIdea() {
         alert: true,
         title: 'Отправлено на модерацию',
         text: (body.kind === 'task' ? 'Бизнес-задача' : 'Идея') + ' появится в банке идей после проверки — она занимает до 24 часов. ' +
-              'О решении придёт личное сообщение, а пока статус виден во вкладке «Мои».'
+              'О решении придёт личное сообщение, а пока статус виден во вкладке «Выбранные».'
       });
     } else {
       showToast('Сохранено', 'success');

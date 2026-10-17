@@ -346,3 +346,11 @@ body {
 /* Гость (не вошёл): скрываем пункты меню, доступные только участникам платформы */
 .is-guest .nav a[href="ideas.html"],
 .is-guest .nav a[href="members.html"] { display: none; }
+
+/* Файл-вложение в чате */
+.msg-file { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); max-width: 280px; }
+.msg-file:hover { filter: brightness(1.1); }
+.msg-file__icon { flex-shrink: 0; width: 40px; height: 40px; border-radius: 8px; background: var(--bg2); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: var(--accent); }
+.msg-file__meta { display: flex; flex-direction: column; min-width: 0; }
+.msg-file__name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-file__size { font-size: 11px; color: var(--text3); }

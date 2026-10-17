@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Командный чат — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=9"/>
+  <link rel="stylesheet" href="styles.css?v=10"/>
   <style>
     html,body{height:100%;overflow:hidden}
     .chat-layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - var(--nav-h));margin-top:var(--nav-h)}
@@ -108,8 +108,8 @@
       </div>
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-input-area">
-        <input type="file" id="photoFileInput" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="sendPhoto(this)"/>
-        <button class="send-btn" style="background:var(--bg3);color:var(--text2);font-size:20px" title="Прикрепить фото" onclick="document.getElementById('photoFileInput').click()">📎</button>
+        <input type="file" id="photoFileInput" style="display:none" onchange="sendPhoto(this)"/>
+        <button class="send-btn" style="background:var(--bg3);color:var(--text2);font-size:20px" title="Прикрепить фото или файл до 2 МБ" onclick="var f=document.getElementById('photoFileInput');f.accept=CHAT_FILE_ACCEPT;f.click()">📎</button>
         <textarea class="chat-textarea" id="msgInput" placeholder="Напишите сообщение команде..." data-ty-placeholder="Напиши сообщение команде..." rows="1"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
           oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
@@ -120,7 +120,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=15"></script>
+<script src="api-config.js?v=16"></script>
 <script>
 requireAuth('login.html');
 
@@ -254,9 +254,8 @@ function renderMessages(msgs) {
       ? '<img src="'+esc(m.sender_avatar)+'" onerror="this.style.display=\'none\'"/>'
       : name.charAt(0).toUpperCase();
     var roleLabel = roleBadge(m.sender_role);
-    var bubble = m.type === 'image'
-      ? '<div class="msg__bubble" style="padding:4px"><img src="'+esc(m.text)+'" style="max-width:260px;max-height:320px;border-radius:8px;display:block;cursor:pointer" onclick="window.open(this.src,\'_blank\')"/></div>'
-      : '<div class="msg__bubble">'+esc(m.text||'').replace(/\n/g,'<br>')+'</div>';
+    var bubble = chatAttachmentBubble(m)
+      || '<div class="msg__bubble">'+esc(m.text||'').replace(/\n/g,'<br>')+'</div>';
 
     html += '<div class="msg '+(mine?'msg--mine':'msg--theirs')+'">'+
       '<div class="msg__av">'+avatar+'</div>'+
@@ -300,18 +299,11 @@ async function sendPhoto(input) {
   var file = input.files[0];
   input.value = '';
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) { showToast('Файл слишком большой (макс. 2 МБ)', 'error'); return; }
   if (!activeStartupId) return;
-  showToast('Загружаю фото...', 'info');
+  showToast('Загружаю файл...', 'info');
   try {
-    var base64 = await new Promise(function(resolve, reject) {
-      var r = new FileReader();
-      r.onload = function(e) { resolve(e.target.result.split(',')[1]); };
-      r.onerror = reject;
-      r.readAsDataURL(file);
-    });
-    var res = await api.post('/upload', { data: base64, contentType: file.type, folder: 'chat' });
-    await api.post('/team-chat/' + activeStartupId + '/messages', { text: res.url, type: 'image' });
+    var body = await uploadChatAttachment(file);
+    await api.post('/team-chat/' + activeStartupId + '/messages', body);
     await loadMessages();
   } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
 }

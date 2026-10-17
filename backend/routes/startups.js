@@ -305,9 +305,9 @@ router.delete('/:id/like', requireAuth, async (req, res) => {
 router.post('/', requireAuth, async (req, res) => {
   try {
     // Наблюдатель стартапы не создаёт
-    const canCreate = ['startup', 'admin'].includes(req.user.role) || isActiveExpert(req.user.role);
+    const canCreate = ['startup', 'user', 'admin'].includes(req.user.role) || isActiveExpert(req.user.role);
     if (!canCreate) {
-      return res.status(403).json({ error: 'Только стартапер или эксперт могут создавать проекты' });
+      return res.status(403).json({ error: 'Создавать проекты могут стартаперы, специалисты и эксперты' });
     }
 
     const b = req.body;
