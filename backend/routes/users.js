@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt  = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { queryOne, queryAll } = require('../db');
-const { requireAuth, optionalAuth, signToken } = require('../middleware/auth');
+const { requireAuth, optionalAuth, signToken, forgetRole } = require('../middleware/auth');
 const { ensureModeratorSchema, isAdmin, moderatorCanActOn } = require('../lib/moderation');
 const { ensureNicknameSchema, validateNicknameFormat, isNicknameFree, resolveNicknameForCreate } = require('../lib/nickname');
 const { ALL_ROLES, ensureRoleConstraint } = require('../lib/roles');
@@ -181,6 +181,7 @@ router.patch('/:uid/role', requireAuth, async (req, res) => {
 
     await ensureRoleConstraint();   // разрешить новые роли в CHECK-констрейнте
     await queryOne('UPDATE users SET role = $1 WHERE uid = $2', [role, req.params.uid]);
+    forgetRole(req.params.uid);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка сервера' });

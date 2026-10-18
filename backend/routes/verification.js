@@ -7,7 +7,7 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { query, queryOne, queryAll } = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, forgetRole } = require('../middleware/auth');
 const { MODERATED_ROLES, needsModeration, needsInn, isValidInn, ensureRoleConstraint } = require('../lib/roles');
 const { fileUrl, deleteStoredFile } = require('./upload');
 const { sendDirectMessage } = require('../lib/dm');
@@ -222,6 +222,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       await ensureRoleConstraint();
       // Повышаем только наблюдателя: если админ уже сменил роль вручную — не трогаем
       await queryOne("UPDATE users SET role=$1 WHERE uid=$2 AND role='observer'", [row.requested_role, row.user_uid]);
+      forgetRole(row.user_uid);
     }
 
     const text = status === 'approved'

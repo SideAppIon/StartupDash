@@ -12,26 +12,58 @@ function signToken(user) {
   );
 }
 
+// Роль в токене фиксируется при входе и живёт 30 дней. После модерации
+// (наблюдатель → эксперт / ментор / ...) или смены роли админом она устаревает,
+// поэтому актуальную роль берём из базы. Короткий кеш, чтобы не ходить в БД на каждый запрос.
+const ROLE_TTL_MS = 15 * 1000;
+const roleCache = new Map(); // uid → { role, exp }
+
+async function currentRole(uid) {
+  const hit = roleCache.get(uid);
+  if (hit && hit.exp > Date.now()) return hit.role;
+  const { queryOne } = require('../db');
+  const row = await queryOne('SELECT role FROM users WHERE uid = $1', [uid]);
+  const role = row ? row.role : null;
+  roleCache.set(uid, { role, exp: Date.now() + ROLE_TTL_MS });
+  if (roleCache.size > 5000) roleCache.clear();
+  return role;
+}
+
+// Сбросить кеш роли (после одобрения заявки или смены роли)
+function forgetRole(uid) { roleCache.delete(uid); }
+
+// Расшифровать токен и подставить актуальную роль. null — токен невалиден или пользователь удалён.
+async function userFromToken(token) {
+  let payload;
+  try { payload = jwt.verify(token, JWT_SECRET); } catch (e) { return null; }
+  const role = await currentRole(payload.uid);
+  if (!role) return null;
+  return Object.assign(payload, { role });
+}
+
 // Middleware: проверить токен, добавить req.user
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const header = req.headers['authorization'] || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Не авторизован' });
 
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
+    const user = await userFromToken(token);
+    if (!user) return res.status(401).json({ error: 'Токен недействителен или истёк' });
+    req.user = user;
   } catch (e) {
-    return res.status(401).json({ error: 'Токен недействителен или истёк' });
+    console.error('requireAuth error:', e.message);
+    return res.status(500).json({ error: 'Ошибка сервера' });
   }
+  next();
 }
 
 // Middleware: проверить токен если есть (не обязательно)
-function optionalAuth(req, res, next) {
+async function optionalAuth(req, res, next) {
   const header = req.headers['authorization'] || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (token) {
-    try { req.user = jwt.verify(token, JWT_SECRET); } catch (e) {}
+    try { const user = await userFromToken(token); if (user) req.user = user; } catch (e) {}
   }
   next();
 }
@@ -46,4 +78,4 @@ function requireAdmin(req, res, next) {
   });
 }
 
-module.exports = { signToken, requireAuth, optionalAuth, requireAdmin };
+module.exports = { signToken, requireAuth, optionalAuth, requireAdmin, forgetRole };
