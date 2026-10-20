@@ -3,7 +3,7 @@ const { queryOne } = require('../db');
 
 // Служебное личное сообщение fromUid → toUid: находит или создаёт диалог и пишет в него.
 // Без проверок ограничений переписки — это уведомление (решение модерации, идея забрана и т.п.),
-// пользователь увидит его в колокольчике.
+// пользователь увидит его в колокольчике. Возвращает id диалога.
 async function sendDirectMessage(fromUid, toUid, text) {
   let conv = await queryOne(
     `SELECT c.id FROM conversations c
@@ -17,7 +17,7 @@ async function sendDirectMessage(fromUid, toUid, text) {
       queryOne('SELECT uid, name, avatar, role FROM users WHERE uid=$1', [fromUid]),
       queryOne('SELECT uid, name, avatar, role FROM users WHERE uid=$1', [toUid]),
     ]);
-    if (!me || !other) return;
+    if (!me || !other) return null;
     const id = uuidv4();
     conv = await queryOne(
       `INSERT INTO conversations (id, participant_names, participant_avatars, participant_roles, last_message, last_at, created_at)
@@ -37,6 +37,7 @@ async function sendDirectMessage(fromUid, toUid, text) {
   );
   await queryOne('UPDATE conversations SET last_message=$1, last_at=NOW() WHERE id=$2',
     [text.substring(0, 80), conv.id]);
+  return conv.id;
 }
 
 module.exports = { sendDirectMessage };

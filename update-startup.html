@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Обновление стартапа — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=10"/>
+  <link rel="stylesheet" href="styles.css?v=11"/>
   <style>
     .img-preview{width:100%;max-height:300px;object-fit:cover;border-radius:var(--radius);border:1px solid var(--border2);margin-top:8px;display:none}
     .img-preview.show{display:block}
@@ -86,11 +86,12 @@
         <div class="form-hint" style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.6">
           Ссылка для встраивания: ВКонтакте → видео → Поделиться → Код для вставки → <code>iframe</code> (скопируй ссылку из <code>src="…"</code>, вида <code>https://vk.com/video_ext.php?oid=…&id=…</code>).<br/>
           Можно вставить и весь код <code>&lt;iframe…&gt;</code> или обычную ссылку на видео — преобразуем сами.
+          Rutube и YouTube тоже встраиваются, ссылки на другие сайты покажем обычной ссылкой.
         </div>
 
         <!-- Вариант 2: загрузка файлом -->
         <div style="margin-top:12px">
-          <label class="form-label" style="font-size:13px">…или загрузи файлом (mp4, webm, mov, до ~2 МБ)</label>
+          <label class="form-label" style="font-size:13px">…или загрузи файлом (mp4, webm, mov, до 7 МБ)</label>
           <input type="file" accept="video/mp4,video/webm,video/quicktime" id="videoFileInput"
             class="form-input" style="padding:6px" onchange="uploadUpdateVideo(this)"/>
           <div id="videoUploadStatus" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
@@ -115,7 +116,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=16"></script>
+<script src="api-config.js?v=17"></script>
 <script>
 requireAuth('login.html');
 
@@ -136,34 +137,10 @@ function previewImage(url) {
 
 // Нормализация ссылки на видео ВК → ссылка для встраивания (video_ext.php).
 // Принимает код <iframe src="...">, готовую embed-ссылку или обычную ссылку на видео.
-function normalizeVkVideo(raw) {
-  if (!raw) return '';
-  var s = String(raw).trim();
-  var iframe = s.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
-  if (iframe) s = iframe[1].trim();
-  if (/^\/\//.test(s)) s = 'https:' + s;
-  if (/^www\./i.test(s)) s = 'https://' + s;
-  if (/video_ext\.php/i.test(s)) return s.replace(/^http:\/\//i, 'https://');
-  var m = s.match(/video(-?\d+)_(\d+)/i);
-  if (m) return 'https://vk.com/video_ext.php?oid=' + m[1] + '&id=' + m[2] + '&hd=2';
-  return s;
-}
+function normalizeVkVideo(raw) { return normalizeVideoUrl(raw); }
 
-// Прямой видеофайл (загруженный к нам) — рендерим <video>, иначе <iframe> (VK)
-function isFileVideo(url) {
-  return /storage\.yandexcloud\.net/i.test(url) || /\.(mp4|webm|mov)(\?|$)/i.test(url);
-}
-
-// HTML встроенного видео — только для безопасных https-ссылок
-function videoEmbed(url) {
-  if (!url || String(url).indexOf('https://') !== 0) return '';
-  if (isFileVideo(url)) {
-    return '<video src="' + esc(url) + '" controls preload="metadata" ' +
-      'style="width:100%;max-height:360px;border-radius:var(--radius);margin-top:10px;display:block;background:#000"></video>';
-  }
-  return '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-top:10px">' +
-    '<iframe src="' + esc(url) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
-}
+// Видео: файл → <video>, известный плеер → <iframe>, иначе — обычная ссылка (videoHtml в api-config.js)
+function videoEmbed(url) { return url ? videoHtml(url, 'margin-top:10px') : ''; }
 
 // Текущее выбранное видео: приоритет у загруженного файла, иначе — ссылка ВК
 function currentVideoUrl() {
@@ -187,15 +164,13 @@ async function uploadUpdateVideo(input) {
   var file = input.files[0];
   if (!file) return;
   var status = document.getElementById('videoUploadStatus');
-  if (file.size > 2.3 * 1024 * 1024) {
-    status.textContent = 'Видео слишком большое (макс. ~2 МБ). Для больших видео используй ссылку ВКонтакте.';
+  if (file.size > UPLOAD_MAX_BYTES) {
+    status.textContent = 'Видео слишком большое (макс. ' + UPLOAD_MAX_MB + ' МБ). Для больших видео используй ссылку ВКонтакте или Rutube.';
     input.value = ''; input.removeAttribute('data-url'); previewVideo(); return;
   }
   status.textContent = 'Загружаю видео...';
   try {
-    var r = new FileReader();
-    var base64 = await new Promise(function(res, rej){ r.onload=function(e){res(e.target.result.split(',')[1]);}; r.onerror=rej; r.readAsDataURL(file); });
-    var result = await api.post('/upload', { data: base64, contentType: file.type, folder: 'updates' });
+    var result = await uploadRawFile(file, 'updates');
     input.setAttribute('data-url', result.url);
     // При загрузке файла очищаем поле ссылки, чтобы не конфликтовали
     document.getElementById('videoInput').value = '';
@@ -210,15 +185,9 @@ async function uploadUpdateVideo(input) {
 async function uploadUpdatePhoto(input) {
   var file = input.files[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) {
-    document.getElementById('imageUploadStatus').textContent = 'Файл слишком большой (макс. 2 МБ)';
-    input.value = ''; return;
-  }
   document.getElementById('imageUploadStatus').textContent = 'Загружаю...';
   try {
-    var r = new FileReader();
-    var base64 = await new Promise(function(res, rej){ r.onload=function(e){res(e.target.result.split(',')[1]);}; r.onerror=rej; r.readAsDataURL(file); });
-    var result = await api.post('/upload', { data: base64, contentType: file.type, folder: 'updates' });
+    var result = await uploadImage(file, 'updates', 'photo');
     document.getElementById('imageInput').value = result.url;
     previewImage(result.url);
     document.getElementById('imageUploadStatus').textContent = '✓ Загружено';

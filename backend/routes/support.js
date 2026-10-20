@@ -3,6 +3,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { query, queryOne, queryAll } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { sendDirectMessage } = require('../lib/dm');
 
 const router = express.Router();
 
@@ -30,10 +31,34 @@ async function ensureSupportSchema() {
     )`);
     await query('CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status)');
     await query('CREATE INDEX IF NOT EXISTS idx_support_user ON support_tickets(user_uid)');
+    // Кому из поддержки ушло обращение и в каком диалоге идёт переписка
+    await query('ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS agent_uid TEXT');
+    await query('ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS conv_id TEXT');
     supportSchemaEnsured = true;
   } catch (e) {
     console.error('ensureSupportSchema error:', e.message);
   }
+}
+
+// Сотрудник, которому уходит обращение: тот, с кем пользователь уже переписывался,
+// иначе первый сотрудник поддержки, иначе администратор.
+async function pickSupportAgent(userUid) {
+  const prev = await queryOne(
+    `SELECT u.uid FROM conversation_participants me
+     JOIN conversations c ON c.id = me.conv_id AND c.is_group IS NOT TRUE
+     JOIN conversation_participants cp ON cp.conv_id = c.id AND cp.user_uid <> me.user_uid
+     JOIN users u ON u.uid = cp.user_uid AND u.role IN ('support','admin')
+     WHERE me.user_uid = $1
+     ORDER BY (u.role = 'support') DESC, c.last_at DESC NULLS LAST LIMIT 1`,
+    [userUid]
+  );
+  if (prev) return prev.uid;
+  const agent = await queryOne(
+    `SELECT uid FROM users WHERE role IN ('support','admin') AND uid <> $1
+     ORDER BY (role = 'support') DESC, created_at ASC LIMIT 1`,
+    [userUid]
+  );
+  return agent ? agent.uid : null;
 }
 
 function parseTicket(t) {
@@ -41,6 +66,8 @@ function parseTicket(t) {
     ...t,
     userUid:    t.user_uid,
     userName:   t.user_name,
+    agentUid:   t.agent_uid,
+    convId:     t.conv_id,
     answeredBy: t.answered_by,
     createdAt:  t.created_at,
     answeredAt: t.answered_at,
@@ -57,11 +84,22 @@ router.post('/', requireAuth, async (req, res) => {
     if (!text)    return res.status(400).json({ error: 'Опишите ваш вопрос' });
 
     const me = await queryOne('SELECT name FROM users WHERE uid=$1', [req.user.uid]);
+
+    // Сообщение сразу уходит в личку поддержке — у пользователя появляется чат
+    // с историей, поддержка отвечает в нём же
+    let agentUid = null, convId = null;
+    try {
+      agentUid = await pickSupportAgent(req.user.uid);
+      if (agentUid) convId = await sendDirectMessage(req.user.uid, agentUid, `🎧 Обращение в поддержку: ${subject}\n\n${text}`);
+    } catch (e) {
+      console.error('support DM error:', e.message);
+    }
+
     const id = uuidv4();
     const ticket = await queryOne(
-      `INSERT INTO support_tickets (id, user_uid, user_name, subject, text, status, created_at)
-       VALUES ($1,$2,$3,$4,$5,'open',NOW()) RETURNING *`,
-      [id, req.user.uid, me ? me.name : '', subject, text]
+      `INSERT INTO support_tickets (id, user_uid, user_name, subject, text, status, agent_uid, conv_id, created_at)
+       VALUES ($1,$2,$3,$4,$5,'open',$6,$7,NOW()) RETURNING *`,
+      [id, req.user.uid, me ? me.name : '', subject, text, agentUid, convId]
     );
     res.status(201).json({ ticket: parseTicket(ticket) });
   } catch (e) {

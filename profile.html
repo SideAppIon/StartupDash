@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Мой профиль — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=10"/>
+  <link rel="stylesheet" href="styles.css?v=11"/>
   <style>
     .profile-cover{height:180px;background:linear-gradient(135deg,rgba(0,230,118,.15),rgba(180,139,255,.1) 50%,rgba(61,142,245,.1));border-bottom:1px solid var(--border)}
     .profile-wrap{max-width:860px;margin:0 auto;padding:0 24px}
@@ -171,7 +171,7 @@
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:20px">
       <img id="avatarPreview" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);background:var(--bg3);flex-shrink:0" src="https://ui-avatars.com/api/?background=181c24&color=00e676&name=U"/>
       <div style="flex:1">
-        <label class="form-label" data-ty="Выбери фото (макс. 2 МБ)">Выберите фото (макс. 2 МБ)</label>
+        <label class="form-label" data-ty="Выбери фото — уменьшим автоматически">Выберите фото — уменьшим автоматически</label>
         <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" id="avatarFileInput"
           class="form-input" style="padding:6px" onchange="onAvatarFileChange(this)"/>
         <div id="avatarUploadStatus" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
@@ -185,7 +185,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=16"></script>
+<script src="api-config.js?v=17"></script>
 <script>
 requireAuth('login.html');
 
@@ -310,7 +310,7 @@ function onVerifyLogo(input) {
   errEl.style.display = 'none';
   if (!f) return;
   var err = LOGO_TYPES.indexOf(f.type) === -1 ? 'Логотип: нужно изображение (jpg, png, webp)'
-          : f.size > 2 * 1024 * 1024        ? 'Логотип: файл больше 2 МБ' : '';
+          : f.size > IMAGE_RAW_MAX_BYTES    ? 'Логотип: файл слишком большой' : '';
   if (err) { errEl.textContent = err; errEl.style.display = 'block'; input.value = ''; return; }
   verifyLogoFile = f;
   var prev = document.getElementById('vLogoPreview');
@@ -356,7 +356,7 @@ async function loadVerification() {
             '<img id="vLogoPreview" alt="" src="' + esc(v && v.orgLogo || '') + '" style="' + (v && v.orgLogo ? '' : 'display:none;') + 'width:56px;height:56px;border-radius:12px;object-fit:contain;background:var(--bg3);border:1px solid var(--border2);flex-shrink:0"/>' +
             '<input type="file" class="form-input" style="padding:6px;flex:1" accept="image/jpeg,image/png,image/webp,image/gif" onchange="onVerifyLogo(this)"/>' +
           '</div>' +
-          (v && v.orgLogo ? '<div class="form-hint">Можно оставить прежний логотип</div>' : '<div class="form-hint">Изображение до 2 МБ</div>') + '</div>' +
+          (v && v.orgLogo ? '<div class="form-hint">Можно оставить прежний логотип</div>' : '<div class="form-hint">Изображение (jpg, png, webp) — уменьшим автоматически</div>') + '</div>' +
         '<div class="form-group"><label class="form-label">ИНН *</label>' +
           '<input type="text" class="form-input" id="vInn" inputmode="numeric" maxlength="12" placeholder="10 цифр — компания, 12 — ИП" value="' + esc(v && v.inn || '') + '"/></div>' +
         '<div class="form-group"><label class="form-label">Юридический адрес *</label>' +
@@ -533,12 +533,10 @@ async function saveProfile() {
   } catch(e) { showToast('Ошибка: '+e.message,'error'); }
 }
 
-var _avatarBase64 = null;
-var _avatarContentType = null;
+var _avatarBlob = null;
 
 function openAvatarModal() {
-  _avatarBase64 = null;
-  _avatarContentType = null;
+  _avatarBlob = null;
   document.getElementById('avatarFileInput').value = '';
   document.getElementById('avatarUploadStatus').textContent = '';
   var cur = (uData&&uData.avatar)||'https://ui-avatars.com/api/?background=181c24&color=00e676&name=U';
@@ -549,29 +547,24 @@ function openAvatarModal() {
 function onAvatarFileChange(input) {
   var file = input.files[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) {
-    document.getElementById('avatarUploadStatus').textContent = 'Файл слишком большой (макс. 2 МБ)';
-    input.value = '';
-    return;
-  }
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var dataUrl = e.target.result;
-    // dataUrl = "data:image/jpeg;base64,XXXX"
-    var parts = dataUrl.split(',');
-    _avatarBase64 = parts[1];
-    _avatarContentType = file.type;
-    document.getElementById('avatarPreview').src = dataUrl;
-    document.getElementById('avatarUploadStatus').textContent = file.name + ' (' + (file.size/1024).toFixed(0) + ' КБ)';
-  };
-  reader.readAsDataURL(file);
+  var status = document.getElementById('avatarUploadStatus');
+  status.textContent = 'Обрабатываю фото...';
+  // Сразу сжимаем до 512 px — в предпросмотре видно ровно то, что загрузится
+  compressImage(file, 'avatar').then(function(blob) {
+    _avatarBlob = blob;
+    document.getElementById('avatarPreview').src = URL.createObjectURL(blob);
+    status.textContent = file.name + ' (' + formatFileSize(blob.size) + ')';
+  }).catch(function(e) {
+    _avatarBlob = null; input.value = '';
+    status.textContent = e.message || 'Не удалось обработать фото';
+  });
 }
 
 async function doSaveAvatar() {
-  if (!_avatarBase64) { showToast(tv('Выбери файл','Выберите файл'), 'error'); return; }
+  if (!_avatarBlob) { showToast(tv('Выбери файл','Выберите файл'), 'error'); return; }
   try {
     document.getElementById('avatarUploadStatus').textContent = 'Загружаю...';
-    var res = await api.post('/upload', { data: _avatarBase64, contentType: _avatarContentType, folder: 'avatars' });
+    var res = await api.post('/upload', { data: await blobToBase64(_avatarBlob), contentType: _avatarBlob.type, folder: 'avatars' });
     var url = res.url;
     await db.collection('users').doc(currentUser.uid).update({ avatar: url });
     uData.avatar = url;

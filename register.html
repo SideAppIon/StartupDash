@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Регистрация — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=10"/>
+  <link rel="stylesheet" href="styles.css?v=11"/>
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px 0; }
     .auth-box { width:100%; max-width:480px; padding:24px; }
@@ -188,7 +188,7 @@
             <img id="orgLogoPreview" alt="" style="display:none;width:56px;height:56px;border-radius:12px;object-fit:contain;background:var(--bg3);border:1px solid var(--border2);flex-shrink:0"/>
             <input type="file" class="form-input" id="orgLogoInput" style="padding:6px;flex:1" accept="image/jpeg,image/png,image/webp,image/gif" onchange="onOrgLogo(this)"/>
           </div>
-          <div class="form-hint">Изображение до 2 МБ</div>
+          <div class="form-hint">Изображение (jpg, png, webp) — уменьшим автоматически</div>
         </div>
         <div class="form-group">
           <label class="form-label">ИНН *</label>
@@ -211,7 +211,7 @@
         <label class="form-label" id="certLabel">Сертификат / подтверждение квалификации *</label>
         <input type="file" class="form-input" id="certInput" style="padding:6px" multiple
           accept="application/pdf,image/jpeg,image/png,image/webp" onchange="onCertFiles(this)"/>
-        <div class="form-hint">PDF или изображение, до 2 МБ каждый, максимум 5 файлов</div>
+        <div class="form-hint">PDF или изображение, до 7 МБ каждый, максимум 5 файлов</div>
         <div id="certList"></div>
       </div>
       <div class="form-group" style="margin-bottom:10px">
@@ -245,7 +245,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=16"></script>
+<script src="api-config.js?v=17"></script>
 <script>
 // Редирект только если уже авторизован при загрузке страницы (не во время регистрации)
 var registering = false;
@@ -404,7 +404,7 @@ function onOrgLogo(input) {
   var f = input.files[0];
   if (!f) return;
   var err = LOGO_TYPES.indexOf(f.type) === -1 ? 'Логотип: нужно изображение (jpg, png, webp)'
-          : f.size > 2 * 1024 * 1024        ? 'Логотип: файл больше 2 МБ' : '';
+          : f.size > IMAGE_RAW_MAX_BYTES    ? 'Логотип: файл слишком большой' : '';
   if (err) { showErr(2, err); orgLogoFile = null; input.value = ''; return; }
   orgLogoFile = f;
   var prev = document.getElementById('orgLogoPreview');

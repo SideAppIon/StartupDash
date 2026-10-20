@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Создать стартап — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=10"/>
+  <link rel="stylesheet" href="styles.css?v=11"/>
   <style>
     .emoji-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
     .emoji-opt{width:42px;height:42px;border-radius:10px;background:var(--bg3);border:2px solid var(--border2);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
@@ -154,7 +154,7 @@
     <!-- ВЛОЖЕНИЯ / ДОКУМЕНТАЦИЯ -->
     <div class="card" style="margin-bottom:20px">
       <h3 style="font-family:var(--font-head);font-size:16px;margin-bottom:6px">Вложения / документация</h3>
-      <p style="font-size:13px;color:var(--text2);margin-bottom:14px">До 5 файлов: pdf, doc, docx, xls, xlsx, ppt, pptx, txt, csv, zip. Каждый до ~2 МБ. Другие пользователи смогут их скачать.</p>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px">До 5 файлов: pdf, doc, docx, xls, xlsx, ppt, pptx, txt, csv, zip. Каждый до 7 МБ. Другие пользователи смогут их скачать.</p>
       <div id="attachList" style="margin-bottom:12px"></div>
       <input type="file" id="attachInput" multiple
         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
@@ -202,7 +202,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=16"></script>
+<script src="api-config.js?v=17"></script>
 <script>
 requireAuth('login.html');
 
@@ -227,16 +227,8 @@ EMOJIS.forEach(function(e){
   grid.appendChild(btn);
 });
 
-async function uploadFile(base64, contentType, folder, filename) {
-  var body = { data: base64, contentType: contentType, folder: folder || 'startups' };
-  if (filename) body.filename = filename;
-  var res = await api.post('/upload', body);
-  return res.url;
-}
-
 // ── Вложения (документы стартапа) ─────────────────────────
 var attachments = [];
-var ATTACH_MAX_BYTES = 2.3 * 1024 * 1024;
 var ATTACH_MIME = {
   pdf:'application/pdf', doc:'application/msword',
   docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -261,11 +253,10 @@ async function onAttachmentPick(input){
     var ext=(f.name.split('.').pop()||'').toLowerCase();
     var mime=ATTACH_MIME[ext];
     if (!mime){ status.textContent='«'+f.name+'»: формат не поддерживается'; continue; }
-    if (f.size>ATTACH_MAX_BYTES){ status.textContent='«'+f.name+'» слишком большой (макс. ~2 МБ)'; continue; }
+    if (f.size>UPLOAD_MAX_BYTES){ status.textContent='«'+f.name+'» слишком большой (макс. '+UPLOAD_MAX_MB+' МБ)'; continue; }
     status.textContent='Загружаю «'+f.name+'»...';
     try {
-      var base64=await readFileAsBase64(f);
-      var url=await uploadFile(base64, mime, 'docs', f.name);
+      var url=(await uploadRawFile(f, 'docs', mime, f.name)).url;
       attachments.push({ name:f.name, url:url, size:f.size, ext:ext });
       renderAttachments();
       status.textContent='✓ Загружено: '+f.name;
@@ -287,26 +278,12 @@ function renderAttachments(){
 }
 function removeAttachment(i){ attachments.splice(i,1); renderAttachments(); }
 
-function readFileAsBase64(file) {
-  return new Promise(function(resolve, reject) {
-    var r = new FileReader();
-    r.onload = function(e) { resolve(e.target.result.split(',')[1]); };
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-}
-
 async function uploadAndPreview(input, hiddenId, previewId, statusId) {
   var file = input.files[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) {
-    document.getElementById(statusId).textContent = 'Файл слишком большой (макс. 2 МБ)';
-    input.value = ''; return;
-  }
   document.getElementById(statusId).textContent = 'Загружаю...';
   try {
-    var base64 = await readFileAsBase64(file);
-    var url = await uploadFile(base64, file.type, 'startups');
+    var url = (await uploadImage(file, 'startups', 'photo')).url;
     document.getElementById(hiddenId).value = url;
     var prev = document.getElementById(previewId);
     prev.src = url; prev.className = 'img-preview-small show';
@@ -319,14 +296,9 @@ async function uploadAndPreview(input, hiddenId, previewId, statusId) {
 async function uploadIconFile(input) {
   var file = input.files[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) {
-    document.getElementById('iconUploadStatus').textContent = 'Файл слишком большой (макс. 2 МБ)';
-    input.value = ''; return;
-  }
   document.getElementById('iconUploadStatus').textContent = 'Загружаю...';
   try {
-    var base64 = await readFileAsBase64(file);
-    var url = await uploadFile(base64, file.type, 'startups');
+    var url = (await uploadImage(file, 'startups', 'logo')).url;
     document.getElementById('iconImage').value = url;
     var emoji = document.getElementById('iconPreviewEmoji');
     var img   = document.getElementById('iconPreviewImg');
@@ -459,10 +431,8 @@ function renderBlocks(){
         fileInp.addEventListener('change', async function(){
           var file=this.files[0];
           if (!file) return;
-          if (file.size > 2*1024*1024){ showToast('Файл слишком большой (макс. 2 МБ)','error'); return; }
           try {
-            var base64=await readFileAsBase64(file);
-            var url=await uploadFile(base64, file.type, 'startups');
+            var url=(await uploadImage(file, 'startups', 'photo')).url;
             updateBlock(bid,'content',url);
             previewBlockImg(pid, url);
           } catch(e){ showToast('Ошибка загрузки: '+e.message,'error'); }
@@ -498,11 +468,11 @@ function renderBlocks(){
       })(b.id, vPrevId);
       var hint=document.createElement('div');
       hint.className='form-hint';
-      hint.innerHTML='Ссылка для встраивания: ВКонтакте → видео → Поделиться → Код для вставки → <code>iframe</code> (скопируй ссылку из src). Можно вставить и весь код &lt;iframe&gt; или обычную ссылку — преобразуем сами.';
+      hint.innerHTML='Ссылка для встраивания: ВКонтакте → видео → Поделиться → Код для вставки → <code>iframe</code> (скопируй ссылку из src). Можно вставить и весь код &lt;iframe&gt; или обычную ссылку — преобразуем сами. Rutube и YouTube тоже встраиваются, ссылки на другие сайты покажем обычной ссылкой.';
       // Загрузка файлом
       var fileLabel=document.createElement('div');
       fileLabel.style.cssText='font-size:13px;color:var(--text2);margin-top:10px;margin-bottom:4px';
-      fileLabel.textContent='…или загрузи файлом (mp4, webm, mov, до ~2 МБ)';
+      fileLabel.textContent='…или загрузи файлом (mp4, webm, mov, до '+UPLOAD_MAX_MB+' МБ)';
       var vFile=document.createElement('input');
       vFile.type='file';
       vFile.accept='video/mp4,video/webm,video/quicktime';
@@ -512,10 +482,9 @@ function renderBlocks(){
         vFile.addEventListener('change', async function(){
           var file=this.files[0];
           if (!file) return;
-          if (file.size > 2.3*1024*1024){ showToast('Видео слишком большое (макс. ~2 МБ). Для больших — ссылка ВК.','error'); this.value=''; return; }
+          if (file.size > UPLOAD_MAX_BYTES){ showToast('Видео слишком большое (макс. '+UPLOAD_MAX_MB+' МБ). Для больших — ссылка ВК или Rutube.','error'); this.value=''; return; }
           try {
-            var base64=await readFileAsBase64(file);
-            var url=await uploadFile(base64, file.type, 'startups');
+            var url=(await uploadRawFile(file, 'startups')).url;
             urlInput.value=''; updateBlock(bid,'content',url); previewBlockVideo(pid, url);
             showToast('✓ Видео загружено','success');
           } catch(e){ showToast('Ошибка загрузки: '+e.message,'error'); }
@@ -546,31 +515,14 @@ function previewBlockImg(previewId, url){
   } else { img.className='img-preview-small'; }
 }
 
-// Нормализация ссылки на видео ВК → embed-ссылка (video_ext.php).
-function normalizeVkVideo(raw){
-  if(!raw) return '';
-  var s=String(raw).trim();
-  if(/storage\.yandexcloud\.net/i.test(s) || /\.(mp4|webm|mov)(\?|$)/i.test(s)) return s.replace(/^http:\/\//i,'https://');
-  var iframe=s.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
-  if(iframe) s=iframe[1].trim();
-  if(/^\/\//.test(s)) s='https:'+s;
-  if(/^www\./i.test(s)) s='https://'+s;
-  if(/video_ext\.php/i.test(s)) return s.replace(/^http:\/\//i,'https://');
-  var m=s.match(/video(-?\d+)_(\d+)/i);
-  if(m) return 'https://vk.com/video_ext.php?oid='+m[1]+'&id='+m[2]+'&hd=2';
-  return s;
-}
+// Ссылка на видео: ВК / Rutube / YouTube → ссылка для встраивания (normalizeVideoUrl в api-config.js)
+function normalizeVkVideo(raw){ return normalizeVideoUrl(raw); }
 
+// Предпросмотр: плеер, если площадка известна, иначе — обычная ссылка (как на странице стартапа)
 function previewBlockVideo(previewId, url){
   var el=document.getElementById(previewId);
   if(!el) return;
-  if(!url || String(url).indexOf('https://')!==0){ el.innerHTML=''; return; }
-  if(/storage\.yandexcloud\.net/i.test(url) || /\.(mp4|webm|mov)(\?|$)/i.test(url)){
-    el.innerHTML='<video src="'+esc(url)+'" controls preload="metadata" style="width:100%;max-height:300px;border-radius:var(--radius);background:#000;display:block"></video>';
-  } else {
-    el.innerHTML='<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius)">'+
-      '<iframe src="'+esc(url)+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
-  }
+  el.innerHTML = url ? videoHtml(url) : '';
 }
 
 renderBlocks(); // показываем пустое состояние

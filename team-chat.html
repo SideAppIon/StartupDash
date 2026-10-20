@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Командный чат — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=10"/>
+  <link rel="stylesheet" href="styles.css?v=11"/>
   <style>
     html,body{height:100%;overflow:hidden}
     .chat-layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - var(--nav-h));margin-top:var(--nav-h)}
@@ -109,7 +109,7 @@
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-input-area">
         <input type="file" id="photoFileInput" style="display:none" onchange="sendPhoto(this)"/>
-        <button class="send-btn" style="background:var(--bg3);color:var(--text2);font-size:20px" title="Прикрепить фото или файл до 2 МБ" onclick="var f=document.getElementById('photoFileInput');f.accept=CHAT_FILE_ACCEPT;f.click()">📎</button>
+        <button class="send-btn" style="background:var(--bg3);color:var(--text2);font-size:20px" title="Прикрепить фото или файл до 7 МБ" onclick="var f=document.getElementById('photoFileInput');f.accept=CHAT_FILE_ACCEPT;f.click()">📎</button>
         <textarea class="chat-textarea" id="msgInput" placeholder="Напишите сообщение команде..." data-ty-placeholder="Напиши сообщение команде..." rows="1"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
           oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
@@ -120,7 +120,7 @@
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="api-config.js?v=16"></script>
+<script src="api-config.js?v=17"></script>
 <script>
 requireAuth('login.html');
 

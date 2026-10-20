@@ -56,15 +56,11 @@ const DOC_TYPES = {
 };
 const ALLOWED_TYPES = { ...IMAGE_TYPES, ...VIDEO_TYPES, ...DOC_TYPES };
 
-// Лимиты по base64 (фактический файл ~ в 1.37 раза меньше).
-// ВАЖНО: запросы идут через API Gateway с лимитом тела ~3.5 МБ.
-// base64 раздувает файл на ~35%, поэтому файл должен быть ≲ 2.3 МБ,
-// иначе шлюз вернёт 413 ещё до функции (без CORS-заголовков → в браузере «CORS»).
-const MAX_IMAGE_B64 = 2.7 * 1024 * 1024;                                  // ~2 МБ файл
-const MAX_VIDEO_MB  = parseFloat(process.env.MAX_VIDEO_MB || '2.3');       // ~2.3 МБ файл (предел шлюза)
-const MAX_VIDEO_B64 = MAX_VIDEO_MB * 1.37 * 1024 * 1024;
-const MAX_DOC_MB    = parseFloat(process.env.MAX_DOC_MB || '2.3');         // ~2.3 МБ файл (предел шлюза)
-const MAX_DOC_B64   = MAX_DOC_MB * 1.37 * 1024 * 1024;
+// Лимит на файл — 7 МБ (фото сжимаются в браузере ещё до отправки).
+// Файл приходит в base64 — он длиннее файла на треть, поэтому сравниваем
+// длину строки с лимитом × 4/3. nginx пропускает тело запроса до 12 МБ.
+const MAX_FILE_MB  = parseFloat(process.env.MAX_FILE_MB || '7');
+const MAX_FILE_B64 = Math.ceil(MAX_FILE_MB * 1024 * 1024 * 4 / 3) + 1024;
 
 // POST /upload
 // Body: { data: "<base64>", contentType: "image/jpeg"|"video/mp4", folder: "avatars"|"chat"|... }
@@ -88,14 +84,11 @@ router.post('/', requireAuth, async (req, res) => {
     }
     const isVideo = !!VIDEO_TYPES[contentType];
     const isDoc   = !!DOC_TYPES[contentType];
-    const maxB64  = isVideo ? MAX_VIDEO_B64 : isDoc ? MAX_DOC_B64 : MAX_IMAGE_B64;
-    if (data.length > maxB64) {
+    if (data.length > MAX_FILE_B64) {
       return res.status(400).json({
         error: isVideo
-          ? `Видео слишком большое. Максимум ~${MAX_VIDEO_MB} МБ. Для больших видео используй ссылку ВКонтакте.`
-          : isDoc
-          ? `Файл слишком большой. Максимум ~${MAX_DOC_MB} МБ`
-          : 'Файл слишком большой. Максимум 2 МБ',
+          ? `Видео слишком большое. Максимум ${MAX_FILE_MB} МБ. Для больших видео используйте ссылку ВКонтакте или Rutube.`
+          : `Файл слишком большой. Максимум ${MAX_FILE_MB} МБ`,
       });
     }
 

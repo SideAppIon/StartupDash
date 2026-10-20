@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Стартап — Атриум</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-  <link rel="stylesheet" href="styles.css?v=10"/>
+  <link rel="stylesheet" href="styles.css?v=11"/>
   <style>
     .startup-hero{background:var(--bg2);border-bottom:1px solid var(--border);padding:calc(var(--nav-h) + 40px) 0 32px}
     .startup-hero__inner{display:flex;gap:24px;align-items:flex-start}
@@ -301,7 +301,7 @@
     </div>
     <input type="hidden" id="prodId"/>
     <div class="form-group">
-      <label class="form-label">Фото товара <span style="color:var(--text3);font-weight:400">(необязательно, до ~2 МБ)</span></label>
+      <label class="form-label">Фото товара <span style="color:var(--text3);font-weight:400">(необязательно)</span></label>
       <div style="display:flex;gap:12px;align-items:center">
         <div id="prodImgPreview" style="width:72px;height:72px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text3);overflow:hidden;flex-shrink:0">Фото</div>
         <div>
@@ -355,7 +355,7 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="api-config.js?v=16"></script>
+<script src="api-config.js?v=17"></script>
 <script>
 var startupId = getUrlParam('id');
 if (!startupId) window.location.href = 'startups.html';
@@ -433,11 +433,7 @@ onAuthReady(async function(user, userData) {
         } else if (b.type === 'image' && b.content) {
           return '<img src="' + esc(b.content) + '" style="width:100%;border-radius:var(--radius);margin-bottom:16px;display:block" onerror="this.style.display=&quot;none&quot;"/>';
         } else if (b.type === 'video' && b.content) {
-          if (/storage\.yandexcloud\.net/i.test(b.content) || /\.(mp4|webm|mov)(\?|$)/i.test(b.content)) {
-            return '<video src="' + esc(b.content) + '" controls preload="metadata" style="width:100%;max-height:360px;border-radius:var(--radius);margin-bottom:16px;background:#000;display:block"></video>';
-          }
-          return '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-bottom:16px">' +
-            '<iframe src="' + esc(b.content) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
+          return videoHtml(b.content, 'margin-bottom:16px');
         }
         return '';
       }).join('');
@@ -680,17 +676,9 @@ async function loadUpdates() {
         : '';
       // Картинка
       var imgUrl = u.imageUrl || u.image_url || '';
-      // Видео — только безопасные https-ссылки. Файл → <video>, VK → <iframe>
+      // Видео: файл → <video>, известный плеер → <iframe>, иначе — ссылка
       var vidUrl = u.videoUrl || u.video_url || '';
-      var videoHtml = '';
-      if (vidUrl && String(vidUrl).indexOf('https://') === 0) {
-        if (/storage\.yandexcloud\.net/i.test(vidUrl) || /\.(mp4|webm|mov)(\?|$)/i.test(vidUrl)) {
-          videoHtml = '<video src="' + esc(vidUrl) + '" controls preload="metadata" style="width:100%;max-height:360px;border-radius:var(--radius);margin-top:12px;display:block;background:#000"></video>';
-        } else {
-          videoHtml = '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);margin-top:12px">' +
-            '<iframe src="' + esc(vidUrl) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
-        }
-      }
+      var updVideoHtml = vidUrl ? videoHtml(vidUrl, 'margin-top:12px') : '';
       var delBtn = canDelete
         ? '<button class="btn btn--danger btn--sm" style="flex-shrink:0" data-uid="' + esc(d.id) + '" onclick="deleteUpdate(this)">Удалить</button>'
         : '';
@@ -702,7 +690,7 @@ async function loadUpdates() {
         '<div class="update-card__date">' + dateStr + '</div>' +
         '<div class="update-card__body">' + esc(text) + '</div>' +
         (imgUrl ? '<img src="' + esc(imgUrl) + '" style="width:100%;max-height:300px;object-fit:cover;border-radius:var(--radius);margin-top:12px;display:block" onerror="this.style.display=&quot;none&quot;"/>' : '') +
-        videoHtml +
+        updVideoHtml +
         '<div style="margin-top:12px">' + updateLikeBtn(u, d.id) + '</div>' +
       '</div>';
     }).join('');
@@ -1653,26 +1641,15 @@ function clearProdImage() {
   _renderProdPreview('');
 }
 
-function _readFileAsBase64(file) {
-  return new Promise(function(resolve, reject) {
-    var r = new FileReader();
-    r.onload  = function(e){ resolve(e.target.result.split(',')[1]); };
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-}
-
 async function onProdImagePick(input) {
   var file = input.files[0];
   input.value = '';
   if (!file) return;
   var status = document.getElementById('prodImgStatus');
   if (!/^image\//.test(file.type)) { status.textContent = 'Нужен файл изображения'; return; }
-  if (file.size > 2 * 1024 * 1024)  { status.textContent = 'Фото слишком большое (макс. ~2 МБ)'; return; }
   status.textContent = 'Загружаю фото...';
   try {
-    var base64 = await _readFileAsBase64(file);
-    var res = await api.post('/upload', { data: base64, contentType: file.type, folder: 'startups' });
+    var res = await uploadImage(file, 'startups', 'product');
     document.getElementById('prodImgUrl').value = res.url;
     _renderProdPreview(res.url);
     status.textContent = '✓ Фото загружено';

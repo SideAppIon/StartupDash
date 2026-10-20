@@ -142,7 +142,7 @@ function _initSupportButton() {
         '<textarea id="sfText" maxlength="4000" placeholder="Опишите вопрос подробно..." style="width:100%;min-height:120px;background:var(--bg3,#181c24);border:1px solid var(--border2,#2b323c);border-radius:10px;color:var(--text,#e8eaf0);font-size:15px;padding:11px 14px;outline:none;resize:vertical"></textarea>' +
       '</div>' +
       '<div id="sfMsg" style="font-size:13px;min-height:18px;margin:4px 0 10px"></div>' +
-      '<div style="font-size:12px;color:var(--text3,#555c72);margin-bottom:14px">Поддержка ответит вам в личных сообщениях.</div>' +
+      '<div style="font-size:12px;color:var(--text3,#555c72);margin-bottom:14px">Обращение появится в «Сообщениях» — там же будет ответ поддержки и вся история.</div>' +
       '<button type="button" id="sfSend" style="width:100%;justify-content:center;padding:12px;border:none;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600;color:#04120a;background:var(--accent,#00e676)">Отправить</button>' +
     '</div>';
 
@@ -165,12 +165,20 @@ function _initSupportButton() {
     if (!text) { msg.textContent = 'Опишите вопрос'; return; }
     btn.disabled = true; btn.textContent = 'Отправка...';
     try {
-      await api.post('/support', { subject: subj, text: text });
-      msg.style.color = 'var(--accent,#00e676)';
-      msg.textContent = '✓ Обращение отправлено! Поддержка ответит в личных сообщениях.';
+      const r = await api.post('/support', { subject: subj, text: text });
+      const convId = r && r.ticket && r.ticket.convId;
       document.getElementById('sfSubject').value = '';
       document.getElementById('sfText').value = '';
-      setTimeout(close, 1600);
+      msg.style.color = 'var(--accent,#00e676)';
+      if (convId) {
+        // Обращение уже лежит в личке с поддержкой — там же будет ответ и вся история
+        const chatUrl = 'messages.html?conv=' + encodeURIComponent(convId);
+        msg.innerHTML = '✓ Обращение отправлено. Переписка с поддержкой — в <a href="' + chatUrl + '" style="color:inherit;text-decoration:underline">Сообщениях</a>.';
+        if (/messages\.html$/.test(location.pathname)) { setTimeout(() => { location.href = chatUrl; }, 900); return; }
+      } else {
+        msg.textContent = '✓ Обращение отправлено! Поддержка ответит в личных сообщениях.';
+      }
+      setTimeout(close, 2600);
     } catch (e) {
       msg.textContent = 'Ошибка: ' + (e.message || 'не удалось отправить');
     } finally {
@@ -658,7 +666,7 @@ function isValidInn(inn) {
 }
 
 var CERT_TYPES   = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-var CERT_MAX_MB  = 2;
+var CERT_MAX_MB  = 7;
 var CERT_MAX_CNT = 5;
 
 // Проверка файла сертификата; возвращает текст ошибки или ''
@@ -680,7 +688,7 @@ function validateOrgInfo(org) {
   if (!org.logoFile && !org.logoUrl) return 'Загрузите логотип организации';
   if (org.logoFile) {
     if (LOGO_TYPES.indexOf(org.logoFile.type) === -1) return 'Логотип: нужно изображение (jpg, png, webp)';
-    if (org.logoFile.size > 2 * 1024 * 1024) return 'Логотип: файл больше 2 МБ';
+    if (org.logoFile.size > IMAGE_RAW_MAX_BYTES) return 'Логотип: файл слишком большой';
   }
   return '';
 }
@@ -707,7 +715,7 @@ async function submitRoleVerification(requestedRole, files, comment, org) {
   if (org) {
     var logoUrl = org.logoUrl || '';
     if (org.logoFile) {
-      logoUrl = (await api.post('/upload', { data: await _readFileB64(org.logoFile), contentType: org.logoFile.type, folder: 'org-logos' })).url;
+      logoUrl = (await uploadImage(org.logoFile, 'org-logos', 'logo')).url;
     }
     body.inn            = (org.inn || '').replace(/\s/g, '');
     body.legal_address  = (org.legalAddress || '').trim();
@@ -803,9 +811,171 @@ function _openNotifPopup() {
 // ── Окно подтверждения в стиле сайта (вместо системного confirm) ──
 // uiConfirm({ title, text, okText, cancelText, danger, alert }) → Promise<boolean>
 // alert: true — информационное окно с одной кнопкой (по умолчанию «Понятно»)
+// ── Загрузка файлов: лимит и сжатие картинок ──────────
+// Все файлы — до UPLOAD_MAX_MB. Фото перед отправкой уменьшаются и пересохраняются
+// в браузере (заодно удаляются EXIF-данные, в т.ч. геолокация). GIF не трогаем —
+// иначе пропадёт анимация; сертификаты для модерации грузим как есть.
+var UPLOAD_MAX_MB    = 7;
+var UPLOAD_MAX_BYTES = UPLOAD_MAX_MB * 1024 * 1024;
+var IMAGE_RAW_MAX_BYTES = 40 * 1024 * 1024; // исходник до сжатия — чтобы не повесить вкладку
+var IMAGE_PRESETS = {
+  avatar:  { max: 512,  q: 0.85 },  // аватар
+  logo:    { max: 512,  q: 0.9  },  // логотип / иконка — прозрачность сохраняем
+  product: { max: 1600, q: 0.88 },  // фото товара на витрине
+  photo:   { max: 2000, q: 0.85 }   // обложки, блоки, обновления, чат
+};
+var UPLOAD_TOO_BIG = 'Файл слишком большой (макс. ' + UPLOAD_MAX_MB + ' МБ)';
+
+function _decodeImage(file) {
+  if (window.createImageBitmap) {
+    return createImageBitmap(file, { imageOrientation: 'from-image' })
+      .catch(function(){ return createImageBitmap(file); })
+      .catch(function(){ return _decodeImageEl(file); });
+  }
+  return _decodeImageEl(file);
+}
+function _decodeImageEl(file) {
+  return new Promise(function(resolve, reject) {
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload  = function(){ URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('Не удалось открыть изображение')); };
+    img.src = url;
+  });
+}
+function _canvasToBlob(canvas, type, q) {
+  return new Promise(function(resolve){ canvas.toBlob(resolve, type, q); });
+}
+
+// Сжать картинку по пресету. Возвращает Blob (или исходный файл, если сжимать нечего).
+async function compressImage(file, preset) {
+  var p = IMAGE_PRESETS[preset] || IMAGE_PRESETS.photo;
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+    if (file.size > UPLOAD_MAX_BYTES) throw new Error(UPLOAD_TOO_BIG);
+    return file;
+  }
+  if (file.size > IMAGE_RAW_MAX_BYTES) throw new Error('Изображение слишком большое (макс. 40 МБ до сжатия)');
+  var src;
+  try { src = await _decodeImage(file); }
+  catch (e) { if (file.size > UPLOAD_MAX_BYTES) throw new Error(UPLOAD_TOO_BIG); return file; }
+  var w = src.width, h = src.height;
+  var scale = Math.min(1, p.max / Math.max(w, h));
+  var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+  var canvas = document.createElement('canvas');
+  canvas.width = cw; canvas.height = ch;
+  var ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(src, 0, 0, cw, ch);
+  if (src.close) src.close();
+
+  // JPEG-фото → JPEG; PNG / WebP (может быть прозрачность) → WebP, а если браузер не умеет — PNG
+  var out;
+  if (file.type === 'image/jpeg') {
+    out = await _canvasToBlob(canvas, 'image/jpeg', p.q);
+  } else {
+    out = await _canvasToBlob(canvas, 'image/webp', p.q);
+    if (!out || out.type !== 'image/webp') out = await _canvasToBlob(canvas, 'image/png');
+  }
+  if (!out) out = file;
+  // Картинка и так маленькая и сжатие её только раздуло — оставляем исходник
+  if (out !== file && scale === 1 && out.size >= file.size) out = file;
+  if (out.size > UPLOAD_MAX_BYTES) throw new Error(UPLOAD_TOO_BIG);
+  return out;
+}
+
+function blobToBase64(blob) {
+  return new Promise(function(resolve, reject) {
+    var r = new FileReader();
+    r.onload  = function(e) { resolve(String(e.target.result).split(',')[1]); };
+    r.onerror = function() { reject(new Error('Не удалось прочитать файл')); };
+    r.readAsDataURL(blob);
+  });
+}
+
+// Загрузить картинку со сжатием. Возвращает { url, size, type }
+async function uploadImage(file, folder, preset) {
+  var blob = await compressImage(file, preset);
+  var res = await api.post('/upload', { data: await blobToBase64(blob), contentType: blob.type, folder: folder });
+  return { url: res.url, size: blob.size, type: blob.type };
+}
+
+// Загрузить файл как есть (документ, видео, сертификат) с проверкой лимита
+async function uploadRawFile(file, folder, contentType, filename) {
+  if (file.size > UPLOAD_MAX_BYTES) throw new Error(UPLOAD_TOO_BIG);
+  var body = { data: await blobToBase64(file), contentType: contentType || file.type, folder: folder };
+  if (filename) body.filename = filename;
+  var res = await api.post('/upload', body);
+  return { url: res.url, size: file.size, type: body.contentType };
+}
+
+// ── Видео: встраиваем только известные плееры, остальное — обычной ссылкой ──
+// Загруженный файл (mp4/webm/mov) → <video>; ВК / Rutube / YouTube / OK / Vimeo → <iframe>;
+// любая другая ссылка → кликабельная ссылка (иначе вместо видео будет пустое окно).
+function isFileVideoUrl(url) {
+  return /storage\.yandexcloud\.net/i.test(url) || /\.(mp4|webm|mov)(\?|#|$)/i.test(url);
+}
+
+// Приводим ссылку к виду для встраивания, если знаем площадку. Неизвестные — как есть.
+function normalizeVideoUrl(raw) {
+  if (!raw) return '';
+  var s = String(raw).trim();
+  var iframe = s.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
+  if (iframe) s = iframe[1].trim();
+  if (/^\/\//.test(s)) s = 'https:' + s;
+  if (!/^[a-z]+:\/\//i.test(s) && /^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(s)) s = 'https://' + s;
+  s = s.replace(/^http:\/\//i, 'https://');
+  if (isFileVideoUrl(s) || /video_ext\.php/i.test(s)) return s;
+  var m;
+  if ((m = s.match(/(?:vk\.com|vkvideo\.ru|vk\.ru)\/.*video(-?\d+)_(\d+)/i)))
+    return 'https://vk.com/video_ext.php?oid=' + m[1] + '&id=' + m[2] + '&hd=2';
+  if ((m = s.match(/rutube\.ru\/(?:video|shorts)\/([0-9a-f]{20,})/i)))
+    return 'https://rutube.ru/play/embed/' + m[1];
+  if ((m = s.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/)|youtu\.be\/)([\w-]{6,})/i)))
+    return 'https://www.youtube.com/embed/' + m[1];
+  return s;
+}
+
+var VIDEO_EMBED_RE = [
+  /^https:\/\/(?:m\.)?vk\.(?:com|ru)\/video_ext\.php\?/i,
+  /^https:\/\/(?:www\.)?vkvideo\.ru\/video_ext\.php\?/i,
+  /^https:\/\/rutube\.ru\/play\/embed\//i,
+  /^https:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\//i,
+  /^https:\/\/(?:www\.)?ok\.ru\/videoembed\//i,
+  /^https:\/\/player\.vimeo\.com\/video\//i
+];
+function isEmbeddableVideo(url) {
+  return VIDEO_EMBED_RE.some(function(re){ return re.test(url); });
+}
+
+// Карточка-ссылка вместо плеера
+function videoLinkHtml(url, margin) {
+  var host = '';
+  try { host = new URL(url).hostname.replace(/^www\./, ''); } catch(e) {}
+  return '<a href="' + esc(url) + '" target="_blank" rel="noopener nofollow" class="video-link" style="' + (margin || '') + '">' +
+    '<span class="video-link__icon">▶</span>' +
+    '<span class="video-link__meta"><span class="video-link__title">Смотреть видео' + (host ? ' на ' + esc(host) : '') + '</span>' +
+    '<span class="video-link__url">' + esc(url) + '</span></span></a>';
+}
+
+// HTML видео. margin — CSS отступа, например 'margin-top:12px'
+function videoHtml(rawUrl, margin) {
+  var url = normalizeVideoUrl(rawUrl);
+  if (!/^https?:\/\//i.test(url)) return '';
+  margin = margin || '';
+  if (isFileVideoUrl(url)) {
+    // Если файл не открылся — показываем ссылку
+    return '<video src="' + esc(url) + '" controls preload="metadata" data-url="' + esc(url) + '" data-margin="' + esc(margin) + '" ' +
+      'onerror="this.outerHTML=videoLinkHtml(this.dataset.url,this.dataset.margin)" ' +
+      'style="width:100%;max-height:360px;border-radius:var(--radius);display:block;background:#000;' + margin + '"></video>';
+  }
+  if (isEmbeddableVideo(url)) {
+    return '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:var(--radius);' + margin + '">' +
+      '<iframe src="' + esc(url) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>';
+  }
+  return videoLinkHtml(url, margin);
+}
+
 // ── Вложения в чатах (личка и проектный чат) ─────────
 // Картинки уходят сообщением type:'image', документы — type:'file' с JSON {url,name,size}.
-var CHAT_FILE_MAX = 2 * 1024 * 1024;
 var CHAT_FILE_TYPES = {
   jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp',
   pdf:'application/pdf', doc:'application/msword',
@@ -828,15 +998,11 @@ async function uploadChatAttachment(file) {
   var ext = (file.name.split('.').pop() || '').toLowerCase();
   var ct = CHAT_FILE_TYPES[ext];
   if (!ct) throw new Error('Такой тип файла не поддерживается. Можно: фото, PDF, Word, Excel, PowerPoint, TXT, CSV, ZIP');
-  if (file.size > CHAT_FILE_MAX) throw new Error('Файл слишком большой (макс. 2 МБ)');
-  var base64 = await new Promise(function(resolve, reject) {
-    var r = new FileReader();
-    r.onload = function(e) { resolve(e.target.result.split(',')[1]); };
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-  var res = await api.post('/upload', { data: base64, contentType: ct, folder: 'chat' });
-  if (ct.indexOf('image/') === 0) return { text: res.url, type: 'image' };
+  if (ct.indexOf('image/') === 0) {
+    var img = await uploadImage(file, 'chat', 'photo');
+    return { text: img.url, type: 'image' };
+  }
+  var res = await uploadRawFile(file, 'chat', ct);
   return { text: JSON.stringify({ url: res.url, name: file.name, size: file.size }), type: 'file' };
 }
 
